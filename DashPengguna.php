@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Dashboard — SportField</title>
-    <link rel="stylesheet" href="dashboard.css" />
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
@@ -212,6 +212,6 @@
       </div>
     </div>
 
-    <script src="dashboard.js"></script>
+    <script src="assets/js/dashboard.js"></script>
   </body>
 </html>
