@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SportField - Daftar</title>
+    <title>Daftar</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -57,17 +57,15 @@
     <div class="w-full max-w-2xl">
       <!-- Logo -->
       <div class="text-center mb-8">
-        <a href="index.html" class="inline-flex items-center gap-3 mb-6">
-          <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center text-white shadow-lg">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white" />
-            </svg>
+        <a href="index.php" class="inline-flex items-center gap-3 mb-6">
+          <div class="w-14 h-14 rounded-xl bg-white flex items-center justify-center text-white shadow-lg">
+            <img src="assets/images/LogoRush.png" alt="SportField Logo" class="w-14 h-14 object-contain rounded-xl shadow-md">
           </div>
           <div>
-            <div class="font-poppins font-semibold text-2xl text-gray-900">SportField</div>
-            <div class="text-sm text-gray-500 -mt-0.5">Booking Lapangan</div>
-          </div>
-        </a>
+        <div class="font-poppins font-semibold text-lg leading-tight">Rush Badminton Academy</div>
+        <div class="text-xs text-slate-500 -mt-0.5">Booking Lapangan Online</div>
+    </div>
+</a>
       </div>
 
       <!-- Register Card -->
@@ -170,7 +168,7 @@
         <div class="text-center mt-6 pt-6 border-t border-gray-200">
           <p class="text-gray-600">
             Sudah punya akun?
-            <a href="login.html" class="text-primary font-semibold hover:text-primaryDark transition-colors">Masuk di sini</a>
+            <a href="login.php" class="text-primary font-semibold hover:text-primaryDark transition-colors">Masuk di sini</a>
           </p>
         </div>
       </div>

@@ -1,11 +1,13 @@
 <?php
 ob_start(); 
 require_once __DIR__ . '/../config/database.php';
+// ... (Bagian include header, topbar, sidebar tetap sama) ...
 include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  // Pengambilan dan Sanitasi Data
   $nama = mysqli_real_escape_string($conn, $_POST['nama_lapangan']);
   $tipe = mysqli_real_escape_string($conn, $_POST['tipe']);
   $harga = floatval($_POST['harga_per_jam']);
@@ -13,23 +15,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $deskripsi = mysqli_real_escape_string($conn, $_POST['deskripsi']);
   $status = mysqli_real_escape_string($conn, $_POST['status']);
 
-  // Upload foto
+  // --- LOGIKA UPLOAD FOTO OTOMATIS ---
   $fotoName = null;
-  if (!empty($_FILES['foto']['name'])) {
-    $uploadDir = "../uploads/lapangan/";
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+  // Periksa apakah file 'foto' berhasil diunggah dan tidak kosong
+  if (isset($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
+    $uploadDir = "../assets/images/"; // Ganti path dari ../uploads/lapangan/ ke path yang digunakan di booking.php
+    
+    // Pastikan direktori ada
+    if (!is_dir($uploadDir)) {
+        // Coba buat direktori jika belum ada
+        if (!mkdir($uploadDir, 0777, true)) {
+            $_SESSION['toast_error'] = "Gagal membuat direktori upload: " . $uploadDir;
+            header("Location: lapangan.php");
+            exit;
+        }
+    }
 
-    $ext = pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION);
+    $file = $_FILES['foto'];
+    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+    
+    // Buat nama file unik: lap_timestamp.ekstensi
     $fotoName = "lap_" . time() . "." . strtolower($ext);
-    move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $fotoName);
+    $targetFile = $uploadDir . $fotoName;
+
+    // Pindahkan file dari lokasi sementara ke folder tujuan (otomatisasi)
+    if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
+        $_SESSION['toast_error'] = "Gagal memindahkan file yang diunggah. Cek izin folder.";
+        // Di sini kita bisa memilih untuk melanjutkan tanpa foto atau menghentikan proses
+        $fotoName = null; 
+    }
   }
 
-  // Simpan ke database
+  // --- SIMPAN KE DATABASE ---
   $query = "
     INSERT INTO lapangan 
       (nama_lapangan, tipe, harga_per_jam, deskripsi, harga_member, foto, status, created_at) 
     VALUES 
-      ('$nama', '$tipe', '$harga', '$deskripsi', '$harga_member', '$fotoName', '$status', NOW())
+      ('$nama', '$tipe', '$harga', '$deskripsi', '$harga_member', " . ($fotoName ? "'$fotoName'" : "NULL") . ", '$status', NOW())
   ";
 
   if (mysqli_query($conn, $query)) {
@@ -38,6 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   } else {
     $_SESSION['toast_error'] = "Gagal menambahkan data lapangan: " . mysqli_error($conn);
+    // Hapus file yang sudah terlanjur diupload jika query gagal (opsional tapi baik)
+    if ($fotoName && file_exists($targetFile)) {
+        unlink($targetFile);
+    }
   }
 }
 ?>
@@ -62,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           <div class="card-body">
             <div class="row">
-              <!-- Nama Lapangan -->
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Nama Lapangan <span class="text-danger">*</span></label>
@@ -70,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
 
-              <!-- Tipe Lapangan -->
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Tipe Lapangan</label>
@@ -83,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
 
-              <!-- Harga Umum -->
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Harga Sewa / Jam (Umum) <span class="text-danger">*</span></label>
@@ -91,7 +114,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
 
-              <!-- Harga Member -->
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Harga Sewa / Jam (Member)</label>
@@ -99,7 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
 
-              <!-- Deskripsi -->
               <div class="col-md-12">
                 <div class="form-group">
                   <label>Deskripsi / Catatan</label>
@@ -107,7 +128,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
 
-              <!-- Foto -->
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Upload Foto Lapangan</label>
@@ -116,7 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
 
-              <!-- Status -->
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Status</label>
