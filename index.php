@@ -58,11 +58,9 @@
       <div class="max-w-7xl mx-auto px-4">
         <nav class="flex items-center justify-between h-20">
           <!-- Logo -->
-          <a href="index.html" class="flex items-center gap-3">
-            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center text-white shadow-lift transform transition-all duration-500 hover:scale-110">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white" />
-              </svg>
+          <a href="index.php" class="flex items-center gap-3">
+            <div class="w-14 h-14 flex items-center justify-center transform transition-all duration-500 hover:scale-110">
+              <img src="uploads/images/LogoRush.png" alt="SportField Logo" class="w-14 h-14 object-contain rounded-xl shadow-md">
             </div>
             <div>
               <div class="font-poppins font-semibold text-lg leading-tight">SportField</div>
@@ -77,7 +75,7 @@
                 <a href="#home" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Beranda</a>
               </li>
               <li>
-                <a href="#facilities" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a>
+                <a href="/BookingLapanganKel2/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a>
               </li>
               <li>
                 <a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a>
@@ -190,7 +188,7 @@
           <div class="lg:w-5/12" data-aos="fade-left">
             <div class="rounded-2xl bg-white shadow-lift overflow-hidden transform transition hover:scale-105 duration-300">
               <div class="relative">
-                <img src="assets/hero-preview.jpg" alt="Preview Lapangan SportField" class="w-full h-64 md:h-80 object-cover" />
+                <img src="uploads/images/semuaLP.jpg" alt="Preview Lapangan SportField" class="w-full h-64 md:h-80 object-cover" />
                 <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 <div class="absolute top-4 left-4">
                   <span class="inline-block px-3 py-1 rounded-full text-xs bg-accent text-white font-semibold animate-pulse">⭐ Populer</span>
@@ -238,7 +236,7 @@
           <!-- Futsal A -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="100">
             <div class="relative">
-              <img src="assets/lap1.jpg" alt="Lapangan Futsal A - Sintetis Premium" class="w-full h-56 object-cover" />
+              <img src="uploads/images/lapangan1.jpg" alt="Lapangan Futsal A - Sintetis Premium" class="w-full h-56 object-cover" />
               <div class="absolute left-4 top-4 bg-white/90 text-primary px-3 py-2 rounded-lg font-semibold text-sm shadow-soft">Rp 150.000 / jam</div>
               <div class="absolute right-4 top-4">
                 <span class="bg-accent text-white text-xs px-3 py-1 rounded-full font-semibold">🔥 Best Seller</span>
@@ -265,7 +263,7 @@
           <!-- Futsal B -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="150">
             <div class="relative">
-              <img src="assets/lap2.jpg" alt="Lapangan Futsal B - Vinyl Anti Slip" class="w-full h-56 object-cover" />
+              <img src="uploads/images/lapangan2.jpg" alt="Lapangan Futsal B - Vinyl Anti Slip" class="w-full h-56 object-cover" />
               <div class="absolute left-4 top-4 bg-white/90 text-primary px-3 py-2 rounded-lg font-semibold text-sm shadow-soft">Rp 120.000 / jam</div>
             </div>
             <div class="p-6">
@@ -288,7 +286,7 @@
           <!-- Badminton -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="200">
             <div class="relative">
-              <img src="assets/lap3.jpg" alt="Lapangan Badminton - Standard Intl" class="w-full h-56 object-cover" />
+              <img src="uploads/images/lapangan3.jpg" alt="Lapangan Badminton - Standard Intl" class="w-full h-56 object-cover" />
               <div class="absolute left-4 top-4 bg-white/90 text-primary px-3 py-2 rounded-lg font-semibold text-sm shadow-soft">Rp 80.000 / jam</div>
             </div>
             <div class="p-6">
@@ -311,7 +309,7 @@
           <!-- Basket -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="250">
             <div class="relative">
-              <img src="assets/lap4.jpg" alt="Lapangan Basket - Full Court Indoor" class="w-full h-56 object-cover" />
+              <img src="uploads/images/lapangan4.jpg" alt="Lapangan Basket - Full Court Indoor" class="w-full h-56 object-cover" />
               <div class="absolute left-4 top-4 bg-white/90 text-primary px-3 py-2 rounded-lg font-semibold text-sm shadow-soft">Rp 200.000 / jam</div>
             </div>
             <div class="p-6">
@@ -323,7 +321,6 @@
                 <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🏟️ Full Court</span>
                 <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🔊 Sound System</span>
               </div>
-
               <div class="flex gap-3">
                 <button class="flex-1 btn-outline py-3" onclick="showFieldDetail('basket')">Detail</button>
                 <button class="flex-1 btn-primary py-3" onclick="handleBookingClick('Basket',200000)">Booking</button>
