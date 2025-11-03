@@ -7,7 +7,6 @@ include('../includes/sidebar.php');
 ?>
 
 <div class="content-wrapper">
-  <!-- Header -->
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-futbol mr-2"></i> Data Lapangan</h1>
@@ -17,7 +16,6 @@ include('../includes/sidebar.php');
     </div>
   </section>
 
-  <!-- Konten Utama -->
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-sm">
@@ -48,7 +46,11 @@ include('../includes/sidebar.php');
               $query = mysqli_query($conn, "SELECT * FROM lapangan ORDER BY id_lapangan DESC");
 
               while ($r = mysqli_fetch_assoc($query)):
-                $fotoPath = !empty($r['foto']) ? "../uploads/lapangan/" . htmlspecialchars($r['foto']) : "../assets/img/no-image.png";
+                // PERBAIKAN PATH DISINI: Mengganti ../uploads/lapangan/ menjadi ../assets/images/
+                $fotoPath = !empty($r['foto']) 
+                    ? "../assets/images/" . htmlspecialchars($r['foto']) 
+                    : "../assets/img/no-image.png";
+                    
                 $statusBadge = ($r['status'] === 'aktif')
                   ? '<span class="badge bg-success"><i class="fas fa-check-circle mr-1"></i>Aktif</span>'
                   : '<span class="badge bg-secondary"><i class="fas fa-ban mr-1"></i>Nonaktif</span>';
