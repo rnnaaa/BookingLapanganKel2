@@ -1,3 +1,7 @@
+<?php
+session_start();
+date_default_timezone_set('Asia/Jakarta');
+?>
 <!DOCTYPE html>
 <html lang="id">
   <head>
@@ -7,7 +11,6 @@
     <meta name="keywords" content="booking lapangan, futsal, badminton, basket, olahraga, sportfield" />
     <title>Rush Badminton</title>
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -36,7 +39,6 @@
       };
     </script>
 
-    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
 
     <style>
@@ -50,14 +52,72 @@
       html {
         scroll-behavior: smooth;
       }
+      
+      /* ---------------- Sidebar Keranjang (CSS dari booking.php) ---------------- */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        right: -420px;
+        width: 380px;
+        height: 100vh;
+        background: #fff;
+        box-shadow: -10px 0 30px rgba(10,10,20,0.12);
+        transition: right 0.38s cubic-bezier(.2,.9,.2,1);
+        display: flex;
+        flex-direction: column;
+        z-index: 2000;
+        border-left: 1px solid #f1f3f5;
+      }
+      .sidebar.active { right: 0; }
+      .sidebar-header { padding: 18px; border-bottom: 1px solid #f3f4f6; display:flex; align-items:center; justify-content:space-between; }
+      .sidebar-body { padding: 14px; overflow-y: auto; flex: 1; }
+      .sidebar-footer { padding: 14px; border-top: 1px solid #f3f4f6; }
+      .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #475569;}
+      .keranjang-item { display:flex; justify-content:space-between; gap:10px; padding:10px 0; align-items:center; border-bottom:1px solid #f3f4f6;}
+      .keranjang-item .left { flex:1; }
+      .keranjang-item .right { text-align:right; min-width:90px; }
+      .checkout-btn { width:100%; padding:10px 12px; border-radius:8px; background:#0b63d6; color:#fff; font-weight:600; border:none; cursor:pointer; }
+      .checkout-btn:disabled { opacity:0.5; cursor:not-allowed; }
+      
+      @media (max-width: 640px) {
+        .sidebar { width: 100%; right: -100%; }
+        .sidebar.active { right: 0; }
+      }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   </head>
   <body class="bg-softGray text-slate-900 antialiased">
-    <!-- HEADER / NAVIGATION -->
+
+    <div id="sidebarKeranjang" class="sidebar <?= (isset($_SESSION['show_sidebar']) && $_SESSION['show_sidebar']) ? 'active' : '' ?>">
+      <div class="sidebar-header">
+        <h4 class="font-poppins font-semibold">JADWAL DIPILIH</h4>
+        <button id="closeSidebar" class="close-btn" aria-label="Tutup">&times;</button>
+      </div>
+      <div class="sidebar-body" id="keranjangList">
+        <?php if (empty($_SESSION['keranjang'] ?? [])): ?>
+          <p class="text-slate-400">Belum ada jadwal di keranjang.</p>
+        <?php else: ?>
+          <?php foreach ($_SESSION['keranjang'] as $i => $it): ?>
+            <div class="keranjang-item" data-index="<?= $i ?>">
+              <div class="left">
+                <div class="text-sm font-semibold"><?= htmlspecialchars($it['jam']) ?></div>
+                <div class="text-xs text-slate-500"><?= date('d M Y', strtotime($it['tanggal'])) ?></div>
+                </div>
+              <div class="right">
+                <div class="text-sm font-semibold">Rp <?= number_format($it['harga'],0,',','.') ?></div>
+                <button class="text-xs mt-2 text-red-600 remove-item-btn" data-index="<?= $i ?>" style="background:none;border:none;cursor:pointer;">Hapus</button>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+      <div class="sidebar-footer">
+        <button id="checkoutBtn" class="checkout-btn" <?= empty($_SESSION['keranjang'] ?? []) ? 'disabled' : '' ?>>Checkout</button>
+      </div>
+    </div>
     <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-md">
       <div class="max-w-7xl mx-auto px-4">
         <nav class="flex items-center justify-between h-20">
-          <!-- Logo -->
           <a href="index.php" class="flex items-center gap-3">
             <div class="w-14 h-14 flex items-center justify-center transform transition-all duration-500 hover:scale-110">
               <img src="assets/images/LogoRush.png" alt="SportField Logo" class="w-14 h-14 object-contain rounded-xl shadow-md">
@@ -68,7 +128,6 @@
             </div>
           </a>
 
-          <!-- Desktop Navigation -->
           <div class="hidden lg:flex flex-1 justify-center">
             <ul id="topNav" class="flex gap-8 items-end">
               <li>
@@ -86,25 +145,32 @@
               <li>
                 <a href="about.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a>
               </li>
-            </ul>
+              
+              <li>
+                <div id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer mr-2" title="Lihat Keranjang">
+                    <i class="fa-solid fa-cart-shopping text-lg"></i>
+                    <span id="cartCount"
+                          class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-semibold rounded-full px-1.5 py-0.5">
+                      <?= count($_SESSION['keranjang'] ?? []) ?>
+                    </span>
+                </div>
+              </li>
+              </ul>
           </div>
 
-          <!-- Auth Buttons (Desktop) -->
-          <div class="hidden md:flex items-center gap-3">
-            <!-- TOMBOL MASUK -->
+          <div class="hidden md:flex items-center gap-3"> 
+            
             <a href="login.php" 
               class="border border-primary text-primary px-4 py-2 rounded-lg text-sm hover:bg-primary hover:text-white transition-all duration-300">
               Masuk
             </a>
             
-            <!-- TOMBOL DAFTAR -->
             <a href="register.php" 
               class="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-primaryDark transition-all duration-300">
               Daftar
             </a>
           </div>
 
-          <!-- Mobile Menu Toggle -->
           <div class="lg:hidden">
             <button id="mobileBtn" class="p-2 rounded-md hover:bg-slate-100 focus:outline-none transition-colors">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -115,7 +181,6 @@
         </nav>
       </div>
 
-      <!-- Navigation Indicator (Desktop) -->
       <div class="hidden lg:block">
         <div id="navIndicator" class="mx-auto max-w-7xl px-4">
           <div class="h-0.5 bg-transparent relative">
@@ -125,7 +190,6 @@
       </div>
     </header>
 
-    <!-- Mobile Navigation Menu -->
     <div id="mobileNav" class="lg:hidden hidden bg-white border-t border-slate-100 shadow-lg">
       <div class="px-4 py-4 flex flex-col gap-2">
         <a href="#home" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors active">Beranda</a>
@@ -140,17 +204,13 @@
       </div>
     </div>
 
-    <!-- MAIN CONTENT -->
     <main>
-      <!-- HERO SECTION -->
       <section class="relative overflow-hidden bg-gradient-to-r from-primary to-primaryDark text-white">
-        <!-- Background Ornaments -->
         <div class="absolute top-10 left-10 w-20 h-20 bg-accent/20 rounded-full animate-pulse-slow"></div>
         <div class="absolute bottom-10 right-10 w-32 h-32 bg-white/10 rounded-full animate-bounce-slow"></div>
         <div class="absolute top-1/2 left-1/4 w-16 h-16 bg-accent/30 rounded-full animate-pulse"></div>
 
         <div class="max-w-7xl mx-auto px-4 py-20 lg:py-28 flex flex-col lg:flex-row items-center gap-12 relative z-10">
-          <!-- Hero Content -->
           <div class="lg:w-7/12" data-aos="fade-right">
             <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-4 py-2 text-sm font-semibold mb-6 animate-pulse">
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -163,7 +223,6 @@
 
             <p class="text-lg md:text-xl text-white/90 max-w-2xl mb-8">Pilih lapangan, cek slot tersedia, dan konfirmasi. Sistem memudahkan latihan harian hingga event—semua transparan dan aman.</p>
 
-            <!-- Call to Action Buttons -->
             <div class="flex flex-wrap gap-4 mb-8">
               <a href="#lapangan" class="btn-primary btn-lg transform transition hover:scale-105 hover:shadow-lg">Lihat Lapangan</a>
               <button class="btn-outline btn-lg transform transition hover:scale-105" onclick="scrollToSection('penawaran')">Penawaran Spesial</button>
@@ -176,7 +235,6 @@
               </button>
             </div>
 
-            <!-- Quick Stats -->
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-md">
               <div class="bg-white/20 rounded-xl p-4 text-center backdrop-blur shadow-soft hover:scale-105 transition-transform duration-300">
                 <div class="text-xs opacity-90">Lapangan</div>
@@ -193,7 +251,6 @@
             </div>
           </div>
 
-          <!-- Hero Image/Preview -->
           <div class="lg:w-5/12" data-aos="fade-left">
             <div class="rounded-2xl bg-white shadow-lift overflow-hidden transform transition hover:scale-105 duration-300">
               <div class="relative">
@@ -218,7 +275,6 @@
               </div>
             </div>
 
-            <!-- Additional Stats -->
             <div class="mt-6 grid grid-cols-2 gap-4">
               <div class="bg-white/20 rounded-xl p-4 text-center backdrop-blur shadow-soft">
                 <div class="text-xs opacity-90">Rating Pengguna</div>
@@ -233,7 +289,6 @@
         </div>
       </section>
 
-      <!-- LAPANGAN SECTION -->
       <section id="lapangan" class="max-w-7xl mx-auto px-4 py-20" data-aos="fade-up">
         <div class="text-center mb-12">
           <h2 class="text-4xl font-poppins font-bold mb-4">Lapangan Kami</h2>
@@ -242,7 +297,6 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <!-- Futsal A -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="100">
             <div class="relative">
               <img src="assets/images/lapangan1.jpg" alt="Lapangan Futsal A - Sintetis Premium" class="w-full h-56 object-cover" />
@@ -255,7 +309,6 @@
               <h3 class="font-semibold text-xl mb-2">Futsal A - Sintetis Premium</h3>
               <p class="text-slate-600 mb-4">Lapangan rumput sintetis terbaik dengan drainage & pencahayaan turnamen.</p>
 
-              <!-- Facilities Icons -->
               <div class="flex gap-2 mb-4">
                 <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">⚽ Futsal</span>
                 <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">💡 LED</span>
@@ -269,7 +322,6 @@
             </div>
           </article>
 
-          <!-- Futsal B -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="150">
             <div class="relative">
               <img src="assets/images/lapangan2.jpg" alt="Lapangan Futsal B - Vinyl Anti Slip" class="w-full h-56 object-cover" />
@@ -292,7 +344,6 @@
             </div>
           </article>
 
-          <!-- Badminton -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="200">
             <div class="relative">
               <img src="assets/images/lapangan3.jpg" alt="Lapangan Badminton - Standard Intl" class="w-full h-56 object-cover" />
@@ -315,7 +366,6 @@
             </div>
           </article>
 
-          <!-- Basket -->
           <article class="card-lapangan bg-white rounded-2xl shadow-soft overflow-hidden hover:shadow-lift transform transition hover:scale-105 duration-300" data-aos="zoom-in" data-aos-delay="250">
             <div class="relative">
               <img src="assets/images/lapangan4.jpg" alt="Lapangan Basket - Full Court Indoor" class="w-full h-56 object-cover" />
@@ -339,12 +389,10 @@
         </div>
       </section>
 
-      <!-- FIELD DETAIL SECTION (akan ditampilkan saat klik Detail) -->
       <section id="fieldDetail" class="hidden max-w-7xl mx-auto px-4 py-12 bg-white rounded-2xl shadow-soft mb-12">
         <div id="fieldDetailContent"></div>
       </section>
 
-      <!-- PENAWARAN SECTION -->
       <section id="penawaran" class="py-20 bg-white" data-aos="fade-up">
         <div class="max-w-7xl mx-auto px-4">
           <div class="text-center mb-12">
@@ -353,7 +401,6 @@
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Membership Weekend -->
             <div class="p-8 bg-gradient-to-br from-primary to-primaryDark text-white rounded-2xl shadow-lift transform transition hover:scale-105 duration-300">
               <div class="flex items-start gap-6 mb-6">
                 <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">👑</div>
@@ -373,7 +420,6 @@
               </div>
             </div>
 
-            <!-- Promo Event -->
             <div class="p-8 bg-white rounded-2xl shadow-soft border border-slate-100 transform transition hover:scale-105 duration-300">
               <div class="flex items-start gap-6 mb-6">
                 <div class="w-16 h-16 rounded-2xl bg-yellow-100 flex items-center justify-center text-2xl">🎯</div>
@@ -393,7 +439,6 @@
               </div>
             </div>
 
-            <!-- Paket Reguler -->
             <div class="p-8 bg-white rounded-2xl shadow-soft border border-slate-100 transform transition hover:scale-105 duration-300">
               <div class="flex items-start gap-6 mb-6">
                 <div class="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center text-2xl">💎</div>
@@ -416,7 +461,6 @@
         </div>
       </section>
 
-      <!-- FASILITAS SECTION -->
       <section id="fasilitas" class="py-20 bg-softGray" data-aos="fade-up">
         <div class="max-w-7xl mx-auto px-4">
           <div class="text-center mb-12">
@@ -457,7 +501,6 @@
         </div>
       </section>
 
-      <!-- TESTIMONIAL SECTION -->
       <section id="testimoni" class="py-20 bg-white" data-aos="fade-up">
         <div class="max-w-7xl mx-auto px-4">
           <div class="text-center mb-12">
@@ -503,7 +546,6 @@
         </div>
       </section>
 
-      <!-- FAQ SECTION -->
       <section id="faq" class="py-12 bg-white" data-aos="fade-up">
         <div class="max-w-3xl mx-auto px-4">
           <h3 class="text-3xl font-poppins font-semibold text-center mb-6">Pertanyaan Umum</h3>
@@ -524,7 +566,6 @@
         </div>
       </section>
 
-      <!-- CTA SECTION -->
       <section class="py-12 bg-gradient-to-r from-primary to-primaryDark text-white">
         <div class="max-w-7xl mx-auto px-4 text-center">
           <h3 class="text-3xl font-poppins font-bold">Siap booking? Amankan jadwalmu sekarang juga</h3>
@@ -536,7 +577,6 @@
       </section>
     </main>
 
-    <!-- FOOTER -->
     <footer class="bg-white border-t border-slate-100">
       <div class="max-w-7xl mx-auto px-4 py-10">
         <div class="grid md:grid-cols-3 gap-6">
@@ -564,8 +604,6 @@
       </div>
     </footer>
 
-    <!-- MODALS -->
-    <!-- LOGIN MODAL -->
     <div class="modal-backdrop hidden" id="loginModal">
       <div class="modal-panel">
         <div class="modal-header">
@@ -585,7 +623,6 @@
       </div>
     </div>
 
-    <!-- REGISTER MODAL -->
     <div class="modal-backdrop hidden" id="registerModal">
       <div class="modal-panel">
         <div class="modal-header">
@@ -605,7 +642,6 @@
       </div>
     </div>
 
-    <!-- MEMBER MODAL -->
     <div class="modal-backdrop hidden" id="memberModal">
       <div class="modal-panel">
         <div class="modal-header">
@@ -626,7 +662,6 @@
       </div>
     </div>
 
-    <!-- BOOKING MODAL -->
     <div class="modal-backdrop hidden" id="bookingModal">
       <div class="modal-panel">
         <div class="modal-header">
@@ -649,9 +684,11 @@
       </div>
     </div>
 
-    <!-- SCRIPTS -->
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
     <script src="js/app.js"></script>
+    
+    <script src="assets/js/booking-script.js"></script>
+
     <script>
       // Initialize AOS (Animate On Scroll)
       AOS.init({

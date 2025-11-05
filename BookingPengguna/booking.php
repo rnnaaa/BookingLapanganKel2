@@ -10,6 +10,98 @@ if (!isset($_SESSION['id_user'])) {
 }
 $user_id = $_SESSION['id_user'];
 
+// ------------------ BACKEND ENDPOINT UNTUK CART (AJAX) ------------------
+// Actions:
+// - add_to_cart : tambah item ke $_SESSION['keranjang']
+// - remove_from_cart : hapus item berdasarkan index
+// - clear_cart : kosongkan keranjang (opsional)
+// Response JSON
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    if ($action === 'add_to_cart') {
+        $id_jadwal_waktu = isset($_POST['id_jadwal_waktu']) ? (int)$_POST['id_jadwal_waktu'] : 0;
+        $id_lapangan = isset($_POST['id_lapangan']) ? (int)$_POST['id_lapangan'] : 0;
+        $tanggal = $_POST['tanggal'] ?? '';
+        $jam = $_POST['jam'] ?? '';
+        $harga = isset($_POST['harga']) ? (float)$_POST['harga'] : 0.0;
+
+        // Validasi minimal
+        if (!$id_jadwal_waktu || !$tanggal || !$jam) {
+            echo json_encode(['status' => 'error', 'message' => 'Data slot tidak lengkap.']);
+            exit;
+        }
+
+        // Inisialisasi keranjang
+        if (!isset($_SESSION['keranjang']) || !is_array($_SESSION['keranjang'])) {
+            $_SESSION['keranjang'] = [];
+        }
+
+        // Cek duplikat (sama id_jadwal_waktu & tanggal)
+        $duplicate = false;
+        foreach ($_SESSION['keranjang'] as $it) {
+            if ((int)$it['id_jadwal_waktu'] === $id_jadwal_waktu && $it['tanggal'] === $tanggal) {
+                $duplicate = true;
+                break;
+            }
+        }
+        if ($duplicate) {
+            echo json_encode(['status' => 'error', 'message' => 'Slot sudah ada di keranjang.', 'count' => count($_SESSION['keranjang'])]);
+            exit;
+        }
+
+        // Optional: cek apakah slot sudah dipesan di DB (safety)
+        $check_q = "SELECT 1 FROM detail_booking db JOIN booking b ON db.id_booking = b.id_booking WHERE db.id_jadwal_waktu = ? AND b.tanggal = ? AND b.status IN ('disetujui','menunggu')";
+        $stmt = mysqli_prepare($conn, $check_q);
+        if ($stmt) {
+            mysqli_stmt_bind_param($stmt, "is", $id_jadwal_waktu, $tanggal);
+            mysqli_stmt_execute($stmt);
+            $res = mysqli_stmt_get_result($stmt);
+            if ($row = mysqli_fetch_assoc($res)) {
+                echo json_encode(['status' => 'error', 'message' => 'Slot sudah dibooking oleh orang lain.']);
+                exit;
+            }
+        }
+
+        // Tambah ke session
+        $_SESSION['keranjang'][] = [
+            'id_jadwal_waktu' => $id_jadwal_waktu,
+            'id_lapangan' => $id_lapangan,
+            'tanggal' => $tanggal,
+            'jam' => $jam,
+            'harga' => $harga
+        ];
+
+        echo json_encode(['status' => 'ok', 'message' => 'Slot ditambahkan ke keranjang.', 'count' => count($_SESSION['keranjang'])]);
+        exit;
+    }
+
+    if ($action === 'remove_from_cart') {
+        $index = isset($_POST['index']) ? (int)$_POST['index'] : -1;
+        if (isset($_SESSION['keranjang'][$index])) {
+            array_splice($_SESSION['keranjang'], $index, 1);
+            echo json_encode(['status' => 'ok', 'message' => 'Item dihapus.', 'count' => count($_SESSION['keranjang'])]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Index tidak ditemukan.']);
+        }
+        exit;
+    }
+
+    if ($action === 'clear_cart') {
+        $_SESSION['keranjang'] = [];
+        echo json_encode(['status' => 'ok', 'message' => 'Keranjang dikosongkan.', 'count' => 0]);
+        exit;
+    }
+
+    // default
+    echo json_encode(['status' => 'error', 'message' => 'Aksi tidak dikenali.']);
+    exit;
+}
+// ------------------ AKHIR ENDPOINT CART --------------------------------
+
 // --- PARAMETER ---
 $selected_lapangan = (int)($_GET['lapangan'] ?? 0);
 
@@ -123,7 +215,7 @@ foreach ($jadwal_list as $jadwal) {
     }
 }
 
-// PROSES BOOKING (Logika Anda sudah benar)
+// PROSES BOOKING (LOGIKA LAMA) - tetap dipertahankan jika form lama digunakan
 $message = '';
 if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     $jadwal_id = (int)$_POST['jadwal_id'];
@@ -284,10 +376,101 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     .message-box.info {
       @apply bg-primary-light text-primary border-primary/20; /* Aksen Biru */
     }
-    
+
+    /* ---------------- Sidebar Keranjang ---------------- */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -420px;
+      width: 380px;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -10px 0 30px rgba(10,10,20,0.12);
+      transition: right 0.38s cubic-bezier(.2,.9,.2,1);
+      display: flex;
+      flex-direction: column;
+      z-index: 2000;
+      border-left: 1px solid #f1f3f5;
+    }
+    .sidebar.active { right: 0; }
+    .sidebar-header { padding: 18px; border-bottom: 1px solid #f3f4f6; display:flex; align-items:center; justify-content:space-between; }
+    .sidebar-body { padding: 14px; overflow-y: auto; flex: 1; }
+    .sidebar-footer { padding: 14px; border-top: 1px solid #f3f4f6; }
+    .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #475569;}
+    .keranjang-item { display:flex; justify-content:space-between; gap:10px; padding:10px 0; align-items:center; border-bottom:1px solid #f3f4f6;}
+    .keranjang-item .left { flex:1; }
+    .keranjang-item .right { text-align:right; min-width:90px; }
+    .checkout-btn { width:100%; padding:10px 12px; border-radius:8px; background:#0b63d6; color:#fff; font-weight:600; border:none; cursor:pointer; }
+    .checkout-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+    /* cart icon */
+    .cart-icon {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #0b63d6;
+      color: white;
+      border-radius: 999px;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      z-index: 2100;
+    }
+    .cart-count {
+      position:absolute;
+      top: 8px;
+      right: 8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 999px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-weight:600;
+    }
+
+    /* small responsive fix */
+    @media (max-width: 640px) {
+      .sidebar { width: 100%; right: -100%; }
+      .sidebar.active { right: 0; }
+    }
+
   </style>
 </head>
+
 <body class="bg-softGray text-slate-900 antialiased">
+ <!-- Sidebar Keranjang -->
+ <div id="sidebarKeranjang" class="sidebar <?= (isset($_SESSION['show_sidebar']) && $_SESSION['show_sidebar']) ? 'active' : '' ?>">
+   <div class="sidebar-header">
+     <h4 class="font-poppins font-semibold">JADWAL DIPILIH</h4>
+     <button id="closeSidebar" class="close-btn" aria-label="Tutup">&times;</button>
+   </div>
+   <div class="sidebar-body" id="keranjangList">
+     <?php if (empty($_SESSION['keranjang'] ?? [])): ?>
+       <p class="text-slate-400">Belum ada jadwal di keranjang.</p>
+     <?php else: ?>
+       <?php foreach ($_SESSION['keranjang'] as $i => $it): ?>
+         <div class="keranjang-item" data-index="<?= $i ?>">
+           <div class="left">
+             <div class="text-sm font-semibold"><?= htmlspecialchars($it['jam']) ?></div>
+             <div class="text-xs text-slate-500"><?= date('d M Y', strtotime($it['tanggal'])) ?></div>
+             <div class="text-xs text-slate-500">Lapangan: <?= htmlspecialchars($lapangan['nama_lapangan']) ?></div>
+           </div>
+           <div class="right">
+             <div class="text-sm font-semibold">Rp <?= number_format($it['harga'],0,',','.') ?></div>
+             <button class="text-xs mt-2 text-red-600 remove-item-btn" data-index="<?= $i ?>" style="background:none;border:none;cursor:pointer;">Hapus</button>
+           </div>
+         </div>
+       <?php endforeach; ?>
+     <?php endif; ?>
+   </div>
+   <div class="sidebar-footer">
+     <button id="checkoutBtn" class="checkout-btn" <?= empty($_SESSION['keranjang'] ?? []) ? 'disabled' : '' ?>>Checkout</button>
+   </div>
+ </div>
 
  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-md">
       <div class="max-w-7xl mx-auto px-4">
@@ -310,18 +493,21 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
               <li><a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a></li>
               <li><a href="#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a></li>
               <li><a href="about.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a></li>
+              <li>
+                <div id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
+                <i class="fa-solid fa-cart-shopping text-lg"></i>
+                <span id="cartCount"
+                      class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-semibold rounded-full px-1.5 py-0.5">
+                  <?= count($_SESSION['keranjang'] ?? []) ?>
+                </span>
+            </div>
+              </li>           
             </ul>
           </div>
-          <div class="hidden md:flex items-center gap-4"> <a href="keranjang.php" 
-               class="relative text-slate-600 p-2 rounded-full hover:bg-primary-light hover:text-primary transition-all duration-300"
-               title="Keranjang Belanja">
-                <i class="fa-solid fa-cart-shopping text-lg"></i>
-                <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-xs font-medium text-white">
-                  0 </span>
-            </a>
+          <div class="hidden md:flex items-center gap-3"> 
             
-            <div class="h-6 w-px bg-gray-200"></div>
-
+            
+          <div class="hidden md:flex items-center gap-4"> 
             <a href="login.php" 
               class="border border-primary text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary hover:text-white transition-all duration-300">
               Masuk
@@ -448,18 +634,21 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
                   <div class="text-sm font-medium mt-1">Dipesan</div>
                 </div>
               <?php else: ?>
-                <form method="post" class="contents">
-                  <input type="hidden" name="action" value="book_slot">
-                  <input type="hidden" name="jadwal_id" value="<?= $jadwal_id ?>">
-                  <input type="hidden" name="slot" value="<?= $slot_text ?>">
-                  <button type="submit" class="slot-card available w-full h-full">
+                <!-- Ubah: tombol sekarang memicu modal & data dikirim via AJAX saat pilih Masukkan ke Keranjang -->
+                <button 
+                  type="button" 
+                  class="slot-card available w-full h-full jam-main" 
+                  data-id="<?= $jadwal_id ?>"
+                  data-lapangan="<?= $selected_lapangan ?>"
+                  data-tanggal="<?= htmlspecialchars($selected_date) ?>"
+                  data-jam="<?= htmlspecialchars($start . ' - ' . $end) ?>"
+                  data-harga="<?= htmlspecialchars($harga) ?>">
                     <div class="text-xs font-medium text-slate-500">60 Menit</div>
                     <div class="text-sm font-semibold mt-1 time"><?= $start ?> - <?= $end ?></div>
                     <div class="text-sm mt-1 price">
                       Rp <?= number_format($harga, 0, ',', '.') ?>
                     </div>
-                  </button>
-                </form>
+                </button>
               <?php endif; ?>
             <?php endforeach; ?>
           </div>
@@ -476,17 +665,34 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     © 2025 SportField — All rights reserved
   </footer>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const topNav = document.getElementById("topNav");
-        const navLine = document.getElementById("navLine");
-        const activeLink = topNav.querySelector(".active");
+  <!-- Modal Konfirmasi Booking (tetap dipakai) -->
+  <div id="bookingModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 420px; margin: auto; padding: 20px; background: white; border-radius: 10px; text-align:center;">
+      <button id="closeBookingModal" style="position:absolute; right:18px; top:12px; background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+      <h3 class="text-lg font-semibold mb-2">Pilih Aksi</h3>
+      <p class="text-sm text-slate-600">Apakah Anda ingin langsung checkout atau masukkan ke keranjang?</p>
+      <div style="margin-top:20px; display:flex; gap:12px; justify-content:center;">
+        <button id="btnCheckout" class="checkout-btn" style="background:#0b63d6; border-radius:8px; padding:8px 16px; color:#fff;">Langsung Checkout</button>
+        <button id="btnKeranjang" class="checkout-btn" style="background:#6b7280; border-radius:8px; padding:8px 16px; color:#fff;">Masukkan ke Keranjang</button>
+      </div>
+    </div>
+  </div>
 
-        if (activeLink && navLine) {
-            navLine.style.width = `${activeLink.offsetWidth}px`;
-            navLine.style.left = `${activeLink.offsetLeft - topNav.offsetLeft}px`;
-        }
-    });
-  </script>
+  <style>
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(2,6,23,0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 3000;
+      padding: 20px;
+    }
+    .modal[style*="display:none"] { display:none; }
+  </style>
+
+  <script src="../assets/js/booking-script.js"></script>
 </body>
 </html>
