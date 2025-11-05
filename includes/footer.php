@@ -21,6 +21,12 @@
 <script src="../public/asseth/tampilan_admin/plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script>
 <script src="../public/asseth/tampilan_admin/dist/js/adminlte.min.js"></script>
 
+<!-- ================== SELECT2 ================== -->
+<link rel="stylesheet" href="../public/asseth/tampilan_admin/plugins/select2/css/select2.min.css">
+<link rel="stylesheet" href="../public/asseth/tampilan_admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css">
+<script src="../public/asseth/tampilan_admin/plugins/select2/js/select2.full.min.js"></script>
+ 
+
 <!-- ================== DATATABLES ================== -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
@@ -84,13 +90,11 @@ $(function () {
     const $tbl = $(this);
     const id = $tbl.attr('id') || 'dataTable_' + Math.random().toString(36).substr(2, 5);
 
-    // 🔹 Cek apakah DataTable sudah diinisialisasi secara manual di halaman
     if ($.fn.DataTable.isDataTable($tbl)) {
       console.log(`⚠️ [${id}] sudah diinisialisasi manual — dilewati oleh global.`);
       return;
     }
 
-    // 🔹 Inisialisasi DataTable baru secara aman
     const dt = $tbl.DataTable({
       responsive: true,
       autoWidth: false,
@@ -107,20 +111,27 @@ $(function () {
       language: { url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" },
       initComplete: function () {
         initialized++;
-        // Animasi baris muncul bertahap
-        $tbl.find('tbody tr').each((i, el) => {
-          setTimeout(() => $(el).addClass("appear"), 60 * i);
-        });
-        // Loader hilang setelah semua tabel siap
+        animateRows($tbl);
         if (initialized === tables.length) $loader.fadeOut(400);
       }
     });
 
-    // 🔹 Letakkan tombol di area atas tabel
+    dt.on('draw.dt', function () {
+      animateRows($tbl);
+    });
+
     dt.buttons().container().appendTo('#' + id + '_wrapper .col-sm-6:eq(0)');
   });
+
+  function animateRows($tbl) {
+    $tbl.find('tbody tr').each((i, el) => {
+      $(el).removeClass("appear");
+      setTimeout(() => $(el).addClass("appear"), 50 * i);
+    });
+  }
 });
 </script>
+
 
 
 <!-- ================== SWEETALERT KONFIRMASI GLOBAL ================== -->
@@ -204,5 +215,40 @@ $(window).on('load', function() {
 });
 </script>
 
-</body>
-</html>
+
+<script>
+  window.addEventListener("load", function () {
+    const preloader = document.querySelector(".preloader");
+    preloader.classList.add("hidden");
+    setTimeout(() => preloader.remove(), 600);
+  });
+</script>
+
+
+<script>
+  // Efek hilang halus saat halaman selesai dimuat
+  window.addEventListener("load", function () {
+    const preloader = document.querySelector(".preloader");
+    preloader.classList.add("hidden");
+    setTimeout(() => preloader.remove(), 800);
+  });
+</script>
+
+
+
+
+<!-- Validasi jam buka dan tutup -->
+<script>
+$(document).ready(function(){
+  $('input[type="time"]').on('change', function(){
+    const row = $(this).closest('tr');
+    const buka = row.find('input[name^="jam_buka"]').val();
+    const tutup = row.find('input[name^="jam_tutup"]').val();
+    if (buka && tutup && tutup <= buka) {
+      alert('Jam tutup harus lebih besar dari jam buka!');
+      row.find('input[name^="jam_tutup"]').val('');
+    }
+  });
+});
+</script>
+/html>

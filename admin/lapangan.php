@@ -1,5 +1,4 @@
 <?php
-ob_start();
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
 include('../includes/topbar.php');
@@ -7,6 +6,7 @@ include('../includes/sidebar.php');
 ?>
 
 <div class="content-wrapper">
+  <!-- Header -->
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-futbol mr-2"></i> Data Lapangan</h1>
@@ -16,10 +16,13 @@ include('../includes/sidebar.php');
     </div>
   </section>
 
+  <!-- Konten Utama -->
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-sm">
-        <div class="card-header bg-info text-white">
+        <div class="card-header text-white" 
+             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
+                    box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.15);">
           <h3 class="card-title mb-0">
             <i class="fas fa-table mr-2"></i> Daftar Lapangan Badminton
           </h3>
@@ -46,11 +49,7 @@ include('../includes/sidebar.php');
               $query = mysqli_query($conn, "SELECT * FROM lapangan ORDER BY id_lapangan DESC");
 
               while ($r = mysqli_fetch_assoc($query)):
-                // PERBAIKAN PATH DISINI: Mengganti ../uploads/lapangan/ menjadi ../assets/images/
-                $fotoPath = !empty($r['foto']) 
-                    ? "../assets/images/" . htmlspecialchars($r['foto']) 
-                    : "../assets/img/no-image.png";
-                    
+                $fotoPath = !empty($r['foto']) ? "../uploads/lapangan/" . htmlspecialchars($r['foto']) : "../assets/img/no-image.png";
                 $statusBadge = ($r['status'] === 'aktif')
                   ? '<span class="badge bg-success"><i class="fas fa-check-circle mr-1"></i>Aktif</span>'
                   : '<span class="badge bg-secondary"><i class="fas fa-ban mr-1"></i>Nonaktif</span>';
@@ -65,7 +64,7 @@ include('../includes/sidebar.php');
                   <td><?= htmlspecialchars($r['nama_lapangan']) ?></td>
                   <td class="text-capitalize"><?= htmlspecialchars($r['tipe']) ?></td>
                   <td>Rp <?= number_format($r['harga_per_jam'], 0, ',', '.') ?></td>
-                  <td>Rp <?= number_format($r['harga_member'], 0, ',', '.') ?></td>
+                  <td>Rp <?= number_format($r['harga_per_jam_member'], 0, ',', '.') ?></td>
                   <td><?= !empty($r['deskripsi'])
                         ? htmlspecialchars(strlen($r['deskripsi']) > 60
                             ? substr($r['deskripsi'], 0, 60) . '...'
@@ -97,5 +96,4 @@ include('../includes/sidebar.php');
 
 <?php
 include('../includes/footer.php');
-ob_end_flush();
 ?>

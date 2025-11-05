@@ -7,7 +7,7 @@ include('../includes/sidebar.php');
 
 // Ambil data user & lapangan
 $users = mysqli_query($conn, "SELECT id_user, nama, tipe_user FROM users ORDER BY nama ASC");
-$lapangan = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan, harga_per_jam FROM lapangan WHERE status='aktif' ORDER BY nama_lapangan ASC");
+$lapangan = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan, harga_per_jam, harga_member FROM lapangan WHERE status='aktif' ORDER BY nama_lapangan ASC");
 
 // Proses submit booking baru
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -18,37 +18,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tanggal = $_POST['tanggal'];
     $jam_mulai = $_POST['jam_mulai'];
     $jam_selesai = $_POST['jam_selesai'];
-    $payment_method = $_POST['payment_method'];
     $total = str_replace(['.', ','], '', $_POST['total_amount']);
     $dp = str_replace(['.', ','], '', $_POST['dp_amount']);
     $sisa = str_replace(['.', ','], '', $_POST['remaining_amount']);
+    $payment_method = $_POST['payment_method'];
 
-    // Insert ke booking
+    // Ambil tipe booking otomatis dari user
+    $qUser = mysqli_query($conn, "SELECT tipe_user FROM users WHERE id_user='$id_user'");
+    $dUser = mysqli_fetch_assoc($qUser);
+    $tipe_booking = $dUser ? $dUser['tipe_user'] : 'manual';
+
+    // Tambah booking baru
     mysqli_query($conn, "
-      INSERT INTO booking (id_user, id_lapangan, tanggal, total_amount, dp_amount, remaining_amount, 
-      payment_status, payment_method, status, created_at)
-      VALUES ('$id_user', '$id_lapangan', '$tanggal', '$total', '$dp', '$sisa', 'belum_bayar', '$payment_method', 'menunggu', NOW())
+      INSERT INTO booking (
+        id_user, id_lapangan, tipe_booking, tanggal, total_amount, dp_amount, remaining_amount,
+        status, payment_status, payment_method, created_at
+      )
+      VALUES (
+        '$id_user', '$id_lapangan', '$tipe_booking', '$tanggal', '$total', '$dp', '$sisa',
+        'menunggu', 'belum_bayar', '$payment_method', NOW()
+      )
     ");
+
     $booking_id = mysqli_insert_id($conn);
 
-    // Insert detail booking
+    // Simpan ke detail_booking
     $qJam = mysqli_query($conn, "
       SELECT id_jadwal_waktu FROM jadwal_waktu 
       WHERE id_lapangan='$id_lapangan' 
-      AND jam_mulai >= '$jam_mulai' AND jam_selesai <= '$jam_selesai'
+      AND jam_mulai >= '$jam_mulai' 
+      AND jam_selesai <= '$jam_selesai'
     ");
     while ($j = mysqli_fetch_assoc($qJam)) {
       mysqli_query($conn, "INSERT INTO detail_booking (id_booking, id_jadwal_waktu) VALUES ('$booking_id', '{$j['id_jadwal_waktu']}')");
     }
 
-    // Insert pembayaran DP otomatis
-    mysqli_query($conn, "
-      INSERT INTO pembayaran (booking_id, tipe, amount, method, status_verifikasi, created_at)
-      VALUES ('$booking_id', 'DP', '$dp', '$payment_method', 'menunggu', NOW())
-    ");
-
     mysqli_commit($conn);
-    $_SESSION['toast_success'] = "Booking berhasil dibuat dan menunggu pembayaran DP.";
+    $_SESSION['toast_success'] = "Booking berhasil dibuat. Silakan lakukan pembayaran di menu Pembayaran.";
     header("Location: booking.php");
     exit;
   } catch (Exception $e) {
@@ -57,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 ?>
-
 
 <div class="content-wrapper animate__animated animate__fadeIn">
   <section class="content-header">
@@ -77,8 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST">
           <div class="card-body">
             <div class="row">
-              
-              <!-- User -->
+
+              <!-- Pemesan -->
               <div class="col-md-6 mb-3">
                 <label for="id_user">Pilih Pemesan</label>
                 <select name="id_user" id="id_user" class="form-control select2" required>
@@ -97,20 +102,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <select name="id_lapangan" id="id_lapangan" class="form-control select2" required>
                   <option value="">-- Pilih Lapangan --</option>
                   <?php while ($l = mysqli_fetch_assoc($lapangan)): ?>
-                    <option value="<?= $l['id_lapangan'] ?>" data-harga="<?= $l['harga_per_jam'] ?>">
-                      <?= htmlspecialchars($l['nama_lapangan']) ?> - Rp <?= number_format($l['harga_per_jam'],0,',','.') ?>/jam
+                    <option 
+                      value="<?= $l['id_lapangan'] ?>" 
+                      data-harga-regular="<?= $l['harga_per_jam'] ?>" 
+                      data-harga-member="<?= $l['harga_member'] ?>">
+                      <?= htmlspecialchars($l['nama_lapangan']) ?>
                     </option>
                   <?php endwhile; ?>
                 </select>
               </div>
 
-              <!-- Tanggal -->
+              <!-- Tanggal dan Jam -->
               <div class="col-md-4 mb-3">
                 <label for="tanggal">Tanggal Booking</label>
                 <input type="date" name="tanggal" id="tanggal" class="form-control" required min="<?= date('Y-m-d') ?>">
               </div>
 
-              <!-- Jam -->
               <div class="col-md-4 mb-3">
                 <label for="jam_mulai">Jam Mulai</label>
                 <input type="time" name="jam_mulai" id="jam_mulai" class="form-control" required>
@@ -131,7 +138,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </select>
               </div>
 
-              <!-- Total -->
+              <!-- Harga Otomatis -->
+              <div class="col-md-6 mb-3">
+                <label>Harga Per Jam (Rp)</label>
+                <input type="text" id="harga_per_jam" class="form-control" readonly>
+              </div>
+
               <div class="col-md-6 mb-3">
                 <label>Total Bayar</label>
                 <input type="text" name="total_amount" id="total_amount" class="form-control" readonly>
@@ -146,7 +158,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label>Sisa Pembayaran</label>
                 <input type="text" name="remaining_amount" id="remaining_amount" class="form-control" readonly>
               </div>
-
             </div>
           </div>
 
@@ -161,25 +172,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </section>
 </div>
 
-<?php include('../includes/footer.php'); 
-ob_end_flush();
-?>
+<?php include('../includes/footer.php'); ob_end_flush(); ?>
 
 <script>
-$(function() {
-  // Hitung otomatis total + DP
+$(document).ready(function() {
+  // Aktifkan semua elemen Select2
+  $('.select2').select2({
+    theme: 'bootstrap4',
+    width: '100%',
+    placeholder: 'Pilih atau cari data...',
+    allowClear: true
+  });
+
+  // Update harga otomatis sesuai tipe user dan lapangan
+  function updateHarga() {
+    const tipeUser = $('#id_user option:selected').data('tipe');
+    const lapangan = $('#id_lapangan option:selected');
+    if (!lapangan.val() || !tipeUser) return;
+
+    const harga = (tipeUser === 'member')
+      ? parseFloat(lapangan.data('harga-member') || 0)
+      : parseFloat(lapangan.data('harga-regular') || 0);
+
+    $('#harga_per_jam').val(harga.toLocaleString('id-ID'));
+    hitungTotal();
+  }
+
+  // Hitung total otomatis
   function hitungTotal() {
-    const harga = parseFloat($('#id_lapangan option:selected').data('harga') || 0);
+    const harga = parseFloat($('#harga_per_jam').val().replace(/\./g, '') || 0);
     const mulai = $('#jam_mulai').val();
     const selesai = $('#jam_selesai').val();
-    const tipeUser = $('#id_user option:selected').data('tipe');
-    
-    if (mulai && selesai) {
-      const diff = (new Date(`1970-01-01T${selesai}:00`) - new Date(`1970-01-01T${mulai}:00`)) / (1000 * 60 * 60);
-      if (diff > 0) {
-        let total = harga * diff;
-        if (tipeUser === 'member') total *= 0.9; // Diskon 10% untuk member
 
+    if (mulai && selesai && harga > 0) {
+      const diff = (new Date(`1970-01-01T${selesai}:00`) - new Date(`1970-01-01T${mulai}:00`)) / 3600000;
+      if (diff > 0) {
+        const total = harga * diff;
         const dp = total * 0.3;
         const sisa = total - dp;
 
@@ -190,6 +218,9 @@ $(function() {
     }
   }
 
-  $('#id_lapangan, #jam_mulai, #jam_selesai, #id_user').on('change', hitungTotal);
+  // Event trigger
+  $('#id_user, #id_lapangan').on('change', updateHarga);
+  $('#jam_mulai, #jam_selesai').on('change', hitungTotal);
 });
 </script>
+

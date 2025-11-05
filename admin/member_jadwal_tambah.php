@@ -5,36 +5,60 @@ include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
 
-$members = mysqli_query($conn, "SELECT m.id_member, u.nama FROM member m JOIN users u ON m.id_user = u.id_user WHERE m.status='aktif'");
-$lapangan = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan FROM lapangan WHERE status='aktif'");
+// Ambil data member aktif dan lapangan aktif
+$members = mysqli_query($conn, "
+  SELECT m.id_member, u.nama 
+  FROM member m 
+  JOIN users u ON m.id_user = u.id_user 
+  WHERE m.status = 'aktif'
+");
+$lapangan = mysqli_query($conn, "
+  SELECT id_lapangan, nama_lapangan, harga_member 
+  FROM lapangan 
+  WHERE status = 'aktif'
+");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $id_member = $_POST['id_member'];
-  $id_lapangan = $_POST['id_lapangan'];
-  $hari = $_POST['hari'];
+  $id_member = mysqli_real_escape_string($conn, $_POST['id_member']);
+  $id_lapangan = mysqli_real_escape_string($conn, $_POST['id_lapangan']);
+  $hari = mysqli_real_escape_string($conn, $_POST['hari']);
   $jam_mulai = $_POST['jam_mulai'];
   $jam_selesai = $_POST['jam_selesai'];
   $harga = $_POST['harga'];
 
-  // Validasi jadwal bentrok
-  $cek = mysqli_query($conn, "
-    SELECT * FROM member_jadwal 
-    WHERE id_lapangan='$id_lapangan' 
-    AND hari='$hari' 
-    AND (
-      (jam_mulai < '$jam_selesai' AND jam_selesai > '$jam_mulai')
-    )
-  ");
-  if (mysqli_num_rows($cek) > 0) {
-    $_SESSION['toast_error'] = "⚠️ Jadwal bentrok dengan member lain di lapangan ini!";
+  // Validasi jam
+  if ($jam_mulai >= $jam_selesai) {
+    $_SESSION['toast_error'] = "⚠️ Jam selesai harus lebih besar dari jam mulai!";
   } else {
-    mysqli_query($conn, "
-      INSERT INTO member_jadwal (id_member, id_lapangan, hari, jam_mulai, jam_selesai, harga_per_jam_member, status, created_at)
-      VALUES ('$id_member', '$id_lapangan', '$hari', '$jam_mulai', '$jam_selesai', '$harga', 'aktif', NOW())
+    // Cek bentrok
+    $cek = mysqli_query($conn, "
+      SELECT * FROM member_jadwal 
+      WHERE id_lapangan = '$id_lapangan' 
+      AND hari = '$hari' 
+      AND (
+        (jam_mulai < '$jam_selesai' AND jam_selesai > '$jam_mulai')
+      )
     ");
-    $_SESSION['toast_success'] = "✅ Jadwal rutin berhasil ditambahkan!";
-    header("Location: member_jadwal.php");
-    exit;
+
+    if (mysqli_num_rows($cek) > 0) {
+      $_SESSION['toast_error'] = "⚠️ Jadwal bentrok dengan member lain di lapangan ini!";
+    } else {
+      // Insert data baru
+      $insert = mysqli_query($conn, "
+        INSERT INTO member_jadwal 
+        (id_member, id_lapangan, hari, jam_mulai, jam_selesai, harga_per_jam_member, status, created_at)
+        VALUES 
+        ('$id_member', '$id_lapangan', '$hari', '$jam_mulai', '$jam_selesai', '$harga', 'aktif', NOW())
+      ");
+
+      if ($insert) {
+        $_SESSION['toast_success'] = "✅ Jadwal rutin berhasil ditambahkan!";
+        header("Location: member_jadwal.php");
+        exit;
+      } else {
+        $_SESSION['toast_error'] = "❌ Gagal menyimpan data jadwal!";
+      }
+    }
   }
 }
 ?>
@@ -43,7 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-calendar-plus mr-2"></i> Tambah Jadwal Rutin Member</h1>
-      <a href="member_jadwal.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Kembali</a>
+      <a href="member_jadwal.php" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Kembali
+      </a>
     </div>
   </section>
 
@@ -57,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST">
           <div class="card-body">
             <div class="row">
+              <!-- PILIH MEMBER -->
               <div class="col-md-6 mb-3">
                 <label for="id_member">Pilih Member</label>
                 <select name="id_member" id="id_member" class="form-control select2" required>
@@ -67,24 +94,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </select>
               </div>
 
+              <!-- PILIH LAPANGAN -->
               <div class="col-md-6 mb-3">
                 <label for="id_lapangan">Pilih Lapangan</label>
                 <select name="id_lapangan" id="id_lapangan" class="form-control select2" required>
                   <option value="">-- Pilih Lapangan --</option>
                   <?php while ($l = mysqli_fetch_assoc($lapangan)): ?>
-                    <option value="<?= $l['id_lapangan'] ?>"><?= htmlspecialchars($l['nama_lapangan']) ?></option>
+                    <option value="<?= $l['id_lapangan'] ?>" data-harga="<?= $l['harga_member'] ?>">
+                      <?= htmlspecialchars($l['nama_lapangan']) ?>
+                    </option>
                   <?php endwhile; ?>
                 </select>
               </div>
 
+              <!-- HARI -->
               <div class="col-md-4 mb-3">
                 <label>Hari</label>
                 <select name="hari" class="form-control" required>
-                  <option>Senin</option><option>Selasa</option><option>Rabu</option>
-                  <option>Kamis</option><option>Jumat</option><option>Sabtu</option><option>Minggu</option>
+                  <option value="">-- Pilih Hari --</option>
+                  <option>Senin</option>
+                  <option>Selasa</option>
+                  <option>Rabu</option>
+                  <option>Kamis</option>
+                  <option>Jumat</option>
+                  <option>Sabtu</option>
+                  <option>Minggu</option>
                 </select>
               </div>
 
+              <!-- JAM -->
               <div class="col-md-4 mb-3">
                 <label>Jam Mulai</label>
                 <input type="time" name="jam_mulai" class="form-control" required>
@@ -95,9 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="time" name="jam_selesai" class="form-control" required>
               </div>
 
+              <!-- HARGA -->
               <div class="col-md-6 mb-3">
                 <label>Harga per Jam Member</label>
-                <input type="number" name="harga" class="form-control" placeholder="Masukkan harga" required>
+                <input type="number" id="harga" name="harga" class="form-control" placeholder="Masukkan harga per jam" required>
+                <small class="text-muted">Harga otomatis dari lapangan, bisa disesuaikan manual.</small>
               </div>
             </div>
           </div>
@@ -113,6 +153,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </section>
 </div>
 
-<?php include('../includes/footer.php');
-ob_end_flush();
-?>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+  // Saat lapangan dipilih, ambil harga otomatis
+  $('#id_lapangan').change(function() {
+    const harga = $(this).find(':selected').data('harga');
+    $('#harga').val(harga ? harga : '');
+  });
+});
+</script>
+
+<?php include('../includes/footer.php'); ob_end_flush(); ?>

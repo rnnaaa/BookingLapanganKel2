@@ -3,7 +3,7 @@
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "bookinglapanganb2"; // ✅ disesuaikan dengan nama database kamu
+$db   = "booking_badmintoon"; // ✅ disesuaikan dengan nama database kamu
 
 // Membuat koneksi
 $conn = new mysqli($host, $user, $pass, $db);
