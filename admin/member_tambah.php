@@ -15,23 +15,40 @@ $users = mysqli_query($conn, "
 
 // Proses tambah member
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-  $id_user = $_POST['id_user'];
-  $jenis = $_POST['jenis_member'];
-  $tgl_mulai = $_POST['tgl_mulai'];
-  $tgl_akhir = $_POST['tgl_berakhir'];
-  $harga = $_POST['harga_member'];
-  $status = $_POST['status'];
+  $id_user = mysqli_real_escape_string($conn, $_POST['id_user']);
+  $jenis = mysqli_real_escape_string($conn, $_POST['jenis_member']);
+  $tgl_mulai = mysqli_real_escape_string($conn, $_POST['tgl_mulai']);
+  $tgl_akhir = mysqli_real_escape_string($conn, $_POST['tgl_berakhir']);
+  $harga = mysqli_real_escape_string($conn, $_POST['harga_member']);
+  $status = mysqli_real_escape_string($conn, $_POST['status']);
 
-  if (empty($id_user) || empty($jenis) || empty($tgl_mulai) || empty($tgl_akhir)) {
+  // Validasi form
+  if (empty($id_user) || empty($jenis) || empty($tgl_mulai) || empty($tgl_akhir) || empty($harga)) {
     $error = "Semua kolom wajib diisi!";
   } else {
-    mysqli_query($conn, "
-      INSERT INTO member (id_user, jenis_member, harga_member, tgl_mulai, tgl_berakhir, status, created_at)
-      VALUES ('$id_user', '$jenis', '$harga', '$tgl_mulai', '$tgl_akhir', '$status', NOW())
-    ");
-    $_SESSION['toast_success'] = "Member baru berhasil ditambahkan!";
-    header("Location: member.php");
-    exit;
+    // Cek apakah user sudah jadi member
+    $cek = mysqli_query($conn, "SELECT id_member FROM member WHERE id_user = '$id_user'");
+    if (mysqli_num_rows($cek) > 0) {
+      $error = "Pengguna ini sudah menjadi member!";
+    } else {
+      // Insert data ke tabel member
+      $query = "
+        INSERT INTO member (id_user, jenis_member, tgl_mulai, tgl_berakhir, status, created_at)
+        VALUES ('$id_user', '$jenis', '$tgl_mulai', '$tgl_akhir', '$status', NOW())
+      ";
+      $insert = mysqli_query($conn, $query);
+
+      if ($insert) {
+        // Update tipe_user pada tabel users menjadi 'member'
+        mysqli_query($conn, "UPDATE users SET tipe_user = 'member' WHERE id_user = '$id_user'");
+
+        $_SESSION['toast_success'] = "Member baru berhasil ditambahkan dan tipe user diperbarui!";
+        header("Location: member.php");
+        exit;
+      } else {
+        $error = "Gagal menyimpan data member: " . mysqli_error($conn);
+      }
+    }
   }
 }
 ?>

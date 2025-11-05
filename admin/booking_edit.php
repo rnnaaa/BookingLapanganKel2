@@ -1,10 +1,10 @@
 <?php
+ob_start();
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
 
-// Validasi ID
 if (!isset($_GET['id'])) {
   $_SESSION['toast_error'] = "ID booking tidak ditemukan.";
   header("Location: booking.php");
@@ -13,7 +13,7 @@ if (!isset($_GET['id'])) {
 
 $id_booking = intval($_GET['id']);
 
-// Ambil data booking
+// 🔹 Ambil data booking utama
 $q = mysqli_query($conn, "
   SELECT b.*, u.nama AS nama_user, u.tipe_user, l.nama_lapangan, l.harga_per_jam
   FROM booking b
@@ -22,18 +22,17 @@ $q = mysqli_query($conn, "
   WHERE b.id_booking = $id_booking
 ");
 $data = mysqli_fetch_assoc($q);
-
 if (!$data) {
   $_SESSION['toast_error'] = "Data booking tidak ditemukan!";
   header("Location: booking.php");
   exit;
 }
 
-// Ambil data dropdown
+// 🔹 Ambil pilihan dropdown
 $users = mysqli_query($conn, "SELECT id_user, nama, tipe_user FROM users ORDER BY nama ASC");
 $lapangan = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan, harga_per_jam FROM lapangan ORDER BY nama_lapangan ASC");
 
-// Ambil jadwal booking
+// 🔹 Ambil jadwal jam booking
 $jadwal = [];
 $j = mysqli_query($conn, "
   SELECT jw.jam_mulai, jw.jam_selesai
@@ -41,25 +40,24 @@ $j = mysqli_query($conn, "
   JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu
   WHERE db.id_booking = $id_booking
 ");
-while ($row = mysqli_fetch_assoc($j)) {
-  $jadwal[] = $row;
-}
+while ($row = mysqli_fetch_assoc($j)) $jadwal[] = $row;
 
-// Proses update booking
+// 🔹 Proses update
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $id_user = $_POST['id_user'];
-  $id_lapangan = $_POST['id_lapangan'];
-  $tanggal = $_POST['tanggal'];
-  $status = $_POST['status'];
-  $payment_status = $_POST['payment_status'];
-  $payment_method = $_POST['payment_method'];
-  $total = str_replace('.', '', $_POST['total_amount']);
-  $dp = str_replace('.', '', $_POST['dp_amount']);
-  $sisa = str_replace('.', '', $_POST['remaining_amount']);
-  $jam_mulai = $_POST['jam_mulai'];
-  $jam_selesai = $_POST['jam_selesai'];
+  $id_user       = $_POST['id_user'];
+  $id_lapangan   = $_POST['id_lapangan'];
+  $tanggal       = $_POST['tanggal'];
+  $jam_mulai     = $_POST['jam_mulai'];
+  $jam_selesai   = $_POST['jam_selesai'];
 
-  // Update data utama
+  // Hitung total, DP, dan sisa bayar
+  $hargaPerJam = mysqli_fetch_assoc(mysqli_query($conn, "SELECT harga_per_jam FROM lapangan WHERE id_lapangan='$id_lapangan'"))['harga_per_jam'];
+  $durasi = (strtotime($jam_selesai) - strtotime($jam_mulai)) / 3600;
+  $total = $hargaPerJam * $durasi;
+  $dp = $total * 0.3;
+  $sisa = $total - $dp;
+
+  // Update data utama booking
   mysqli_query($conn, "
     UPDATE booking SET
       id_user='$id_user',
@@ -68,19 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       total_amount='$total',
       dp_amount='$dp',
       remaining_amount='$sisa',
-      status='$status',
-      payment_status='$payment_status',
-      payment_method='$payment_method',
       updated_at=NOW()
     WHERE id_booking=$id_booking
   ");
 
-  // Hapus detail_booking lama
+  // Hapus detail_booking lama dan buat baru
   mysqli_query($conn, "DELETE FROM detail_booking WHERE id_booking=$id_booking");
-
-  // Tambahkan ulang detail_booking baru berdasarkan jam baru
   $jadwalBaru = mysqli_query($conn, "
-    SELECT id_jadwal_waktu FROM jadwal_waktu 
+    SELECT id_jadwal_waktu 
+    FROM jadwal_waktu 
     WHERE id_lapangan='$id_lapangan'
       AND jam_mulai >= '$jam_mulai'
       AND jam_selesai <= '$jam_selesai'
@@ -92,23 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ");
   }
 
-  // Update pembayaran jika DP berubah
-  $pembayaran = mysqli_query($conn, "
-    SELECT * FROM pembayaran WHERE booking_id='$id_booking' AND tipe='DP'
-  ");
-  if (mysqli_num_rows($pembayaran) > 0) {
-    mysqli_query($conn, "
-      UPDATE pembayaran SET amount='$dp', updated_at=NOW()
-      WHERE booking_id='$id_booking' AND tipe='DP'
-    ");
-  } else {
-    mysqli_query($conn, "
-      INSERT INTO pembayaran (booking_id, tipe, amount, method, status_verifikasi, created_at)
-      VALUES ('$id_booking', 'DP', '$dp', '$payment_method', 'menunggu', NOW())
-    ");
-  }
-
-  $_SESSION['toast_success'] = "Data booking berhasil diperbarui.";
+  $_SESSION['toast_success'] = "Data booking berhasil diperbarui tanpa mengubah status.";
   header("Location: booking.php");
   exit;
 }
@@ -132,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST">
           <div class="card-body">
             <div class="row">
-              
+
               <!-- Pemesan -->
               <div class="col-md-6 mb-3">
                 <label for="id_user">Pemesan</label>
@@ -190,44 +168,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="text" name="remaining_amount" id="remaining_amount" class="form-control" value="<?= number_format($data['remaining_amount'],0,',','.') ?>" readonly>
               </div>
 
-              <!-- Status -->
-              <div class="col-md-4 mb-3">
-                <label>Status Booking</label>
-                <select name="status" class="form-control">
-                  <?php
-                  $statuses = ['menunggu','disetujui','ditolak','selesai','dibatalkan'];
-                  foreach ($statuses as $st) {
-                    $sel = $st==$data['status'] ? 'selected' : '';
-                    echo "<option value='$st' $sel>" . ucfirst($st) . "</option>";
-                  }
-                  ?>
-                </select>
-              </div>
-
-              <div class="col-md-4 mb-3">
-                <label>Status Pembayaran</label>
-                <select name="payment_status" class="form-control">
-                  <?php
-                  $pays = ['belum_bayar','menunggu_verifikasi','dp_bayar','lunas','dibatalkan'];
-                  foreach ($pays as $st) {
-                    $sel = $st==$data['payment_status'] ? 'selected' : '';
-                    echo "<option value='$st' $sel>" . ucfirst(str_replace('_',' ',$st)) . "</option>";
-                  }
-                  ?>
-                </select>
-              </div>
-
-              <div class="col-md-4 mb-3">
-                <label>Metode Bayar</label>
-                <select name="payment_method" class="form-control">
-                  <?php
-                  $methods = ['bank_transfer','qris','tunai'];
-                  foreach ($methods as $m) {
-                    $sel = $m==$data['payment_method']?'selected':'';
-                    echo "<option value='$m' $sel>" . ucfirst(str_replace('_',' ',$m)) . "</option>";
-                  }
-                  ?>
-                </select>
+              <!-- Info -->
+              <div class="col-12">
+                <div class="alert alert-info mt-3">
+                  <i class="fas fa-info-circle"></i> 
+                  Status <strong>Booking</strong> dan <strong>Pembayaran</strong> dikelola otomatis melalui halaman <em>Booking Action</em> & <em>Pembayaran Validasi</em>.
+                </div>
               </div>
 
             </div>
@@ -245,25 +191,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <?php include('../includes/footer.php'); ?>
-
-<script>
-$(function() {
-  function hitungTotal() {
-    const harga = parseFloat($('#id_lapangan option:selected').data('harga') || 0);
-    const mulai = $('#jam_mulai').val();
-    const selesai = $('#jam_selesai').val();
-    if (mulai && selesai) {
-      const diff = (new Date(`1970-01-01T${selesai}:00`) - new Date(`1970-01-01T${mulai}:00`)) / 3600000;
-      if (diff > 0) {
-        const total = harga * diff;
-        const dp = total * 0.3;
-        const sisa = total - dp;
-        $('#total_amount').val(total.toLocaleString('id-ID'));
-        $('#dp_amount').val(dp.toLocaleString('id-ID'));
-        $('#remaining_amount').val(sisa.toLocaleString('id-ID'));
-      }
-    }
-  }
-  $('#id_lapangan, #jam_mulai, #jam_selesai').on('change', hitungTotal);
-});
-</script>

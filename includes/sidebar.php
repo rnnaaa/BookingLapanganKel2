@@ -64,6 +64,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <p>Jadwal Harian</p>
           </a>
         </li>
+        <li class="nav-item">
+  <a href="jam_operasional.php" class="nav-link">
+    <i class="nav-icon fas fa-clock"></i>
+    <p>Jam Operasional</p>
+  </a>
+</li>
+
 
         <!-- BOOKING & PEMBAYARAN -->
         <li class="nav-header text-light">BOOKING & PEMBAYARAN</li>

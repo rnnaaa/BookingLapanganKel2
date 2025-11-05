@@ -6,18 +6,23 @@ include('../includes/sidebar.php');
 ?>
 
 <div class="content-wrapper animate__animated animate__fadeIn">
+  <!-- ======== HEADER ======== -->
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-clock mr-2"></i> Jadwal Waktu Lapangan</h1>
-      <a href="jadwal_waktu_tambah.php" class="btn btn-primary shadow-sm"><i class="fas fa-plus-circle"></i> Tambah Jadwal</a>
     </div>
   </section>
 
+  <!-- ======== CONTENT ======== -->
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-lg border-0">
-        <div class="card-header bg-info text-white">
-          <h3 class="card-title mb-0"><i class="fas fa-clock mr-2"></i> Daftar Jadwal Waktu</h3>
+        <div class="card-header text-white" 
+             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
+                    box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.15);">
+          <h3 class="card-title mb-0">
+            <i class="fas fa-clock mr-2"></i> Daftar Jadwal Waktu
+          </h3>
         </div>
 
         <div class="card-body">
@@ -29,7 +34,6 @@ include('../includes/sidebar.php');
                 <th>Jam</th>
                 <th>Harga per Slot</th>
                 <th>Dibuat</th>
-                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -43,17 +47,15 @@ include('../includes/sidebar.php');
               ");
               while ($row = mysqli_fetch_assoc($query)):
               ?>
-              <tr>
-                <td class="text-center"><?= $no++ ?></td>
-                <td><?= htmlspecialchars($row['nama_lapangan']) ?></td>
-                <td class="text-center"><?= substr($row['jam_mulai'],0,5) ?> - <?= substr($row['jam_selesai'],0,5) ?></td>
-                <td class="text-end">Rp <?= number_format($row['harga_per_slot'], 0, ',', '.') ?></td>
-                <td class="text-center"><?= date('d-m-Y H:i', strtotime($row['created_at'])) ?></td>
-                <td class="text-center">
-                  <a href="jadwal_waktu_edit.php?id=<?= $row['id_jadwal_waktu'] ?>" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></a>
-                  <a href="jadwal_waktu_hapus.php?id=<?= $row['id_jadwal_waktu'] ?>" class="btn btn-sm btn-danger btn-delete"><i class="fas fa-trash"></i></a>
-                </td>
-              </tr>
+                <tr>
+                  <td class="text-center"><?= $no++ ?></td>
+                  <td><?= htmlspecialchars($row['nama_lapangan']) ?></td>
+                  <td class="text-center">
+                    <?= substr($row['jam_mulai'], 0, 5) ?> - <?= substr($row['jam_selesai'], 0, 5) ?>
+                  </td>
+                  <td class="text-end">Rp <?= number_format($row['harga_per_jam'], 0, ',', '.') ?></td>
+                  <td class="text-center"><?= date('d-m-Y H:i', strtotime($row['created_at'])) ?></td>
+                </tr>
               <?php endwhile; ?>
             </tbody>
           </table>
@@ -63,5 +65,4 @@ include('../includes/sidebar.php');
   </section>
 </div>
 
-<?php include('../includes/footer.php'); 
-?>
+<?php include('../includes/footer.php'); ?>

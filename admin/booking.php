@@ -6,22 +6,26 @@ include('../includes/sidebar.php');
 ?>
 
 <div class="content-wrapper animate__animated animate__fadeIn">
-  <!-- Header -->
+  <!-- HEADER -->
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-calendar-check mr-2"></i> Data Booking Lapangan</h1>
       <a href="booking_tambah.php" class="btn btn-primary shadow-sm">
-        <i class="fas fa-plus-circle mr-1"></i> Tambah Booking
+        <i class="fas fa-plus-circle mr-1"></i> Tambah Booking Manual
       </a>
     </div>
   </section>
 
-  <!-- Konten -->
+  <!-- KONTEN UTAMA -->
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-lg border-0">
-        <div class="card-header bg-info text-white">
-          <h3 class="card-title mb-0"><i class="fas fa-list mr-2"></i> Daftar Booking</h3>
+        <div class="card-header text-white" 
+             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
+                    box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.15);">
+          <h3 class="card-title mb-0">
+            <i class="fas fa-list mr-2"></i> Daftar Semua Booking (Reguler & Member)
+          </h3>
         </div>
 
         <div class="card-body">
@@ -30,7 +34,7 @@ include('../includes/sidebar.php');
               <tr>
                 <th>No</th>
                 <th>Pemesan</th>
-                <th>Tipe User</th>
+                <th>Tipe Booking</th>
                 <th>Lapangan</th>
                 <th>Tanggal</th>
                 <th>Jam</th>
@@ -41,24 +45,31 @@ include('../includes/sidebar.php');
                 <th>Aksi</th>
               </tr>
             </thead>
+
             <tbody>
               <?php
               $no = 1;
+
+              // 🔹 Query diperbaiki agar booking member (dari member_jadwal) juga tampil
               $sql = "
                 SELECT 
                   b.id_booking,
                   u.nama AS nama_pemesan,
-                  u.tipe_user,
+                  COALESCE(b.tipe_booking, 'reguler') AS tipe_booking,
                   l.nama_lapangan,
                   b.tanggal,
                   b.total_amount,
                   b.status,
                   b.payment_status,
                   b.created_at,
-                  GROUP_CONCAT(
+                  COALESCE(
+                    GROUP_CONCAT(
+                      CONCAT(
+                        DATE_FORMAT(jw.jam_mulai, '%H:%i'), ' - ', DATE_FORMAT(jw.jam_selesai, '%H:%i')
+                      ) ORDER BY jw.jam_mulai SEPARATOR '<br>'
+                    ),
                     CONCAT(
-                      DATE_FORMAT(jw.jam_mulai, '%H:%i'), ' - ', DATE_FORMAT(jw.jam_selesai, '%H:%i')
-                    ) ORDER BY jw.jam_mulai SEPARATOR '<br>'
+                      DATE_FORMAT(b.created_at, '%H:%i'), ' - ', DATE_FORMAT(ADDTIME(b.created_at, '01:00:00'), '%H:%i'))
                   ) AS jam_booking
                 FROM booking b
                 JOIN users u ON b.id_user = u.id_user
@@ -66,58 +77,62 @@ include('../includes/sidebar.php');
                 LEFT JOIN detail_booking db ON b.id_booking = db.id_booking
                 LEFT JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu
                 GROUP BY b.id_booking
-                ORDER BY b.created_at DESC
+                ORDER BY 
+                  b.tanggal DESC,
+                  (b.tipe_booking = 'member') DESC,
+                  b.created_at DESC
               ";
 
               $result = mysqli_query($conn, $sql);
+
               while ($row = mysqli_fetch_assoc($result)):
-                // Badge status booking
+                // 🎨 Badge status booking
                 switch ($row['status']) {
-                  case 'menunggu': $badge = 'bg-warning text-dark'; break;
-                  case 'disetujui': $badge = 'bg-primary'; break;
-                  case 'selesai': $badge = 'bg-success'; break;
-                  case 'ditolak': $badge = 'bg-danger'; break;
-                  default: $badge = 'bg-secondary';
+                  case 'menunggu': $badgeBooking = 'badge bg-warning text-dark'; break;
+                  case 'disetujui': $badgeBooking = 'badge bg-primary'; break;
+                  case 'selesai': $badgeBooking = 'badge bg-success'; break;
+                  case 'ditolak': $badgeBooking = 'badge bg-danger'; break;
+                  default: $badgeBooking = 'badge bg-secondary';
                 }
 
-                // Badge status pembayaran
+                // 💳 Badge status pembayaran
                 switch ($row['payment_status']) {
-                  case 'belum_bayar': $pay = 'badge bg-secondary'; break;
-                  case 'menunggu_verifikasi': $pay = 'badge bg-warning text-dark'; break;
-                  case 'dp_bayar': $pay = 'badge bg-info'; break;
-                  case 'lunas': $pay = 'badge bg-success'; break;
-                  default: $pay = 'badge bg-light text-dark';
+                  case 'belum_bayar': $badgePay = 'badge bg-secondary'; break;
+                  case 'menunggu_verifikasi': $badgePay = 'badge bg-warning text-dark'; break;
+                  case 'dp_bayar': $badgePay = 'badge bg-info'; break;
+                  case 'lunas': $badgePay = 'badge bg-success'; break;
+                  default: $badgePay = 'badge bg-light text-dark';
                 }
 
-                $tipeUser = ($row['tipe_user'] == 'member') ? 
-                  '<span class="badge bg-success">Member</span>' : 
-                  '<span class="badge bg-secondary">Reguler</span>';
+                // 🏷️ Badge tipe booking
+                $badgeTipe = ($row['tipe_booking'] == 'member')
+                  ? '<span class="badge bg-success"><i class="fas fa-user-check"></i> Member</span>'
+                  : '<span class="badge bg-secondary"><i class="fas fa-user"></i> Reguler</span>';
               ?>
+
               <tr>
                 <td class="text-center"><?= $no++ ?></td>
                 <td><?= htmlspecialchars($row['nama_pemesan']) ?></td>
-                <td class="text-center"><?= $tipeUser ?></td>
+                <td class="text-center"><?= $badgeTipe ?></td>
                 <td><?= htmlspecialchars($row['nama_lapangan']) ?></td>
                 <td class="text-center"><?= date('d-m-Y', strtotime($row['tanggal'])) ?></td>
-                <td class="text-center"><?= $row['jam_booking'] ?: '-' ?></td>
+                <td class="text-center"><?= $row['jam_booking'] ?: '<em>-</em>' ?></td>
                 <td class="text-end">Rp <?= number_format($row['total_amount'], 0, ',', '.') ?></td>
-                <td class="text-center"><span class="badge <?= $badge ?>"><?= ucfirst($row['status']) ?></span></td>
-                <td class="text-center"><span class="<?= $pay ?>"><?= ucfirst(str_replace('_', ' ', $row['payment_status'])) ?></span></td>
+                <td class="text-center"><span class="<?= $badgeBooking ?>"><?= ucfirst($row['status']) ?></span></td>
+                <td class="text-center"><span class="<?= $badgePay ?>"><?= ucfirst(str_replace('_', ' ', $row['payment_status'])) ?></span></td>
                 <td class="text-center"><?= date('d-m-Y H:i', strtotime($row['created_at'])) ?></td>
+
                 <td class="text-center">
-                  <!-- Tombol Detail -->
                   <a href="booking_detail.php?id=<?= $row['id_booking'] ?>" 
                      class="btn btn-sm btn-info" title="Detail Booking">
                     <i class="fas fa-info-circle"></i>
                   </a>
 
-                  <!-- Tombol Edit -->
                   <a href="booking_edit.php?id=<?= $row['id_booking'] ?>" 
                      class="btn btn-sm btn-warning" title="Edit Booking">
                     <i class="fas fa-edit"></i>
                   </a>
 
-                  <!-- Tombol Setujui / Tolak -->
                   <?php if ($row['status'] === 'menunggu'): ?>
                     <a href="booking_action_controller.php?action=approve&id=<?= $row['id_booking'] ?>" 
                        class="btn btn-sm btn-success" title="Setujui Booking">
@@ -129,9 +144,9 @@ include('../includes/sidebar.php');
                     </a>
                   <?php endif; ?>
 
-                  <!-- Tombol Hapus -->
                   <a href="booking_action_controller.php?action=delete&id=<?= $row['id_booking'] ?>" 
-                     class="btn btn-sm btn-danger btn-delete" title="Hapus Booking">
+                     class="btn btn-sm btn-danger btn-delete" title="Hapus Booking"
+                     onclick="return confirm('Yakin ingin menghapus booking ini?')">
                     <i class="fas fa-trash"></i>
                   </a>
                 </td>
@@ -146,3 +161,6 @@ include('../includes/sidebar.php');
 </div>
 
 <?php include('../includes/footer.php'); ?>
+
+<!-- 🧩 Inisialisasi DataTable -->
+

@@ -21,8 +21,11 @@ include('../includes/sidebar.php');
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-lg border-0">
-        <div class="card-header bg-info text-white">
-          <h3 class="card-title"><i class="fas fa-list mr-2"></i> Daftar Pengguna Terdaftar</h3>
+        <div class="card-header text-white" 
+             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
+                    box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.15);">
+          <h3 class="card-title mb-0">
+            <i class="fas fa-list mr-2"></i> Daftar Pengguna Terdaftar</h3>
         </div>
 
         <div class="card-body table-responsive">
