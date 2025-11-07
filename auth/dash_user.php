@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dashboard — SportField</title>
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <!-- NAVBAR -->
+    <header class="nav">
+      <div class="nav-left">
+        <div class="logo">
+          <div class="logo-mark">★</div>
+          <div class="logo-text">
+            <div class="title">SportField</div>
+            <div class="subtitle">Booking Lapangan</div>
+          </div>
+        </div>
+        <nav class="main-menu">
+          <a class="active">Dashboard</a>
+          <a id="nav-jadwal">Jadwal</a>
+          <a id="nav-pembayaran">Pembayaran</a>
+        </nav>
+      </div>
+
+      <div class="nav-right">
+        <div class="today" id="todayDate"></div>
+
+        <!-- profile icon with dropdown -->
+        <div class="profile" id="profileToggle" tabindex="0" aria-haspopup="true">
+          <img id="profileAvatar" src="" alt="avatar" />
+        </div>
+
+        <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
+          <button id="btnEditProfile">Edit Profil</button>
+          <button id="btnLogout" class="danger">Keluar</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="wrap">
+      <!-- welcome -->
+      <section class="welcome card fade-in">
+        <div class="welcome-left">
+          <h1>Hai, <span id="userName">User</span> 👋</h1>
+          <p class="muted">Cek ringkasan booking dan jadwal favoritmu di sini.</p>
+        </div>
+        <div class="welcome-right">
+          <button id="btnQuickBook" class="primary small pulse">Booking Sekarang</button>
+        </div>
+      </section>
+
+      <!-- stats row -->
+      <section class="stats-grid">
+        <div class="stat card slide-up" style="animation-delay: 0.1s">
+          <div class="stat-title">Total Booking</div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-note">Total semua booking kamu</div>
+        </div>
+
+        <div class="stat card slide-up" style="animation-delay: 0.2s">
+          <div class="stat-title">Booking Aktif</div>
+          <div class="stat-value" id="statActive">0</div>
+          <div class="stat-note">Booking yang belum selesai</div>
+        </div>
+
+        <div class="stat card slide-up" style="animation-delay: 0.3s">
+          <div class="stat-title">Total Jam Main</div>
+          <div class="stat-value" id="statHours">0</div>
+          <div class="stat-note">Jumlah jam yang pernah kamu main</div>
+        </div>
+
+        <div class="stat card slide-up" style="animation-delay: 0.4s">
+          <div class="stat-title">Pembayaran Terakhir</div>
+          <div class="stat-value" id="statLastPayment">—</div>
+          <div class="stat-note">Nominal transaksi terakhir</div>
+        </div>
+      </section>
+
+      <!-- middle area: chart + right column -->
+      <section class="middle-grid">
+        <div class="card chart-card fade-in">
+          <div class="section-head">
+            <h3>Jam Favorit Kamu</h3>
+            <p class="muted small">Frekuensi booking berdasarkan jam</p>
+          </div>
+          <div class="chart-container">
+            <canvas id="hourChart"></canvas>
+          </div>
+        </div>
+
+        <aside class="right-col">
+          <div class="card next-booking slide-in-right" style="animation-delay: 0.1s">
+            <div class="section-head">
+              <h4>Jadwal Berikutnya</h4>
+            </div>
+            <div id="nextBookingBox" class="next-box muted">Tidak ada jadwal aktif</div>
+          </div>
+
+          <div class="card favorites-box slide-in-right" style="animation-delay: 0.2s">
+            <div class="section-head">
+              <h4>Lapangan Favorit</h4>
+            </div>
+            <div id="favFields" class="fav-list muted">Belum ada data favorit</div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- Additional content below chart -->
+      <section class="bottom-section">
+        <div class="promo-card card fade-in">
+          <div class="promo-content">
+            <div class="promo-text">
+              <h3>🎉 Promo Spesial Bulan Ini!</h3>
+              <p>Dapatkan diskon 20% untuk booking di hari Senin - Kamis. Berlaku hingga akhir bulan.</p>
+              <button class="primary small">Lihat Detail Promo</button>
+            </div>
+            <div class="promo-image">
+              <div class="promo-graphic">🏆</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tips-grid">
+          <div class="tip-card card fade-in" style="animation-delay: 0.1s">
+            <div class="tip-icon">💡</div>
+            <h4>Tips Booking</h4>
+            <p>Booking 3 hari sebelumnya untuk mendapatkan jam favoritmu</p>
+          </div>
+
+          <div class="tip-card card fade-in" style="animation-delay: 0.2s">
+            <div class="tip-icon">⏰</div>
+            <h4>Waktu Terbaik</h4>
+            <p>Jam 18:00-20:00 adalah waktu paling populer, booking lebih awal!</p>
+          </div>
+
+          <div class="tip-card card fade-in" style="animation-delay: 0.3s">
+            <div class="tip-icon">💰</div>
+            <h4>Hemat Biaya</h4>
+            <p>Booking di weekdays bisa lebih hemat hingga 25%</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- PROFILE MODAL -->
+    <div class="modal-bg" id="profileModal" aria-hidden="true">
+      <div class="modal card scale-in">
+        <button class="modal-close" id="closeProfileModal">&times;</button>
+        <h3>Edit Profil</h3>
+        <form id="profileForm">
+          <div class="profile-header">
+            <div class="profile-avatar">
+              <img id="profileAvatarLarge" src="" alt="avatar" />
+              <button type="button" class="avatar-edit">✏️</button>
+            </div>
+            <div class="profile-info">
+              <div class="profile-name" id="profileNameDisplay"></div>
+              <div class="profile-email" id="profileEmailDisplay"></div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <label for="inputName">Nama Lengkap</label>
+            <input id="inputName" type="text" required />
+
+            <label for="inputEmail">Email</label>
+            <input id="inputEmail" type="email" required />
+
+            <label for="inputPhone">No. HP</label>
+            <input id="inputPhone" type="tel" required />
+
+            <label for="inputJob">Pekerjaan</label>
+            <div class="select-container">
+              <select id="inputJob">
+                <option value="">Pilih pekerjaan...</option>
+                <option value="Mahasiswa">Mahasiswa</option>
+                <option value="Pelajar">Pelajar</option>
+                <option value="Pegawai Swasta">Pegawai Swasta</option>
+                <option value="PNS">PNS</option>
+                <option value="Wiraswasta">Wiraswasta</option>
+                <option value="Freelancer">Freelancer</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </div>
+            <input id="inputJobCustom" type="text" placeholder="Tulis pekerjaanmu..." style="display: none" />
+          </div>
+
+          <div class="form-section">
+            <h4>Ubah Password</h4>
+            <label for="inputPassword">Password Baru</label>
+            <div class="password-container">
+              <input id="inputPassword" type="password" placeholder="Kosongkan jika tidak ingin mengubah" />
+              <button type="button" class="password-toggle" id="togglePassword">👁️</button>
+            </div>
+
+            <label for="inputConfirmPassword">Konfirmasi Password Baru</label>
+            <div class="password-container">
+              <input id="inputConfirmPassword" type="password" placeholder="Konfirmasi password baru" />
+              <button type="button" class="password-toggle" id="toggleConfirmPassword">👁️</button>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="saveProfile" class="primary">Simpan Perubahan</button>
+            <button type="button" id="cancelProfile" class="btn-ghost">Batal</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="assets/js/dashboard.js"></script>
+  </body>
+</html>
