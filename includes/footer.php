@@ -1,33 +1,34 @@
-<footer class="main-footer text-sm">
-  <strong>Copyright &copy; 2021 - <?= date('Y'); ?> 
-    <a href="#" class="text-primary">Badmintoon</a>.
-  </strong>
-  All rights reserved.
-  <div class="float-right d-none d-sm-inline-block">
+<footer class="main-footer text-sm d-flex justify-content-between align-items-center flex-wrap">
+  <div class="footer-left">
+    <strong>Copyright &copy; 2021 - <?= date('Y'); ?> 
+      <a href="#" class="text-primary">Badmintoon</a>.
+    </strong> 
+    All rights reserved.
+  </div>
+
+  <div class="footer-right text-muted">
     <b>Version</b> 3.2.0
   </div>
 </footer>
 
-<!-- Control Sidebar -->
+
 <aside class="control-sidebar control-sidebar-dark"></aside>
 </div>
 <!-- ./wrapper -->
 
-<!-- ================== CORE SCRIPTS ================== -->
-<script src="../public/asseth/tampilan_admin/plugins/jquery/jquery.min.js"></script>
+<!-- URUTAN BENAR JAVASCRIPT LIBRARY -->
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 <script src="../public/asseth/tampilan_admin/plugins/jquery-ui/jquery-ui.min.js"></script>
 <script>$.widget.bridge('uibutton', $.ui.button)</script>
-<script src="../public/asseth/tampilan_admin/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../public/asseth/tampilan_admin/plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script>
 <script src="../public/asseth/tampilan_admin/dist/js/adminlte.min.js"></script>
 
-<!-- ================== SELECT2 ================== -->
 <link rel="stylesheet" href="../public/asseth/tampilan_admin/plugins/select2/css/select2.min.css">
 <link rel="stylesheet" href="../public/asseth/tampilan_admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css">
 <script src="../public/asseth/tampilan_admin/plugins/select2/js/select2.full.min.js"></script>
- 
 
-<!-- ================== DATATABLES ================== -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
@@ -40,48 +41,17 @@
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.colVis.min.js"></script>
 
-<!-- ================== SWEETALERT2 & TOASTR ================== -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"/>
 
-<!-- ================== ANIMASI + SPINNER ================== -->
-<style>
-  #tableLoader {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 1050;
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(3px);
-    align-items: center;
-    justify-content: center;
-  }
-  .spinner-border {
-    width: 3rem;
-    height: 3rem;
-    color: #1874ad;
-  }
-  table.dataTable tbody tr {
-    opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.3s ease;
-  }
-  table.dataTable tbody tr.appear {
-    opacity: 1;
-    transform: translateY(0);
-  }
-</style>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-<div id="tableLoader">
-  <div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>
-</div>
-
-<!-- ================== DATATABLE INITIALIZER GLOBAL (Auto-Safe & Adaptive) ================== -->
+<!-- SCRIPT GLOBAL: LOADER, DATATABLES, DARK MODE, TOASTR -->
 <script>
 $(function () {
   const $loader = $("#tableLoader");
-  const tables = $('table[id^="tbl"], table[id^="example"], table.dataTable');
+  const tables = $('table[id^="tbl"], table[id^="example"], table[id^="tabel"], table.dataTable');
   let initialized = 0;
 
   if (tables.length > 0) $loader.fadeIn(200);
@@ -90,10 +60,7 @@ $(function () {
     const $tbl = $(this);
     const id = $tbl.attr('id') || 'dataTable_' + Math.random().toString(36).substr(2, 5);
 
-    if ($.fn.DataTable.isDataTable($tbl)) {
-      console.log(`⚠️ [${id}] sudah diinisialisasi manual — dilewati oleh global.`);
-      return;
-    }
+    if ($.fn.DataTable.isDataTable($tbl)) return;
 
     const dt = $tbl.DataTable({
       responsive: true,
@@ -116,10 +83,7 @@ $(function () {
       }
     });
 
-    dt.on('draw.dt', function () {
-      animateRows($tbl);
-    });
-
+    dt.on('draw.dt', function () { animateRows($tbl); });
     dt.buttons().container().appendTo('#' + id + '_wrapper .col-sm-6:eq(0)');
   });
 
@@ -130,34 +94,8 @@ $(function () {
     });
   }
 });
-</script>
 
-
-
-<!-- ================== SWEETALERT KONFIRMASI GLOBAL ================== -->
-<script>
-$(document).on('click', '.btn-delete', function (e) {
-  e.preventDefault();
-  const href = $(this).attr('href');
-  Swal.fire({
-    title: 'Apakah kamu yakin?',
-    text: "Data yang dihapus tidak bisa dikembalikan!",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#3085d6',
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Ya, hapus!',
-    cancelButtonText: 'Batal'
-  }).then((result) => {
-    if (result.isConfirmed) {
-      window.location.href = href;
-    }
-  });
-});
-</script>
-
-<!-- ================== TOASTR NOTIFIKASI GLOBAL ================== -->
-<script>
+// TOASTR
 <?php if (!empty($_SESSION['toast_success'])): ?>
   toastr.success("<?= $_SESSION['toast_success'] ?>", "Sukses!");
   <?php unset($_SESSION['toast_success']); ?>
@@ -167,10 +105,8 @@ $(document).on('click', '.btn-delete', function (e) {
   toastr.error("<?= $_SESSION['toast_error'] ?>", "Gagal!");
   <?php unset($_SESSION['toast_error']); ?>
 <?php endif; ?>
-</script>
 
-<!-- ================== DARK MODE ================== -->
-<script>
+// DARK MODE
 $(function () {
   const $sidebar = $(".control-sidebar");
   $sidebar.empty();
@@ -206,49 +142,33 @@ $(function () {
 });
 </script>
 
-<!-- ================== PRELOADER FIX ================== -->
-<script>
-$(window).on('load', function() {
-  $(".preloader").fadeOut(500, function() {
-    $(this).remove();
-  });
-});
-</script>
+<style>
+  #tableLoader {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+  }
+  .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    color: #1874ad;
+  }
+  table.dataTable tbody tr {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+  }
+  table.dataTable tbody tr.appear {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
 
-
-<script>
-  window.addEventListener("load", function () {
-    const preloader = document.querySelector(".preloader");
-    preloader.classList.add("hidden");
-    setTimeout(() => preloader.remove(), 600);
-  });
-</script>
-
-
-<script>
-  // Efek hilang halus saat halaman selesai dimuat
-  window.addEventListener("load", function () {
-    const preloader = document.querySelector(".preloader");
-    preloader.classList.add("hidden");
-    setTimeout(() => preloader.remove(), 800);
-  });
-</script>
-
-
-
-
-<!-- Validasi jam buka dan tutup -->
-<script>
-$(document).ready(function(){
-  $('input[type="time"]').on('change', function(){
-    const row = $(this).closest('tr');
-    const buka = row.find('input[name^="jam_buka"]').val();
-    const tutup = row.find('input[name^="jam_tutup"]').val();
-    if (buka && tutup && tutup <= buka) {
-      alert('Jam tutup harus lebih besar dari jam buka!');
-      row.find('input[name^="jam_tutup"]').val('');
-    }
-  });
-});
-</script>
-/html>
+<div id="tableLoader">
+  <div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>
+</div>

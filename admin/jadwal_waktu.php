@@ -32,7 +32,6 @@ include('../includes/sidebar.php');
                 <th>No</th>
                 <th>Lapangan</th>
                 <th>Jam</th>
-                <th>Harga per Slot</th>
                 <th>Dibuat</th>
               </tr>
             </thead>
@@ -53,7 +52,6 @@ include('../includes/sidebar.php');
                   <td class="text-center">
                     <?= substr($row['jam_mulai'], 0, 5) ?> - <?= substr($row['jam_selesai'], 0, 5) ?>
                   </td>
-                  <td class="text-end">Rp <?= number_format($row['harga_per_jam'], 0, ',', '.') ?></td>
                   <td class="text-center"><?= date('d-m-Y H:i', strtotime($row['created_at'])) ?></td>
                 </tr>
               <?php endwhile; ?>

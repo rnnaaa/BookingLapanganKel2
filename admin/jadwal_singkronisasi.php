@@ -12,9 +12,9 @@ $hari_map = [
     'Sunday' => 'Minggu'
 ];
 
-// ===============================
-// 1️⃣ JAM OPERASIONAL DEFAULT
-// ===============================
+// =====================================
+// 1️⃣ Pastikan jam_operasional ada
+// =====================================
 $jam_operasional_default = [
     ['hari' => 'Senin', 'jam_buka' => '07:00:00', 'jam_tutup' => '23:00:00'],
     ['hari' => 'Selasa', 'jam_buka' => '07:00:00', 'jam_tutup' => '23:00:00'],
@@ -29,21 +29,21 @@ foreach ($jam_operasional_default as $j) {
     $hari = $j['hari'];
     $cek = mysqli_query($conn, "SELECT id_operasional FROM jam_operasional WHERE hari='$hari'");
     if (mysqli_num_rows($cek) == 0) {
-        $sql = "INSERT INTO jam_operasional (hari, jam_buka, jam_tutup, created_at)
-                VALUES ('$hari', '{$j['jam_buka']}', '{$j['jam_tutup']}', NOW())";
-        mysqli_query($conn, $sql);
+        mysqli_query($conn, "
+            INSERT INTO jam_operasional (hari, jam_buka, jam_tutup, created_at)
+            VALUES ('$hari', '{$j['jam_buka']}', '{$j['jam_tutup']}', NOW())
+        ");
     }
 }
 
-// ===============================
-// 2️⃣ HAPUS JADWAL HARIAN LAMA
-// ===============================
+// =====================================
+// 2️⃣ Bersihkan jadwal_harian lama
+// =====================================
 mysqli_query($conn, "DELETE FROM jadwal_harian WHERE tanggal < CURDATE()");
 
-// ===============================
-// 3️⃣ GENERATE JADWAL HARIAN 7 HARI KE DEPAN
-// ===============================
-$jumlah_harian = 0;
+// =====================================
+// 3️⃣ Generate jadwal_harian 7 hari ke depan
+// =====================================
 for ($i = 0; $i < 7; $i++) {
     $tanggal = date('Y-m-d', strtotime("+$i day"));
     $hari_en = date('l', strtotime($tanggal));
@@ -52,45 +52,69 @@ for ($i = 0; $i < 7; $i++) {
     $lapangan_q = mysqli_query($conn, "SELECT id_lapangan FROM lapangan WHERE status='aktif'");
     while ($lap = mysqli_fetch_assoc($lapangan_q)) {
         $id_lapangan = $lap['id_lapangan'];
+
+        // Tambah jadwal_harian jika belum ada
         $cek = mysqli_query($conn, "
             SELECT id_jadwal_harian FROM jadwal_harian 
             WHERE tanggal='$tanggal' AND id_lapangan='$id_lapangan'
         ");
         if (mysqli_num_rows($cek) == 0) {
-            $sql = "INSERT INTO jadwal_harian (id_lapangan, tanggal, hari, status_hari, created_at)
-                    VALUES ('$id_lapangan', '$tanggal', '$hari_id', 'tersedia', NOW())";
-            if (mysqli_query($conn, $sql)) $jumlah_harian++;
+            mysqli_query($conn, "
+                INSERT INTO jadwal_harian (id_lapangan, tanggal, hari, status_hari, created_at)
+                VALUES ('$id_lapangan', '$tanggal', '$hari_id', 'tersedia', NOW())
+            ");
         }
-    }
-}
 
-// ===============================
-// 4️⃣ GENERATE JADWAL WAKTU PER LAPANGAN
-// ===============================
-$jumlah_waktu = 0;
-$jam_ops = mysqli_query($conn, "SELECT * FROM jam_operasional");
-while ($j = mysqli_fetch_assoc($jam_ops)) {
-    $hari = $j['hari'];
-    $jam_tutup = strtotime($j['jam_tutup']);
+        // Ambil ID jadwal_harian
+        $jadwal_harian = mysqli_fetch_assoc(mysqli_query($conn, "
+            SELECT id_jadwal_harian FROM jadwal_harian 
+            WHERE tanggal='$tanggal' AND id_lapangan='$id_lapangan'
+        "));
+        $id_jadwal_harian = $jadwal_harian['id_jadwal_harian'];
 
-    $lapangan_q = mysqli_query($conn, "SELECT id_lapangan, harga_per_jam FROM lapangan WHERE status='aktif'");
-    while ($lap = mysqli_fetch_assoc($lapangan_q)) {
-        $id_lapangan = $lap['id_lapangan'];
-        $harga = $lap['harga_per_jam'];
+        // Ambil jam operasional untuk hari tersebut
+        $jam_ops = mysqli_fetch_assoc(mysqli_query($conn, "
+            SELECT * FROM jam_operasional WHERE hari='$hari_id'
+        "));
+        if (!$jam_ops) continue;
 
-        $jam_mulai = strtotime($j['jam_buka']);
+        $jam_mulai = strtotime($jam_ops['jam_buka']);
+        $jam_tutup = strtotime($jam_ops['jam_tutup']);
+
+        // Generate slot waktu per jam
         while ($jam_mulai < $jam_tutup) {
             $start = date('H:i:s', $jam_mulai);
             $end = date('H:i:s', strtotime('+1 hour', $jam_mulai));
 
+            // Pastikan jadwal_waktu (master slot jam) sudah ada
             $cek_slot = mysqli_query($conn, "
                 SELECT id_jadwal_waktu FROM jadwal_waktu 
                 WHERE id_lapangan='$id_lapangan' AND jam_mulai='$start' AND jam_selesai='$end'
             ");
             if (mysqli_num_rows($cek_slot) == 0) {
-                $sql = "INSERT INTO jadwal_waktu (id_lapangan, jam_mulai, jam_selesai, harga_per_jam, created_at)
-                        VALUES ('$id_lapangan', '$start', '$end', '$harga', NOW())";
-                if (mysqli_query($conn, $sql)) $jumlah_waktu++;
+                mysqli_query($conn, "
+                    INSERT INTO jadwal_waktu (id_lapangan, jam_mulai, jam_selesai, created_at)
+                    VALUES ('$id_lapangan', '$start', '$end', NOW())
+                ");
+            }
+
+            // Ambil ID jadwal_waktu
+            $jadwal_waktu = mysqli_fetch_assoc(mysqli_query($conn, "
+                SELECT id_jadwal_waktu FROM jadwal_waktu 
+                WHERE id_lapangan='$id_lapangan' AND jam_mulai='$start' AND jam_selesai='$end'
+            "));
+            $id_jadwal_waktu = $jadwal_waktu['id_jadwal_waktu'];
+
+            // Tambahkan ke jadwal_detail kalau belum ada
+            $cek_detail = mysqli_query($conn, "
+                SELECT id_detail FROM jadwal_detail 
+                WHERE id_jadwal_harian='$id_jadwal_harian' AND id_jadwal_waktu='$id_jadwal_waktu'
+            ");
+            if (mysqli_num_rows($cek_detail) == 0) {
+                mysqli_query($conn, "
+                    INSERT INTO jadwal_detail (id_jadwal_harian, id_jadwal_waktu, status, created_at)
+                    VALUES ('$id_jadwal_harian', '$id_jadwal_waktu', 'tersedia', NOW())
+                ");
             }
 
             $jam_mulai = strtotime('+1 hour', $jam_mulai);
@@ -98,24 +122,11 @@ while ($j = mysqli_fetch_assoc($jam_ops)) {
     }
 }
 
-// ===============================
-// 5️⃣ CATAT LOG SINKRONISASI
-// ===============================
-$jumlah_lapangan = mysqli_num_rows(mysqli_query($conn, "SELECT id_lapangan FROM lapangan WHERE status='aktif'"));
-$pesan = "Sinkronisasi berhasil: {$jumlah_lapangan} lapangan aktif, {$jumlah_harian} jadwal harian baru, {$jumlah_waktu} jadwal waktu baru.";
-
-mysqli_query($conn, "
-    INSERT INTO log_sinkronisasi (waktu_sinkron, jumlah_lapangan, jumlah_jadwal_harian, jumlah_jadwal_waktu, pesan)
-    VALUES (NOW(), '$jumlah_lapangan', '$jumlah_harian', '$jumlah_waktu', '$pesan')
-");
-
-// ===============================
-// 6️⃣ TAMPILKAN HASIL
-// ===============================
 echo "<div style='font-family: Arial; margin: 20px;'>
-<h3 style='color: green;'>✅ Jadwal otomatis berhasil diperbarui sampai 7 hari ke depan!</h3>
-<p>{$pesan}</p>
-<p><b>Catatan:</b> Semua data sinkronisasi telah dicatat di tabel <code>log_sinkronisasi</code>.</p>
-<p><b>Tips:</b> Pasang file ini di cron job agar berjalan otomatis setiap malam (misalnya jam 00:05).</p>
+<h3 style='color: green;'>✅ Jadwal otomatis lengkap sampai 7 hari ke depan!</h3>
+<p>Termasuk: <b>jadwal harian + slot per jam (jadwal_detail)</b></p>
+<p>Setiap slot default: <b>tersedia</b></p>
+<p><b>Harga:</b> akan diambil langsung dari tabel <code>lapangan</code> saat transaksi/booking.</p>
+<p><b>Tips:</b> Pasang di cron job agar diperbarui otomatis tiap malam.</p>
 </div>";
 ?>

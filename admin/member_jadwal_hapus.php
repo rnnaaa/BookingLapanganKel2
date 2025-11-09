@@ -1,32 +1,15 @@
 <?php
-session_start();
 require_once __DIR__ . '/../config/database.php';
+$id = $_POST['id'] ?? 0;
 
-// Pastikan parameter ID dikirim
-if (!isset($_GET['id'])) {
-  $_SESSION['toast_error'] = "⚠️ ID jadwal tidak ditemukan!";
-  header("Location: member_jadwal.php");
+if ($id == 0) {
+  echo json_encode(["status" => "error", "message" => "ID tidak valid."]);
   exit;
 }
 
-$id = intval($_GET['id']);
-
-// Cek apakah data jadwal ada
-$cek = mysqli_query($conn, "SELECT * FROM member_jadwal WHERE id_member_jadwal = '$id'");
-if (mysqli_num_rows($cek) == 0) {
-  $_SESSION['toast_error'] = "⚠️ Jadwal tidak ditemukan!";
-  header("Location: member_jadwal.php");
-  exit;
-}
-
-// Hapus data
-$hapus = mysqli_query($conn, "DELETE FROM member_jadwal WHERE id_member_jadwal = '$id'");
-
+$hapus = mysqli_query($conn, "DELETE FROM member_jadwal WHERE id_member_jadwal='$id'");
 if ($hapus) {
-  $_SESSION['toast_success'] = "✅ Jadwal rutin berhasil dihapus!";
+  echo json_encode(["status" => "success", "message" => "Jadwal berhasil dihapus."]);
 } else {
-  $_SESSION['toast_error'] = "❌ Terjadi kesalahan, data gagal dihapus!";
+  echo json_encode(["status" => "error", "message" => "Gagal menghapus data."]);
 }
-
-header("Location: member_jadwal.php");
-exit;
