@@ -4,10 +4,11 @@ require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
+date_default_timezone_set('Asia/Jakarta');
 ?>
 
 <div class="content-wrapper animate__animated animate__fadeIn">
-  <!-- HEADER -->
+  <!-- Header -->
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-users mr-2"></i> Data Pengguna Sistem</h1>
@@ -17,15 +18,12 @@ include('../includes/sidebar.php');
     </div>
   </section>
 
-  <!-- KONTEN UTAMA -->
+  <!-- Content -->
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-lg border-0">
-        <div class="card-header text-white" 
-             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
-                    box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.15);">
-          <h3 class="card-title mb-0">
-            <i class="fas fa-list mr-2"></i> Daftar Pengguna Terdaftar</h3>
+        <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
+          <h3 class="card-title mb-0"><i class="fas fa-list mr-2"></i> Daftar Pengguna Terdaftar</h3>
         </div>
 
         <div class="card-body table-responsive">
@@ -47,43 +45,78 @@ include('../includes/sidebar.php');
             <tbody>
               <?php
               $no = 1;
-              $sql = "
-                SELECT 
-                  u.id_user,
-                  u.nama,
-                  u.email,
-                  u.no_hp,
-                  u.role,
-                  u.created_at,
-                  COALESCE(m.status, 'belum_member') AS status_member,
-                  (SELECT COUNT(*) FROM booking b WHERE b.id_user = u.id_user) AS total_booking,
-                  (SELECT SUM(p.amount) FROM pembayaran p 
-                    JOIN booking b ON p.booking_id = b.id_booking
-                    WHERE b.id_user = u.id_user AND p.status_verifikasi = 'valid') AS total_pembayaran
-                FROM users u
-                LEFT JOIN member m ON m.id_user = u.id_user
-                ORDER BY u.id_user DESC
-              ";
+              // Query disederhanakan agar MySQL tidak hang
+           $sql = "
+  SELECT 
+    u.id_user,
+    u.nama,
+    u.email,
+    u.no_hp,
+    u.role,
+    u.created_at,
+    COALESCE(
+      (SELECT m.status FROM member m WHERE m.id_user = u.id_user ORDER BY m.id_member DESC LIMIT 1),
+      'belum_member'
+    ) AS status_member,
+    (
+      SELECT COUNT(*) 
+      FROM booking b 
+      WHERE b.id_user = u.id_user
+    ) AS total_booking,
+    (
+      CASE 
+        WHEN (
+          SELECT m.status 
+          FROM member m 
+          WHERE m.id_user = u.id_user 
+          ORDER BY m.id_member DESC LIMIT 1
+        ) = 'aktif'
+        THEN (
+          SELECT COALESCE(SUM(m2.total_bayar),0)
+          FROM member m2
+          WHERE m2.id_user = u.id_user
+            AND m2.status = 'aktif'
+        )
+        ELSE (
+          SELECT COALESCE(SUM(p.amount),0)
+          FROM pembayaran p
+          INNER JOIN booking b2 ON b2.id_booking = p.booking_id
+          WHERE b2.id_user = u.id_user
+            AND p.status_verifikasi = 'valid'
+        )
+      END
+    ) AS total_pembayaran
+  FROM users u
+  ORDER BY u.id_user DESC
+";
+
+
               $result = mysqli_query($conn, $sql);
 
-              while ($row = mysqli_fetch_assoc($result)):
-                $role = $row['role'] == 'admin' 
-                        ? '<span class="badge bg-danger">Admin</span>' 
-                        : '<span class="badge bg-secondary">User</span>';
+              if (!$result) {
+                  echo "<tr><td colspan='10' class='text-center text-danger'>Query Error: " . mysqli_error($conn) . "</td></tr>";
+              } else {
+                while ($row = mysqli_fetch_assoc($result)):
+                  // Badge Role
+                  if ($row['role'] == 'admin') {
+                      $roleBadge = '<span class="badge bg-danger">Admin</span>';
+                  } elseif ($row['role'] == 'member') {
+                      $roleBadge = '<span class="badge bg-info">Member</span>';
+                  } else {
+                      $roleBadge = '<span class="badge bg-secondary">User</span>';
+                  }
 
-                // Badge member
-                switch (strtolower($row['status_member'])) {
-                  case 'aktif':
-                    $memberBadge = '<span class="badge bg-success">Aktif</span>';
-                    break;
-                  case 'nonaktif':
-                    $memberBadge = '<span class="badge bg-secondary">Nonaktif</span>';
-                    break;
-                  default:
-                    $memberBadge = '<span class="badge bg-light text-muted">Belum Member</span>';
-                }
+                  // Badge Member
+                  $statusMember = strtolower($row['status_member']);
+                  if ($statusMember == 'aktif') {
+                      $memberBadge = '<span class="badge bg-success">Aktif</span>';
+                  } elseif ($statusMember == 'nonaktif') {
+                      $memberBadge = '<span class="badge bg-secondary">Nonaktif</span>';
+                  } else {
+                      $memberBadge = '<span class="badge bg-light text-muted">Belum Member</span>';
+                  }
 
-                $totalPembayaran = $row['total_pembayaran'] ? number_format($row['total_pembayaran'], 0, ',', '.') : '0';
+                  $totalPembayaran = number_format($row['total_pembayaran'], 0, ',', '.');
               ?>
               <tr id="user-<?= $row['id_user'] ?>">
                 <td class="text-center"><?= $no++ ?></td>
@@ -98,14 +131,14 @@ include('../includes/sidebar.php');
                 </td>
                 <td class="text-center"><?= $memberBadge ?></td>
                 <td class="text-center"><span class="badge bg-primary"><?= $row['total_booking'] ?></span></td>
-                <td class="text-center">Rp <?= $totalPembayaran ?></td>
+                <td class="text-center fw-bold">Rp <?= $totalPembayaran ?></td>
                 <td class="text-center"><?= date('d-m-Y', strtotime($row['created_at'])) ?></td>
                 <td class="text-center">
                   <a href="users_edit.php?id=<?= $row['id_user'] ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
-                  <a href="users_hapus.php?id=<?= $row['id_user'] ?>" class="btn btn-sm btn-danger btn-delete" title="Hapus"><i class="fas fa-trash"></i></a>
+                  <button class="btn btn-sm btn-danger btn-delete" data-id="<?= $row['id_user'] ?>" title="Hapus"><i class="fas fa-trash"></i></button>
                 </td>
               </tr>
-              <?php endwhile; ?>
+              <?php endwhile; } ?>
             </tbody>
           </table>
         </div>
@@ -114,55 +147,48 @@ include('../includes/sidebar.php');
   </section>
 </div>
 
-<?php include('../includes/footer.php'); ?>
+<?php include_once('../includes/footer.php'); ?>
 
-<!-- SweetAlert & AJAX Role Update -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-$(document).ready(function () {
-  // Hapus konfirmasi
-  $('.btn-delete').on('click', function (e) {
-    e.preventDefault();
-    const url = $(this).attr('href');
+$(function(){
+  // Update Role dengan AJAX
+  $('.role-select').change(function(){
+    const id_user = $(this).data('id');
+    const role = $(this).val();
     Swal.fire({
-      title: 'Yakin ingin menghapus pengguna ini?',
-      text: 'Data yang dihapus tidak dapat dikembalikan!',
-      icon: 'warning',
+      title: 'Perbarui Role?',
+      text: `Anda yakin ingin mengubah role pengguna ini menjadi "${role}"?`,
+      icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, Hapus!',
+      confirmButtonText: 'Ya, perbarui',
       cancelButtonText: 'Batal'
     }).then((result) => {
-      if (result.isConfirmed) {
-        window.location.href = url;
+      if(result.isConfirmed){
+        $.ajax({
+          url: 'users_update_role.php',
+          type: 'POST',
+          data: { id_user, role },
+          beforeSend: () => Swal.fire({ title:'Menyimpan...', text:'Harap tunggu sebentar', allowOutsideClick:false, didOpen:()=>Swal.showLoading() }),
+          success: () => Swal.fire({ icon:'success', title:'Berhasil!', text:'Role berhasil diperbarui.', timer:1500, showConfirmButton:false }),
+          error: () => Swal.fire({ icon:'error', title:'Gagal!', text:'Terjadi kesalahan saat memperbarui.' })
+        });
       }
     });
   });
 
-  // Ganti Role via AJAX
-  $('.role-select').change(function () {
+  // Hapus User
+  $('.btn-delete').click(function(){
     const id = $(this).data('id');
-    const role = $(this).val();
-    $.ajax({
-      url: 'users_update_role.php',
-      type: 'POST',
-      data: { id_user: id, role: role },
-      success: function () {
-        Swal.fire({
-          icon: 'success',
-          title: 'Berhasil!',
-          text: 'Role pengguna diperbarui.',
-          timer: 1500,
-          showConfirmButton: false
-        });
-      },
-      error: function () {
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal!',
-          text: 'Terjadi kesalahan saat memperbarui role.'
-        });
+    Swal.fire({
+      title: 'Yakin ingin menghapus?',
+      text: 'Data pengguna ini akan dihapus permanen!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, hapus',
+      cancelButtonText: 'Batal'
+    }).then((result) => {
+      if(result.isConfirmed){
+        window.location.href = 'users_hapus.php?id=' + id;
       }
     });
   });

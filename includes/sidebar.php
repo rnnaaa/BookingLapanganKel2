@@ -64,6 +64,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <p>Jadwal Harian</p>
           </a>
         </li>
+<li class="nav-item">
+          <a href="jadwal_view.php" class="nav-link <?= $current_page=='jadwal_view.php'?'active':'' ?>">
+            <i class="nav-icon fas fa-calendar-day"></i>
+            <p>Jadwal View</p>
+          </a>
+        </li>
+
         <li class="nav-item">
   <a href="jam_operasional.php" class="nav-link">
     <i class="nav-icon fas fa-clock"></i>

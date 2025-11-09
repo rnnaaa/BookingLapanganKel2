@@ -1,93 +1,309 @@
 <?php
+// Strict error reporting for MySQLi
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+// Start session and include database config
+session_start();
 require_once __DIR__ . '/../config/database.php';
+date_default_timezone_set('Asia/Jakarta');
+
+// --- (1) AMBIL DATA HARGA MEMBER UNTUK JAVASCRIPT (Sebelum dipost/output) ---
+$harga_per_jam_member = 0;
+// Ambil harga_per_jam_member dari lapangan aktif
+if ($qHarga = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHERE status='aktif' LIMIT 1")) {
+    if ($h = mysqli_fetch_assoc($qHarga)) {
+        $harga_per_jam_member = floatval($h['harga_per_jam_member']);
+    }
+    mysqli_free_result($qHarga);
+}
+
+
+// ✅ (2) PROSES POST MEMBER
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // --- PROSES TAMBAH MEMBER ---
+    try {
+        $id_user = intval($_POST['id_user']);
+        $durasi_bulan = intval($_POST['durasi_bulan']);
+        $tanggal_mulai = $_POST['tanggal_mulai'];
+        $method = $_POST['method'];
+        $total_bayar = floatval($_POST['total_bayar_value'] ?? 0); 
+
+        // Validasi dasar
+        if (!$id_user || !$durasi_bulan || !$tanggal_mulai || $total_bayar <= 0) {
+            throw new Exception("Data tidak lengkap atau Total Bayar belum terhitung/tidak valid!");
+        }
+
+        // Mulai transaksi
+        $conn->begin_transaction();
+
+        // Ambil lapangan aktif
+        $stmt = $conn->prepare("SELECT id_lapangan FROM lapangan WHERE status='aktif' LIMIT 1");
+        $stmt->execute();
+        $lap = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$lap) throw new Exception("Tidak ada lapangan aktif ditemukan.");
+
+        $id_lapangan = intval($lap['id_lapangan']);
+
+        // Hitung tanggal berakhir
+        $tanggal_berakhir = date('Y-m-d', strtotime("+$durasi_bulan month", strtotime($tanggal_mulai)));
+
+        // Insert ke member
+        $stmt = $conn->prepare("
+            INSERT INTO member (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, total_bayar, method, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW(), NOW())
+        ");
+        $stmt->bind_param("iiissds", $id_user, $id_lapangan, $durasi_bulan, $tanggal_mulai, $tanggal_berakhir, $total_bayar, $method);
+        $stmt->execute();
+        $id_member = $conn->insert_id;
+        $stmt->close();
+
+        if (!$id_member) throw new Exception("Gagal menyimpan data member.");
+
+        // Update role user menjadi 'member'
+        $stmt = $conn->prepare("UPDATE users SET role='member', updated_at=NOW() WHERE id_user=?");
+        $stmt->bind_param("i", $id_user);
+        $stmt->execute();
+        $stmt->close();
+
+        // Insert keuangan otomatis
+        $stmt = $conn->prepare("
+            INSERT INTO keuangan (tanggal, jenis, kategori, keterangan, jumlah, sumber, booking_id, created_at, updated_at)
+            VALUES (CURDATE(), 'pemasukan', 'Membership', ?, ?, 'Pelunasan', NULL, NOW(), NOW())
+        ");
+        $ket = "Pembayaran Member ID $id_member";
+        $stmt->bind_param("sd", $ket, $total_bayar);
+        $stmt->execute();
+        $stmt->close();
+
+        $conn->commit();
+
+        $_SESSION['toast_success'] = "Member berhasil diaktifkan! ID: $id_member";
+        header("Location: member.php");
+        exit;
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['toast_error'] = "ERROR: " . $e->getMessage();
+        error_log("Member Activation Error: " . $e->getMessage() . " | MySQL Error: " . $conn->error);
+        header("Location: member.php");
+        exit;
+    }
+}
+
+// (3) PERIKSA MEMBER EXPIRED
+// Query ini akan secara otomatis mengubah status member menjadi 'nonaktif' dan role user menjadi 'user'
+// jika tanggal berakhir sudah melewati hari ini (CURDATE()).
+$conn->query("
+    UPDATE member m
+    JOIN users u ON m.id_user = u.id_user
+    SET m.status='nonaktif', u.role='user'
+    WHERE m.tanggal_berakhir < CURDATE() AND m.status='aktif'
+");
+
+// ---------------- DATA FORM ----------------
+// Ambil daftar user yang BELUM menjadi member
+$qUsers = mysqli_query($conn, "SELECT id_user, nama FROM users WHERE role='user' AND status='aktif' ORDER BY nama ASC");
+
+// ---------------- DATA TABLE ----------------
+$qMember = mysqli_query($conn, "
+    SELECT m.id_member, u.nama, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, m.total_bayar, m.status
+    FROM member m
+    LEFT JOIN users u ON m.id_user = u.id_user
+    ORDER BY m.id_member DESC
+");
+
+
+// Baru tampilkan HTML
 include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 
 <div class="content-wrapper animate__animated animate__fadeIn">
-  <section class="content-header">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
-      <h1><i class="fas fa-id-card mr-2"></i> Data Membership</h1>
-      <a href="member_tambah.php" class="btn btn-primary shadow-sm">
-        <i class="fas fa-plus-circle"></i> Tambah Member Baru
-      </a>
-    </div>
-  </section>
 
-  <section class="content">
-    <div class="container-fluid">
-      <div class="card shadow-lg border-0">
-        <div class="card-header text-white" 
-             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
-                    box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.15);">
-          <h3 class="card-title mb-0">
-            <i class="fas fa-users mr-2"></i> Daftar Member Aktif & Nonaktif</h3>
-        </div>
-        <div class="card-body table-responsive">
-          <table id="tblMember" class="table table-bordered table-striped table-hover align-middle w-100">
-            <thead class="bg-light text-center">
-              <tr>
-                <th>No</th>
-                <th>Nama Member</th>
-                <th>Jenis</th>
-                <th>Jadwal Mingguan</th>
-                <th>Tgl Mulai</th>
-                <th>Tgl Berakhir</th>
-                <th>Status</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php
-              $no = 1;
-              $query = "
-                SELECT 
-                  m.*, u.nama AS nama_user,
-                  GROUP_CONCAT(
-                    CONCAT(
-                      mj.hari, ' (', 
-                      DATE_FORMAT(mj.jam_mulai, '%H:%i'), ' - ', DATE_FORMAT(mj.jam_selesai, '%H:%i'),
-                      ') - ', l.nama_lapangan
-                    ) SEPARATOR '<br>'
-                  ) AS jadwal_mingguan
-                FROM member m
-                JOIN users u ON m.id_user = u.id_user
-                LEFT JOIN member_jadwal mj ON m.id_member = mj.id_member
-                LEFT JOIN lapangan l ON mj.id_lapangan = l.id_lapangan
-                GROUP BY m.id_member
-                ORDER BY m.tgl_mulai DESC
-              ";
-              $result = mysqli_query($conn, $query);
-              while ($r = mysqli_fetch_assoc($result)):
-                $statusBadge = $r['status'] == 'aktif' 
-                  ? '<span class="badge bg-success"><i class="fas fa-check-circle"></i> Aktif</span>'
-                  : '<span class="badge bg-secondary"><i class="fas fa-ban"></i> Nonaktif</span>';
-              ?>
-              <tr>
-                <td class="text-center"><?= $no++ ?></td>
-                <td><?= htmlspecialchars($r['nama_user']) ?></td>
-                <td class="text-center"><?= htmlspecialchars($r['jenis_member']) ?></td>
-                <td><?= $r['jadwal_mingguan'] ?: '<em class="text-muted">Belum ada jadwal</em>' ?></td>
-                <td class="text-center"><?= date('d-m-Y', strtotime($r['tgl_mulai'])) ?></td>
-                <td class="text-center"><?= date('d-m-Y', strtotime($r['tgl_berakhir'])) ?></td>
-                <td class="text-center"><?= $statusBadge ?></td>
-                <td class="text-center">
-                  <a href="member_edit.php?id=<?= $r['id_member'] ?>" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
-                  <a href="member_hapus.php?id=<?= $r['id_member'] ?>" 
-                     onclick="return confirm('Yakin ingin menghapus data member ini?')" 
-                     class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
-                </td>
-              </tr>
-              <?php endwhile; ?>
-            </tbody>
-          </table>
-        </div>
-      </div>
+<section class="content-header">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+        <h1><i class="fas fa-users mr-2"></i> Data Member</h1>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="collapse" data-bs-target="#formTambah">
+            <i class="fas fa-plus-circle"></i> Tambah Member
+        </button>
     </div>
-  </section>
+</section>
+
+<section class="content">
+
+<?php 
+$has_alert = false;
+if (!empty($_SESSION['toast_error'])): 
+    $has_alert = true;
+?>
+    <div class="alert alert-danger mt-3" id="alert-message">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+        <?= $_SESSION['toast_error']; ?>
+    </div>
+    <?php unset($_SESSION['toast_error']); ?>
+<?php endif; ?>
+
+<?php if (!empty($_SESSION['toast_success'])): 
+    $has_alert = true;
+?>
+    <div class="alert alert-success mt-3" id="alert-message">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+        <?= $_SESSION['toast_success']; ?>
+    </div>
+    <?php unset($_SESSION['toast_success']); ?>
+<?php endif; ?>
+
+<div class="collapse mt-3" id="formTambah">
+    <div class="card card-primary shadow-lg border-0">
+    <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
+        <h3 class="card-title mb-0"><i class="fas fa-user-plus"></i> Aktivasi Member Baru</h3>
+    </div>
+
+    <form method="POST">
+        <div class="card-body row g-3">
+
+            <div class="col-md-4">
+                <label>Pilih User</label>
+                <select name="id_user" id="id_user_select" class="form-select select2-bootstrap4" required>
+                    <option value="">-- Pilih --</option>
+                    <?php 
+                    if (isset($qUsers)) mysqli_data_seek($qUsers, 0);
+                    while($u=mysqli_fetch_assoc($qUsers)): 
+                    ?>
+                        <option value="<?= $u['id_user'] ?>"><?= htmlspecialchars($u['nama']) ?></option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label>Durasi Membership</label>
+                <select name="durasi_bulan" id="durasi_bulan" class="form-select" required>
+                    <option value="1">1 Bulan</option>
+                    <option value="2">2 Bulan</option>
+                    <option value="3">3 Bulan</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label>Tanggal Mulai</label>
+                <input type="date" name="tanggal_mulai" class="form-control" value="<?= date('Y-m-d') ?>" required>
+            </div>
+
+            <div class="col-md-4">
+                <label>Metode Pembayaran</label>
+                <select name="method" class="form-select">
+                    <option value="tunai">Tunai</option>
+                    <option value="qris">QRIS</option>
+                    <option value="bank_transfer">Transfer Bank</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label>Total Bayar (Asumsi: <?= number_format($harga_per_jam_member,0,',','.') ?> x 4 jam/bln)</label>
+                <input type="text" id="total_bayar_display" class="form-control fw-bold text-end" readonly>
+                <input type="hidden" id="total_bayar_value" name="total_bayar_value">
+            </div>
+
+        </div>
+
+        <div class="card-footer text-end">
+            <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Simpan</button>
+        </div>
+    </form>
+</div>
 </div>
 
-<?php include('../includes/footer.php'); ?>
+<div class="card shadow-lg border-0">
+    <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
+    <h3 class="card-title mb-0"><i class="fas fa-list"></i> Daftar Member</h3>
+</div>
 
+    <div class="card-body table-responsive">
+        <table id="tblMember" class="table table-bordered table-striped table-hover align-middle w-100">
+            <thead class="bg-light text-center">
+                <tr>
+                    <th>No</th>
+                    <th>Nama</th>
+                    <th>Durasi</th>
+                    <th>Tanggal Mulai</th>
+                    <th>Tanggal Berakhir</th>
+                    <th>Total Bayar</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php $no=1; while($m=mysqli_fetch_assoc($qMember)): ?>
+                <tr>
+                    <td class="text-center"><?= $no++ ?></td>
+                    <td><?= htmlspecialchars($m['nama']) ?></td>
+                    <td class="text-center"><?= $m['durasi_bulan'] ?> bln</td>
+                    <td class="text-center"><?= date('d-m-Y', strtotime($m['tanggal_mulai'])) ?></td>
+                    <td class="text-center"><?= date('d-m-Y', strtotime($m['tanggal_berakhir'])) ?></td>
+                    <td class="text-end fw-bold">Rp <?= number_format($m['total_bayar'],0,',','.') ?></td>
+                    <td class="text-center">
+                        <span class="badge bg-<?= $m['status']=='aktif'?'success':'secondary' ?>"><?= ucfirst($m['status']) ?></span>
+                    </td>
+                </tr>
+            <?php endwhile; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 
+</div>
+</section>
+
+<?php 
+mysqli_free_result($qUsers);
+mysqli_free_result($qMember);
+include('../includes/footer.php'); 
+?>
+
+<script>
+    function hitungTotal(){
+        let hargaPerJam = <?= json_encode($harga_per_jam_member) ?>; 
+        let durasi = parseInt($('#durasi_bulan').val()) || 0;
+        let total = hargaPerJam * 4 * durasi; 
+        $('#total_bayar_display').val("Rp " + total.toLocaleString('id-ID'));
+        $('#total_bayar_value').val(total); 
+    }
+
+    $('#durasi_bulan').on('change', hitungTotal);
+    
+    $(document).ready(function() {
+        // 💡 Inisialisasi Select2 dengan tema Bootstrap 4
+        $('#id_user_select').select2({
+            theme: 'bootstrap4', // Menggunakan tema Bootstrap 4
+            placeholder: "Cari dan Pilih User", 
+            allowClear: true
+            // dropdownParent: $('#formTambah') // Dihapus untuk menghindari masalah z-index/positioning
+        });
+
+        // Jalankan saat dokumen siap
+        hitungTotal();
+
+        // Logika untuk menghilangkan notifikasi otomatis setelah 2 detik
+        const alertElement = $('#alert-message');
+        if (alertElement.length) {
+            setTimeout(function() {
+                if (typeof $.fn.fadeOut === 'function') {
+                    alertElement.fadeOut(1000, function() {
+                        $(this).remove();
+                    });
+                } else {
+                    alertElement.hide(1000);
+                }
+            }, 2000);
+        }
+
+        // Inisialisasi DataTable
+        $('#tblMember').DataTable();
+    });
+</script>
