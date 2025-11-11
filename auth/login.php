@@ -1,8 +1,13 @@
 <?php
-// login.php
 session_start();
-require '../config/database.php';
+require '../config/database.php'; // Asumsi path ini benar
 
+// Helper function (karena esc() digunakan di HTML)
+if (!function_exists('esc')) {
+    function esc($str) {
+        return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+    }
+}
 
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -14,30 +19,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->bind_param('ss', $identifier, $identifier);
     $stmt->execute();
     $res = $stmt->get_result();
+    
     if ($row = $res->fetch_assoc()) {
+        // 1. Verifikasi Password
         if (!password_verify($password, $row['password'])) {
             $err = "Password salah.";
-        } elseif ($row['is_verified'] == 0) {
+        } 
+        // 2. Cek Verifikasi Akun
+        elseif ($row['is_verified'] == 0) {
             $err = "Akun belum diverifikasi. Cek email untuk kode verifikasi.";
-        } elseif ($row['status'] !== 'aktif') {
+        } 
+        // 3. Cek Status Akun
+        elseif ($row['status'] !== 'aktif') {
             $err = "Akun tidak aktif. Hubungi admin.";
-        } else {
-            // sukses login
-            $_SESSION['user_id'] = $row['id'];
-            $_SESSION['user_name'] = $row['nama_lengkap'];
+        } 
+        // 4. Sukses Login
+        else {
+            // === PERBAIKAN PENTING ===
+            // Menyesuaikan session dengan yang digunakan di booking.php dan file lain
+            $_SESSION['id_user'] = $row['id_user']; // Menggunakan 'id_user' dari database
+            $_SESSION['nama'] = $row['nama'];     // Menggunakan 'nama' dari database
             $_SESSION['role'] = $row['role'];
+            $_SESSION['foto_profil'] = $row['foto_profil'];
+
+            // === TAMBAHAN: Update last_login ===
+            $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id_user = ?");
+            $update_stmt->bind_param('i', $row['id_user']);
+            $update_stmt->execute();
+            $update_stmt->close();
 
             if ($row['role'] === 'admin') {
-                header('Location: dash_admin.php');
+                // Arahkan ke dashboard admin
+                header('Location: ../Admin/dashboard.php'); // Asumsi path folder Admin
                 exit;
             } else {
-                header('Location: dash_user.php');
+                // Arahkan ke halaman utama pengguna (index.php)
+                header('Location: ../index.php');
                 exit;
             }
         }
     } else {
-        $err = "Akun tidak ditemukan.";
+        $err = "Akun (Email atau Username) tidak ditemukan.";
     }
+    $stmt->close();
 }
 ?>
 <!doctype html>

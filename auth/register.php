@@ -11,6 +11,10 @@
 <body>
 <div class="auth-box">
   <h2>Daftar Akun</h2>
+  
+  <?php if(!empty($_SESSION['error'])){ echo "<div class='err'>".htmlspecialchars($_SESSION['error'])."</div>"; unset($_SESSION['error']); } ?>
+  <?php if(!empty($_SESSION['success'])){ echo "<div class='info'>".htmlspecialchars($_SESSION['success'])."</div>"; unset($_SESSION['success']); } ?>
+
   <form id="regForm" method="POST" action="php/register_process.php">
     <label>Nama Lengkap</label>
     <input name="nama" required>

@@ -6,7 +6,7 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT); // <<< PASTIKAN INI A
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "booking_badmintoon";
+$db   = "bookinglapanganb2"; // ✅ disesuaikan dengan nama database kamu
 
 // Membuat koneksi menggunakan metode Obyek
 $conn = new mysqli($host, $user, $pass, $db);
@@ -21,12 +21,16 @@ if ($conn->connect_error) {
 $conn->set_charset("utf8mb4");
 
 // Fungsi bantu format ke mata uang Rupiah
-function rupiah($angka) {
-   return "Rp " . number_format($angka, 0, ',', '.');
+if (!function_exists('rupiah')) {
+    function rupiah($angka) {
+    return "Rp " . number_format($angka, 0, ',', '.');
+    }
 }
 
 // Fungsi bantu format tanggal Indonesia
-function tanggal_indo($tanggal) {
-   return date('d-m-Y', strtotime($tanggal));
+if (!function_exists('tanggal_indo')) {
+    function tanggal_indo($tanggal) {
+    return date('d-m-Y', strtotime($tanggal));
+    }
 }
 ?>

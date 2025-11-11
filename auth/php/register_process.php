@@ -2,7 +2,14 @@
 // php/register_process.php
 session_start();
 require __DIR__ . '/../../config/database.php';
-require 'mail_helper.php';
+require 'mail_helper.php'; // Pastikan file ini ada di folder 'php/'
+
+// Helper function jika belum ada (dari file login Anda)
+if (!function_exists('esc')) {
+    function esc($str) {
+        return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../register.php');
@@ -13,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $nama = trim($_POST['nama']);
 $username = trim($_POST['username']);
 $email = trim($_POST['email']);
-$phone = trim($_POST['phone']);
+$phone = trim($_POST['phone']); // Kita tetap ambil 'phone' dari form
 $pekerjaan = $_POST['pekerjaan'] ?? null;
 $pekerjaan_lain = isset($_POST['pekerjaan_lain']) ? trim($_POST['pekerjaan_lain']) : null;
 $pass = $_POST['password'];
@@ -30,8 +37,8 @@ if (strlen($pass) < 6) {
     exit;
 }
 
-// cek unik username/email
-$stmt = $conn->prepare("SELECT id FROM users WHERE username=? OR email=? LIMIT 1");
+// PERBAIKAN: Cek ke 'id_user' untuk konsistensi
+$stmt = $conn->prepare("SELECT id_user FROM users WHERE username=? OR email=? LIMIT 1");
 $stmt->bind_param('ss', $username, $email);
 $stmt->execute();
 if ($stmt->get_result()->num_rows > 0) {
@@ -39,6 +46,7 @@ if ($stmt->get_result()->num_rows > 0) {
     header('Location: ../register.php');
     exit;
 }
+$stmt->close();
 
 // hash password
 $hash = password_hash($pass, PASSWORD_DEFAULT);
@@ -48,11 +56,33 @@ $otp = random_int(100000, 999999);
 $expires = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
 // simpan user (is_verified = 0)
-$stmt = $conn->prepare("INSERT INTO users (username, nama_lengkap, pekerjaan, pekerjaan_lain, email, phone, password, otp_code, otp_expires, is_verified, role) VALUES (?,?,?,?,?,?,?,?,?,0,'user')");
+// === PERBAIKAN PENTING PADA KODE SQL ===
+$sql = "INSERT INTO users (
+            username, 
+            nama,           -- PERBAIKAN: dari 'nama_lengkap'
+            pekerjaan, 
+            pekerjaan_lain, 
+            email, 
+            no_hp,          -- PERBAIKAN: dari 'phone'
+            password, 
+            otp_code, 
+            otp_expires, 
+            is_verified, 
+            role,
+            last_login      -- PERBAIKAN: Menambahkan 'last_login'
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'user', NOW() -- PERBAIKAN: Menambahkan NOW()
+        )";
+// === AKHIR PERBAIKAN SQL ===
+
+$stmt = $conn->prepare($sql);
+// bind_param tetap 9 string (NOW() tidak di-bind)
 $stmt->bind_param('sssssssss', $username, $nama, $pekerjaan, $pekerjaan_lain, $email, $phone, $hash, $otp, $expires);
 $ok = $stmt->execute();
+
 if (!$ok) {
-    $_SESSION['err'] = "Gagal registrasi: " . $conn->error;
+    // Tampilkan error SQL jika gagal
+    $_SESSION['err'] = "Gagal registrasi: " . $stmt->error;
     header('Location: ../register.php');
     exit;
 }
@@ -66,7 +96,6 @@ $body = "<p>Halo <b>".esc($nama)."</b>,</p>
 
 $sent = send_email($email, $subject, $body);
 if (!$sent['ok']) {
-    // kalau gagal kirim email: tetap simpan tapi beri tahu user
     $_SESSION['info'] = "Registrasi berhasil. Namun email verifikasi gagal dikirim: " . ($sent['error'] ?? '');
 } else {
     $_SESSION['success'] = "Registrasi berhasil. Kode verifikasi dikirim ke email Anda.";

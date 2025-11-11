@@ -1,7 +1,13 @@
 <?php
 // verify.php
 session_start();
-require 'php/db.php';
+require '../config/database.php';
+// Helper function untuk keamanan (HTML escaping)
+if (!function_exists('esc')) {
+    function esc($str) {
+        return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+    }
+}
 $email = isset($_GET['email']) ? $_GET['email'] : '';
 ?>
 <!doctype html>

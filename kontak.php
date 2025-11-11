@@ -83,59 +83,55 @@
     <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-md">
       <div class="max-w-7xl mx-auto px-4">
         <nav class="flex items-center justify-between h-20">
-  
-          <!-- Logo -->
-          <a href="index.html" class="flex items-center gap-3">
-            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center text-white shadow-lift transform transition-all duration-500 hover:scale-110">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white" />
-              </svg>
+          <a href="/BookingLapanganKel2/index.php" class="flex items-center gap-3">
+            <div class="w-14 h-14 flex items-center justify-center transform transition-all duration-500 hover:scale-110">
+              <img src="../assets/images/LogoRush.png" alt="SportField Logo" class="w-14 h-14 object-contain rounded-xl shadow-md">
             </div>
             <div>
-              <div class="font-poppins font-semibold text-lg leading-tight">SportField</div>
-              <div class="text-xs text-slate-500 -mt-0.5">Booking Lapangan</div>
+              <div class="font-poppins font-semibold text-lg leading-tight">Rush Badminton Academy</div>
+              <div class="text-xs text-slate-500 -mt-0.5">Booking Lapangan Online</div>
             </div>
           </a>
-
-          <!-- Desktop Navigation -->
           <div class="hidden lg:flex flex-1 justify-center">
             <ul id="topNav" class="flex gap-8 items-end">
               <li>
-                <a href="index.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
+                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
               </li>
+              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Lapangan</a></li>
+              <li><a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a></li>
+              <li><a href="#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a></li>
+              <li><a href="about.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a></li>
               <li>
-                <a href="index.html#lapangan" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a>
-              </li>
-              <li>
-                <a href="index.html#penawaran" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a>
-              </li>
-              <li>
-                <a href="index.html#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a>
-              </li>
-              <li>
-                <a href="kontak.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Kontak</a>
-              </li>
+                <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
+                <i class="fa-solid fa-cart-shopping text-lg"></i>
+                <span id="cartCount"
+                      class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-semibold rounded-full px-1.5 py-0.5">
+                  <?= count($_SESSION['keranjang'] ?? []) ?>
+                </span>
+                </a>
+              </li>           
             </ul>
           </div>
-
-          <!-- Auth Buttons (Desktop) -->
-          <div class="hidden md:flex items-center gap-3">
-            <button class="border border-primary text-primary px-4 py-2 rounded-lg text-sm hover:bg-primary hover:text-white transition-all duration-300" data-modal-open="loginModal">Masuk</button>
-            <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-primaryDark transition-all duration-300" data-modal-open="registerModal">Daftar</button>
+          <div class="hidden md:flex items-center gap-4"> 
+            <a href="login.php" 
+              class="border border-primary text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary hover:text-white transition-all duration-300">
+              Masuk
+            </a>
+            
+            <a href="register.php" 
+              class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primaryDark transition-all duration-300 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30">
+              Daftar
+            </a>
           </div>
-
-          <!-- Mobile Menu Toggle -->
           <div class="lg:hidden">
             <button id="mobileBtn" class="p-2 rounded-md hover:bg-slate-100 focus:outline-none transition-colors">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M3 6H21M3 12H21M3 18H21" stroke="#0b1a2b" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6H21M3 12H21M3 18H21" stroke="#0b1a2b" stroke-width="1.5" stroke-linecap="round" /></svg>
             </button>
           </div>
         </nav>
       </div>
-    </header>
-
+      
+      </header>
     <!-- Mobile Navigation Menu -->
     <div id="mobileNav" class="lg:hidden hidden bg-white border-t border-slate-100 shadow-lg">
       <div class="px-4 py-4 flex flex-col gap-2">
