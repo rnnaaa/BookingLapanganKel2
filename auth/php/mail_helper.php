@@ -3,13 +3,13 @@
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require __DIR__ . '/../vendor/autoload.php'; // pastikan composer sudah dijalankan
-require __DIR__ . '/db.php';
+require __DIR__ . '/../../vendor/autoload.php'; // pastikan composer sudah dijalankan
+require __DIR__ . '/../../config/database.php';
 
 function send_email($to, $subject, $html_body) {
     // konfigurasi - ganti dengan email & app-password Gmail mu
-    $MAIL_USER = 'EMAIL_KAMU@gmail.com';       // <--- ganti
-    $MAIL_PASS = 'APP_PASSWORD_GMAILMU';       // <--- ganti (App Password)
+    $MAIL_USER = 'gilangoppo417@gmail.com';       // <--- ganti
+    $MAIL_PASS = 'gdlc icsw dviy cihp';       // <--- ganti (App Password)
 
     $mail = new PHPMailer(true);
     try {

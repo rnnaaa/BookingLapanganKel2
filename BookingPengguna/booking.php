@@ -28,6 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $tanggal = $_POST['tanggal'] ?? '';
         $jam = $_POST['jam'] ?? '';
         $harga = isset($_POST['harga']) ? (float)$_POST['harga'] : 0.0;
+        
+        // Tambahan untuk nama lapangan di keranjang
+        $nama_lapangan = $_POST['nama_lapangan'] ?? 'Lapangan';
 
         // Validasi minimal
         if (!$id_jadwal_waktu || !$tanggal || !$jam) {
@@ -72,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'id_lapangan' => $id_lapangan,
             'tanggal' => $tanggal,
             'jam' => $jam,
-            'harga' => $harga
+            'harga' => $harga,
+            'nama_lapangan' => $nama_lapangan // Simpan nama lapangan
         ];
 
         echo json_encode(['status' => 'ok', 'message' => 'Slot ditambahkan ke keranjang.', 'count' => count($_SESSION['keranjang'])]);
@@ -106,7 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $selected_lapangan = (int)($_GET['lapangan'] ?? 0);
 
 // --- PERBAIKAN: INI ADALAH LOGIKA TANGGAL DEFAULT ---
-// Jika $_GET['date'] tidak ada (saat pertama kali buka), maka gunakan date('Y-m-d') (tanggal hari ini)
 $selected_date     = $_GET['date'] ?? date('Y-m-d');
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected_date)) {
@@ -120,7 +123,7 @@ if ($selected_lapangan <= 0) {
     $selected_lapangan = $first['id_lapangan'] ?? 0;
 }
 
-$lapangan_query = "SELECT id_lapangan, nama_lapangan, deskripsi, foto, tipe FROM lapangan WHERE id_lapangan = ?";
+$lapangan_query = "SELECT id_lapangan, nama_lapangan, deskripsi, foto, tipe, harga_per_jam FROM lapangan WHERE id_lapangan = ?";
 $stmt = mysqli_prepare($conn, $lapangan_query);
 mysqli_stmt_bind_param($stmt, "i", $selected_lapangan);
 mysqli_stmt_execute($stmt);
@@ -161,7 +164,6 @@ if (strtotime($selected_date) < strtotime(date('Y-m-d'))) {
         if ($hari_status === 'penuh') $hari_status_message = 'Jadwal penuh untuk tanggal ini.';
         if ($hari_status === 'libur') $hari_status_message = 'Lapangan libur pada tanggal ini.';
     } else {
-        // Jika tidak ada di DB (misal, melebihi max_date)
         $hari_status = 'belum_tersedia';
         $hari_status_message = 'Jadwal untuk tanggal ini belum diatur oleh admin.';
     }
@@ -183,7 +185,7 @@ if ($hari_status === 'tersedia') {
     }
 }
 
-// CEK BOOKED (Logika Anda sudah benar, menggunakan detail_booking)
+// CEK BOOKED
 $booked_slots = [];
 $check_query = "
     SELECT jw.jam_mulai, jw.jam_selesai, db.id_jadwal_waktu
@@ -200,7 +202,6 @@ if ($stmt) {
     while ($row = mysqli_fetch_assoc($result)) {
         $start = substr($row['jam_mulai'], 0, 5);
         $end = substr($row['jam_selesai'], 0, 5);
-        // Simpan berdasarkan ID dan juga berdasarkan Teks (sesuai logika Anda)
         $booked_slots["$start-$end"] = true; 
         $booked_slots[$row['id_jadwal_waktu']] = true;
     }
@@ -215,7 +216,7 @@ foreach ($jadwal_list as $jadwal) {
     }
 }
 
-// PROSES BOOKING (LOGIKA LAMA) - tetap dipertahankan jika form lama digunakan
+// PROSES BOOKING (LOGIKA LAMA)
 $message = '';
 if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     $jadwal_id = (int)$_POST['jadwal_id'];
@@ -226,7 +227,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     } elseif ($jadwal_id && !isset($booked_slots[$jadwal_id]) && !isset($booked_slots[$slot_text])) {
         mysqli_begin_transaction($conn);
         try {
-            // ... (Logika INSERT booking dan detail_booking Anda sudah benar) ...
             $q = "INSERT INTO booking (id_user, id_lapangan, tanggal, status, payment_status) 
                   VALUES (?, ?, ?, 'menunggu', 'belum_bayar')";
             $stmt = mysqli_prepare($conn, $q);
@@ -234,11 +234,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
             mysqli_stmt_execute($stmt);
             $booking_id = mysqli_insert_id($conn);
 
-            $q = "SELECT harga_per_slot FROM jadwal_waktu WHERE id_jadwal_waktu = ?";
-            $stmt = mysqli_prepare($conn, $q);
-            mysqli_stmt_bind_param($stmt, "i", $jadwal_id);
-            mysqli_stmt_execute($stmt);
-            $harga = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt))['harga_per_slot'] ?? 30000;
+            // Perbaikan: Ambil harga dari $lapangan
+            $harga = (float)($lapangan['harga_per_jam'] ?? 0);
 
             $q = "INSERT INTO detail_booking (id_booking, id_jadwal_waktu, harga) VALUES (?, ?, ?)";
             $stmt = mysqli_prepare($conn, $q);
@@ -321,16 +318,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     .nav-link.active { @apply text-primary font-semibold; }
     .nav-link:not(.active):hover { @apply text-primary; }
     
-    /* Indikator Navigasi (dari kode Anda) */
+    /* === GARIS BIRU DI BAWAH LINK AKTIF DIHAPUS ===
     .nav-link.active::after {
-      content: '';
-      position: absolute;
-      bottom: -4px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background-color: #0b63d6; /* primary */
+      ...
     }
+    */
 
     /* PERBAIKAN: Slot Card (Sesuai Permintaan) */
     .slot-card {
@@ -339,16 +331,15 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     
     .slot-card.available {
       @apply bg-white border-gray-200 text-slate-700 hover:border-primary hover:shadow-lg hover:-translate-y-1 hover:bg-gray-hover cursor-pointer;
-      animation: pop 0.3s ease-out; /* Animasi "muncul" saat dimuat */
+      animation: pop 0.3s ease-out;
     }
     .slot-card.available:hover {
-      /* Tidak perlu 'pop' di hover, cukup translate-y */
     }
     .slot-card.available .price {
       @apply text-green-600 font-bold;
     }
     .slot-card.available:hover .time {
-      @apply text-primary; /* Aksen biru saat hover */
+      @apply text-primary;
     }
 
     .slot-card.booked {
@@ -374,7 +365,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
       @apply bg-yellow-50 text-yellow-800 border-yellow-200;
     }
     .message-box.info {
-      @apply bg-primary-light text-primary border-primary/20; /* Aksen Biru */
+      @apply bg-primary-light text-primary border-primary/20;
     }
 
     /* ---------------- Sidebar Keranjang ---------------- */
@@ -440,10 +431,9 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
 
   </style>
 </head>
-
 <body class="bg-softGray text-slate-900 antialiased">
- <!-- Sidebar Keranjang -->
- <div id="sidebarKeranjang" class="sidebar <?= (isset($_SESSION['show_sidebar']) && $_SESSION['show_sidebar']) ? 'active' : '' ?>">
+ 
+<div id="sidebarKeranjang" class="sidebar <?= (isset($_SESSION['show_sidebar']) && $_SESSION['show_sidebar']) ? 'active' : '' ?>">
    <div class="sidebar-header">
      <h4 class="font-poppins font-semibold">JADWAL DIPILIH</h4>
      <button id="closeSidebar" class="close-btn" aria-label="Tutup">&times;</button>
@@ -457,7 +447,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
            <div class="left">
              <div class="text-sm font-semibold"><?= htmlspecialchars($it['jam']) ?></div>
              <div class="text-xs text-slate-500"><?= date('d M Y', strtotime($it['tanggal'])) ?></div>
-             <div class="text-xs text-slate-500">Lapangan: <?= htmlspecialchars($lapangan['nama_lapangan']) ?></div>
+             <div class="text-xs text-slate-500">Lapangan: <?= htmlspecialchars($it['nama_lapangan'] ?? 'N/A') ?></div>
            </div>
            <div class="right">
              <div class="text-sm font-semibold">Rp <?= number_format($it['harga'],0,',','.') ?></div>
@@ -487,26 +477,23 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
           <div class="hidden lg:flex flex-1 justify-center">
             <ul id="topNav" class="flex gap-8 items-end">
               <li>
-                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Beranda</a>
+                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
               </li>
-              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a></li>
+              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Lapangan</a></li>
               <li><a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a></li>
               <li><a href="#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a></li>
               <li><a href="about.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a></li>
               <li>
-                <div id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
+                <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
                 <i class="fa-solid fa-cart-shopping text-lg"></i>
                 <span id="cartCount"
                       class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-semibold rounded-full px-1.5 py-0.5">
                   <?= count($_SESSION['keranjang'] ?? []) ?>
                 </span>
-            </div>
+                </a>
               </li>           
             </ul>
           </div>
-          <div class="hidden md:flex items-center gap-3"> 
-            
-            
           <div class="hidden md:flex items-center gap-4"> 
             <a href="login.php" 
               class="border border-primary text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary hover:text-white transition-all duration-300">
@@ -525,21 +512,15 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
           </div>
         </nav>
       </div>
-      <div class="hidden lg:block">
-        <div id="navIndicator" class="mx-auto max-w-7xl px-4">
-          <div class="h-0.5 bg-transparent relative">
-            <div id="navLine" class="absolute h-0.5 bg-primary rounded transition-all duration-300" style="width: 68px; left: 0px"></div>
-          </div>
-        </div>
-      </div>
-    </header>
+      
+      </header>
 
   <main class="max-w-7xl mx-auto px-4 py-8">
     <div class="grid lg:grid-cols-2 gap-8">
 
       <div class="bg-white rounded-xl shadow-soft p-6 animate-fade-in">
         <div class="overflow-hidden rounded-lg mb-4 shadow-inner">
-            <img src="../assets/images/<?= htmlspecialchars($lapangan['foto'] ?? 'default.jpg') ?>" 
+            <img src="../uploads/lapangan/<?= htmlspecialchars($lapangan['foto'] ?? 'default.jpg') ?>" 
                  alt="<?= htmlspecialchars($lapangan['nama_lapangan']) ?>" 
                  class="w-full h-64 object-cover transition-transform duration-300 hover:scale-105">
         </div>
@@ -625,7 +606,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
               $slot_text = "$start-$end";
               $jadwal_id = $jadwal['id_jadwal_waktu'];
               $is_booked = isset($booked_slots[$jadwal_id]) || isset($booked_slots[$slot_text]);
-              $harga = (float)($jadwal['harga_per_slot'] ?? 30000);
+              // Perbaikan: Ambil harga dari $lapangan
+              $harga = (float)($lapangan['harga_per_jam'] ?? 0);
             ?>
               <?php if ($is_booked): ?>
                 <div class="slot-card booked">
@@ -634,7 +616,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
                   <div class="text-sm font-medium mt-1">Dipesan</div>
                 </div>
               <?php else: ?>
-                <!-- Ubah: tombol sekarang memicu modal & data dikirim via AJAX saat pilih Masukkan ke Keranjang -->
                 <button 
                   type="button" 
                   class="slot-card available w-full h-full jam-main" 
@@ -665,7 +646,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     © 2025 SportField — All rights reserved
   </footer>
 
-  <!-- Modal Konfirmasi Booking (tetap dipakai) -->
   <div id="bookingModal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width: 420px; margin: auto; padding: 20px; background: white; border-radius: 10px; text-align:center;">
       <button id="closeBookingModal" style="position:absolute; right:18px; top:12px; background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>

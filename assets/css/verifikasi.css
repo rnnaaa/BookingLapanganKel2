@@ -1,0 +1,32 @@
+.file-input-wrapper {
+    border: 2px dashed #d1d5db; /* border-gray-300 */
+    border-radius: 0.5rem; /* rounded-lg */
+    padding: 1.5rem; /* p-6 */
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s ease-in-out;
+}
+
+.file-input-wrapper:hover {
+    border-color: #0b63d6; /* hover:border-primary */
+}
+
+.file-input-wrapper i {
+    font-size: 1.875rem; /* text-3xl */
+    color: #9ca3af; /* text-gray-400 */
+}
+
+.file-input-wrapper span {
+    display: block;
+    font-size: 0.875rem; /* text-sm */
+    color: #6b7280; /* text-gray-500 */
+    margin-top: 0.5rem; /* mt-2 */
+}
+
+/* Sembunyikan input file asli */
+.file-input-wrapper input[type="file"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}

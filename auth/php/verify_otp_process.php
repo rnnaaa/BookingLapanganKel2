@@ -1,7 +1,7 @@
 <?php
 // php/verify_otp_process.php
 session_start();
-require 'db.php';
+require '../../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../verify.php');
@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $email = trim($_POST['email']);
 $otp = trim($_POST['otp']);
 
-$stmt = $conn->prepare("SELECT id, otp_code, otp_expires, is_verified FROM users WHERE email=? LIMIT 1");
+$stmt = $conn->prepare("SELECT id_user, otp_code, otp_expires, is_verified FROM users WHERE email=? LIMIT 1");
 $stmt->bind_param('s', $email);
 $stmt->execute();
 $res = $stmt->get_result();
@@ -23,8 +23,8 @@ if ($row = $res->fetch_assoc()) {
     }
     if ($row['otp_code'] === $otp && strtotime($row['otp_expires']) > time()) {
         // verifikasi sukses
-        $u = $row['id'];
-        $stmt2 = $conn->prepare("UPDATE users SET is_verified=1, otp_code=NULL, otp_expires=NULL WHERE id=?");
+        $u = $row['id_user'];
+        $stmt2 = $conn->prepare("UPDATE users SET is_verified=1, otp_code=NULL, otp_expires=NULL WHERE id_user=?");
         $stmt2->bind_param('i', $u);
         $stmt2->execute();
         $_SESSION['success'] = "Verifikasi berhasil. Silakan login.";
