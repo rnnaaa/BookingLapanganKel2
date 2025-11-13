@@ -1,7 +1,7 @@
 <?php
 // php/update_password.php
 session_start();
-require 'db.php';
+require '../../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: ../login.php'); exit; }
 $uid = $_SESSION['reset_user_id'] ?? null;
@@ -13,7 +13,7 @@ if ($pw !== $pw2) { die("Password tidak cocok."); }
 if (strlen($pw) < 6) { die("Password minimal 6 karakter."); }
 
 $hash = password_hash($pw, PASSWORD_DEFAULT);
-$stmt = $conn->prepare("UPDATE users SET password=?, reset_token=NULL, reset_expires=NULL WHERE id=?");
+$stmt = $conn->prepare("UPDATE users SET password=?, reset_token=NULL, reset_expires=NULL WHERE id_user=?");
 $stmt->bind_param('si', $hash, $uid);
 if ($stmt->execute()) {
     unset($_SESSION['reset_user_id']);
