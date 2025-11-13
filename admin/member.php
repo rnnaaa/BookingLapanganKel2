@@ -1,15 +1,11 @@
 <?php
-// Strict error reporting for MySQLi
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-
-// Start session and include database config
 session_start();
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 
-// --- (1) AMBIL DATA HARGA MEMBER UNTUK JAVASCRIPT (Sebelum dipost/output) ---
+// --- (1) AMBIL DATA HARGA MEMBER UNTUK JAVASCRIPT ---
 $harga_per_jam_member = 0;
-// Ambil harga_per_jam_member dari lapangan aktif
 if ($qHarga = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHERE status='aktif' LIMIT 1")) {
     if ($h = mysqli_fetch_assoc($qHarga)) {
         $harga_per_jam_member = floatval($h['harga_per_jam_member']);
@@ -17,41 +13,38 @@ if ($qHarga = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHE
     mysqli_free_result($qHarga);
 }
 
-
 // ✅ (2) PROSES POST MEMBER
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // --- PROSES TAMBAH MEMBER ---
     try {
         $id_user = intval($_POST['id_user']);
+        $id_lapangan = intval($_POST['id_lapangan']); // ✅ DITAMBAHKAN
         $durasi_bulan = intval($_POST['durasi_bulan']);
         $tanggal_mulai = $_POST['tanggal_mulai'];
         $method = $_POST['method'];
-        $total_bayar = floatval($_POST['total_bayar_value'] ?? 0); 
+        $total_bayar = floatval($_POST['total_bayar_value'] ?? 0);
 
-        // Validasi dasar
-        if (!$id_user || !$durasi_bulan || !$tanggal_mulai || $total_bayar <= 0) {
+        if (!$id_user || !$id_lapangan || !$durasi_bulan || !$tanggal_mulai || $total_bayar <= 0) {
             throw new Exception("Data tidak lengkap atau Total Bayar belum terhitung/tidak valid!");
         }
 
-        // Mulai transaksi
         $conn->begin_transaction();
 
-        // Ambil lapangan aktif
-        $stmt = $conn->prepare("SELECT id_lapangan FROM lapangan WHERE status='aktif' LIMIT 1");
+        // ✅ Ambil validasi lapangan
+        $stmt = $conn->prepare("SELECT nama_lapangan FROM lapangan WHERE id_lapangan=? AND status='aktif'");
+        $stmt->bind_param("i", $id_lapangan);
         $stmt->execute();
-        $lap = $stmt->get_result()->fetch_assoc();
+        $cekLap = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        if (!$lap) throw new Exception("Tidak ada lapangan aktif ditemukan.");
-
-        $id_lapangan = intval($lap['id_lapangan']);
+        if (!$cekLap) throw new Exception("Lapangan tidak ditemukan atau nonaktif.");
 
         // Hitung tanggal berakhir
         $tanggal_berakhir = date('Y-m-d', strtotime("+$durasi_bulan month", strtotime($tanggal_mulai)));
 
         // Insert ke member
         $stmt = $conn->prepare("
-            INSERT INTO member (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, total_bayar, method, status, created_at, updated_at)
+            INSERT INTO member 
+            (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, total_bayar, method, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW(), NOW())
         ");
         $stmt->bind_param("iiissds", $id_user, $id_lapangan, $durasi_bulan, $tanggal_mulai, $tanggal_berakhir, $total_bayar, $method);
@@ -69,10 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Insert keuangan otomatis
         $stmt = $conn->prepare("
-            INSERT INTO keuangan (tanggal, jenis, kategori, keterangan, jumlah, sumber, booking_id, created_at, updated_at)
+            INSERT INTO keuangan 
+            (tanggal, jenis, kategori, keterangan, jumlah, sumber, booking_id, created_at, updated_at)
             VALUES (CURDATE(), 'pemasukan', 'Membership', ?, ?, 'Pelunasan', NULL, NOW(), NOW())
         ");
-        $ket = "Pembayaran Member ID $id_member";
+        $ket = "Pembayaran Member ID $id_member untuk Lapangan: " . $cekLap['nama_lapangan']; // ✅ DITAMBAHKAN
         $stmt->bind_param("sd", $ket, $total_bayar);
         $stmt->execute();
         $stmt->close();
@@ -93,8 +87,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // (3) PERIKSA MEMBER EXPIRED
-// Query ini akan secara otomatis mengubah status member menjadi 'nonaktif' dan role user menjadi 'user'
-// jika tanggal berakhir sudah melewati hari ini (CURDATE()).
 $conn->query("
     UPDATE member m
     JOIN users u ON m.id_user = u.id_user
@@ -103,19 +95,20 @@ $conn->query("
 ");
 
 // ---------------- DATA FORM ----------------
-// Ambil daftar user yang BELUM menjadi member
 $qUsers = mysqli_query($conn, "SELECT id_user, nama FROM users WHERE role='user' AND status='aktif' ORDER BY nama ASC");
+
+// ✅ Ambil daftar lapangan aktif
+$qLapangan = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan FROM lapangan WHERE status='aktif' ORDER BY nama_lapangan ASC");
 
 // ---------------- DATA TABLE ----------------
 $qMember = mysqli_query($conn, "
-    SELECT m.id_member, u.nama, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, m.total_bayar, m.status
+    SELECT m.id_member, u.nama, l.nama_lapangan, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, m.total_bayar, m.status
     FROM member m
     LEFT JOIN users u ON m.id_user = u.id_user
+    LEFT JOIN lapangan l ON m.id_lapangan = l.id_lapangan
     ORDER BY m.id_member DESC
 ");
 
-
-// Baru tampilkan HTML
 include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
@@ -133,32 +126,17 @@ include('../includes/sidebar.php');
 </section>
 
 <section class="content">
-
 <?php 
-$has_alert = false;
-if (!empty($_SESSION['toast_error'])): 
-    $has_alert = true;
-?>
-    <div class="alert alert-danger mt-3" id="alert-message">
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-        <?= $_SESSION['toast_error']; ?>
-    </div>
-    <?php unset($_SESSION['toast_error']); ?>
-<?php endif; ?>
+if (!empty($_SESSION['toast_error'])):
+    echo '<div class="alert alert-danger mt-3">'.$_SESSION['toast_error'].'</div>';
+    unset($_SESSION['toast_error']);
+endif;
 
-<?php if (!empty($_SESSION['toast_success'])): 
-    $has_alert = true;
+if (!empty($_SESSION['toast_success'])):
+    echo '<div class="alert alert-success mt-3">'.$_SESSION['toast_success'].'</div>';
+    unset($_SESSION['toast_success']);
+endif;
 ?>
-    <div class="alert alert-success mt-3" id="alert-message">
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-        <?= $_SESSION['toast_success']; ?>
-    </div>
-    <?php unset($_SESSION['toast_success']); ?>
-<?php endif; ?>
 
 <div class="collapse mt-3" id="formTambah">
     <div class="card card-primary shadow-lg border-0">
@@ -173,11 +151,18 @@ if (!empty($_SESSION['toast_error'])):
                 <label>Pilih User</label>
                 <select name="id_user" id="id_user_select" class="form-select select2-bootstrap4" required>
                     <option value="">-- Pilih --</option>
-                    <?php 
-                    if (isset($qUsers)) mysqli_data_seek($qUsers, 0);
-                    while($u=mysqli_fetch_assoc($qUsers)): 
-                    ?>
+                    <?php while($u=mysqli_fetch_assoc($qUsers)): ?>
                         <option value="<?= $u['id_user'] ?>"><?= htmlspecialchars($u['nama']) ?></option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label>Pilih Lapangan</label> <!-- ✅ DITAMBAHKAN -->
+                <select name="id_lapangan" id="id_lapangan" class="form-select select2-bootstrap4" required>
+                    <option value="">-- Pilih Lapangan --</option>
+                    <?php while($l=mysqli_fetch_assoc($qLapangan)): ?>
+                        <option value="<?= $l['id_lapangan'] ?>"><?= htmlspecialchars($l['nama_lapangan']) ?></option>
                     <?php endwhile; ?>
                 </select>
             </div>
@@ -220,10 +205,10 @@ if (!empty($_SESSION['toast_error'])):
 </div>
 </div>
 
-<div class="card shadow-lg border-0">
+<div class="card shadow-lg border-0 mt-4">
     <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
-    <h3 class="card-title mb-0"><i class="fas fa-list"></i> Daftar Member</h3>
-</div>
+        <h3 class="card-title mb-0"><i class="fas fa-list"></i> Daftar Member</h3>
+    </div>
 
     <div class="card-body table-responsive">
         <table id="tblMember" class="table table-bordered table-striped table-hover align-middle w-100">
@@ -231,6 +216,7 @@ if (!empty($_SESSION['toast_error'])):
                 <tr>
                     <th>No</th>
                     <th>Nama</th>
+                    <th>Lapangan</th> <!-- ✅ DITAMBAHKAN -->
                     <th>Durasi</th>
                     <th>Tanggal Mulai</th>
                     <th>Tanggal Berakhir</th>
@@ -243,6 +229,7 @@ if (!empty($_SESSION['toast_error'])):
                 <tr>
                     <td class="text-center"><?= $no++ ?></td>
                     <td><?= htmlspecialchars($m['nama']) ?></td>
+                    <td><?= htmlspecialchars($m['nama_lapangan']) ?></td> <!-- ✅ DITAMBAHKAN -->
                     <td class="text-center"><?= $m['durasi_bulan'] ?> bln</td>
                     <td class="text-center"><?= date('d-m-Y', strtotime($m['tanggal_mulai'])) ?></td>
                     <td class="text-center"><?= date('d-m-Y', strtotime($m['tanggal_berakhir'])) ?></td>
@@ -257,10 +244,11 @@ if (!empty($_SESSION['toast_error'])):
     </div>
 </div>
 
-</div>
 </section>
+</div>
 
 <?php 
+mysqli_free_result($qLapangan);
 mysqli_free_result($qUsers);
 mysqli_free_result($qMember);
 include('../includes/footer.php'); 
@@ -276,34 +264,10 @@ include('../includes/footer.php');
     }
 
     $('#durasi_bulan').on('change', hitungTotal);
-    
+
     $(document).ready(function() {
-        // 💡 Inisialisasi Select2 dengan tema Bootstrap 4
-        $('#id_user_select').select2({
-            theme: 'bootstrap4', // Menggunakan tema Bootstrap 4
-            placeholder: "Cari dan Pilih User", 
-            allowClear: true
-            // dropdownParent: $('#formTambah') // Dihapus untuk menghindari masalah z-index/positioning
-        });
-
-        // Jalankan saat dokumen siap
+        $('#id_user_select, #id_lapangan').select2({ theme: 'bootstrap4', placeholder: "Pilih..." });
         hitungTotal();
-
-        // Logika untuk menghilangkan notifikasi otomatis setelah 2 detik
-        const alertElement = $('#alert-message');
-        if (alertElement.length) {
-            setTimeout(function() {
-                if (typeof $.fn.fadeOut === 'function') {
-                    alertElement.fadeOut(1000, function() {
-                        $(this).remove();
-                    });
-                } else {
-                    alertElement.hide(1000);
-                }
-            }, 2000);
-        }
-
-        // Inisialisasi DataTable
         $('#tblMember').DataTable();
     });
 </script>
