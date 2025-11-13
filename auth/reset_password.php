@@ -1,12 +1,12 @@
 <?php
 // reset_password.php
 session_start();
-require 'php/db.php';
+require '../config/database.php';
 
 $token = $_GET['token'] ?? '';
 if (!$token) die("Token tidak ditemukan.");
 
-$stmt = $conn->prepare("SELECT id, reset_expires FROM users WHERE reset_token=? LIMIT 1");
+$stmt = $conn->prepare("SELECT id_user, reset_expires FROM users WHERE reset_token=? LIMIT 1");
 $stmt->bind_param('s', $token);
 $stmt->execute();
 $res = $stmt->get_result();
@@ -14,7 +14,7 @@ if ($row = $res->fetch_assoc()) {
     if (strtotime($row['reset_expires']) < time()) {
         die("Link reset sudah kadaluarsa.");
     }
-    $_SESSION['reset_user_id'] = $row['id'];
+    $_SESSION['reset_user_id'] = $row['id_user'];
     $_SESSION['reset_token'] = $token;
 } else { die("Token tidak valid."); }
 ?>

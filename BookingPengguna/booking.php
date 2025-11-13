@@ -1,8 +1,8 @@
 <?php
 date_default_timezone_set('Asia/Jakarta');
-// Booking/booking.php
 session_start();
 require '../config/database.php';
+
 // --- BAGIAN USER (ASUMSI LOGGED IN ATAU DEMO) ---
 if (!isset($_SESSION['id_user'])) {
     $_SESSION['id_user'] = 1;
@@ -11,15 +11,8 @@ if (!isset($_SESSION['id_user'])) {
 $user_id = $_SESSION['id_user'];
 
 // ------------------ BACKEND ENDPOINT UNTUK CART (AJAX) ------------------
-// Actions:
-// - add_to_cart : tambah item ke $_SESSION['keranjang']
-// - remove_from_cart : hapus item berdasarkan index
-// - clear_cart : kosongkan keranjang (opsional)
-// Response JSON
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
-
     header('Content-Type: application/json; charset=utf-8');
 
     if ($action === 'add_to_cart') {
@@ -28,22 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $tanggal = $_POST['tanggal'] ?? '';
         $jam = $_POST['jam'] ?? '';
         $harga = isset($_POST['harga']) ? (float)$_POST['harga'] : 0.0;
-        
-        // Tambahan untuk nama lapangan di keranjang
         $nama_lapangan = $_POST['nama_lapangan'] ?? 'Lapangan';
 
-        // Validasi minimal
         if (!$id_jadwal_waktu || !$tanggal || !$jam) {
             echo json_encode(['status' => 'error', 'message' => 'Data slot tidak lengkap.']);
             exit;
         }
 
-        // Inisialisasi keranjang
         if (!isset($_SESSION['keranjang']) || !is_array($_SESSION['keranjang'])) {
             $_SESSION['keranjang'] = [];
         }
 
-        // Cek duplikat (sama id_jadwal_waktu & tanggal)
         $duplicate = false;
         foreach ($_SESSION['keranjang'] as $it) {
             if ((int)$it['id_jadwal_waktu'] === $id_jadwal_waktu && $it['tanggal'] === $tanggal) {
@@ -56,27 +44,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        // Optional: cek apakah slot sudah dipesan di DB (safety)
-        $check_q = "SELECT 1 FROM detail_booking db JOIN booking b ON db.id_booking = b.id_booking WHERE db.id_jadwal_waktu = ? AND b.tanggal = ? AND b.status IN ('disetujui','menunggu')";
-        $stmt = mysqli_prepare($conn, $check_q);
-        if ($stmt) {
-            mysqli_stmt_bind_param($stmt, "is", $id_jadwal_waktu, $tanggal);
-            mysqli_stmt_execute($stmt);
-            $res = mysqli_stmt_get_result($stmt);
-            if ($row = mysqli_fetch_assoc($res)) {
+        // Cek DB (opsional, tapi bagus)
+        $check_q = "SELECT 1 
+                    FROM jadwal_detail jd
+                    JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian
+                    WHERE jd.id_jadwal_waktu = ? AND jh.tanggal = ? AND jd.status = 'dibooking'";
+        $stmt_check = mysqli_prepare($conn, $check_q);
+        if ($stmt_check) {
+            mysqli_stmt_bind_param($stmt_check, "is", $id_jadwal_waktu, $tanggal);
+            mysqli_stmt_execute($stmt_check);
+            $res_check = mysqli_stmt_get_result($stmt_check);
+            if ($row_check = mysqli_fetch_assoc($res_check)) {
                 echo json_encode(['status' => 'error', 'message' => 'Slot sudah dibooking oleh orang lain.']);
                 exit;
             }
         }
 
-        // Tambah ke session
+
         $_SESSION['keranjang'][] = [
             'id_jadwal_waktu' => $id_jadwal_waktu,
             'id_lapangan' => $id_lapangan,
             'tanggal' => $tanggal,
             'jam' => $jam,
             'harga' => $harga,
-            'nama_lapangan' => $nama_lapangan // Simpan nama lapangan
+            'nama_lapangan' => $nama_lapangan
         ];
 
         echo json_encode(['status' => 'ok', 'message' => 'Slot ditambahkan ke keranjang.', 'count' => count($_SESSION['keranjang'])]);
@@ -94,13 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    if ($action === 'clear_cart') {
-        $_SESSION['keranjang'] = [];
-        echo json_encode(['status' => 'ok', 'message' => 'Keranjang dikosongkan.', 'count' => 0]);
-        exit;
-    }
-
-    // default
+    // ... (aksi lain) ...
     echo json_encode(['status' => 'error', 'message' => 'Aksi tidak dikenali.']);
     exit;
 }
@@ -108,14 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // --- PARAMETER ---
 $selected_lapangan = (int)($_GET['lapangan'] ?? 0);
-
-// --- PERBAIKAN: INI ADALAH LOGIKA TANGGAL DEFAULT ---
 $selected_date     = $_GET['date'] ?? date('Y-m-d');
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected_date)) {
     $selected_date = date('Y-m-d');
 }
-// --- AKHIR LOGIKA TANGGAL DEFAULT ---
 
 // --- AMBIL DATA LAPANGAN (TERMASUK UNTUK DROPDOWN) ---
 if ($selected_lapangan <= 0) {
@@ -135,18 +117,16 @@ if (!$lapangan) {
 
 $all_lapangan_result = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan FROM lapangan WHERE status='aktif' ORDER BY nama_lapangan");
 
-// --- LOGIKA PERBAIKAN TANGGAL & STATUS HARI ---
+// --- LOGIKA TANGGAL & STATUS HARI ---
 $hari_num = date('N', strtotime($selected_date));
 $hari_map = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
 $hari = $hari_map[$hari_num - 1];
 
-// Ambil MIN dan MAX tanggal yang tersedia di DB untuk input date picker
 $date_range_query = mysqli_query($conn, "SELECT MIN(tanggal) AS min_date, MAX(tanggal) AS max_date FROM jadwal_harian WHERE id_lapangan = $selected_lapangan AND tanggal >= CURDATE()");
 $date_range = mysqli_fetch_assoc($date_range_query);
 $min_date = $date_range['min_date'] ?? date('Y-m-d');
 $max_date = $date_range['max_date'] ?? date('Y-m-d');
 
-// Cek status hari HANYA untuk tanggal yang dipilih
 $hari_status = 'tidak_tersedia';
 $hari_status_message = '';
 
@@ -154,105 +134,88 @@ if (strtotime($selected_date) < strtotime(date('Y-m-d'))) {
     $hari_status = 'kadaluarsa';
     $hari_status_message = 'Anda tidak dapat memesan jadwal di masa lalu.';
 } else {
-    $status_query = "SELECT status_hari FROM jadwal_harian WHERE id_lapangan = ? AND tanggal = ?";
-    $stmt = mysqli_prepare($conn, $status_query);
-    mysqli_stmt_bind_param($stmt, "is", $selected_lapangan, $selected_date);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    if ($row = mysqli_fetch_assoc($result)) {
-        $hari_status = $row['status_hari']; // 'tersedia', 'penuh', 'libur'
+    $status_query = "SELECT id_jadwal_harian, status_hari FROM jadwal_harian WHERE id_lapangan = ? AND tanggal = ?";
+    $stmt_status = mysqli_prepare($conn, $status_query);
+    mysqli_stmt_bind_param($stmt_status, "is", $selected_lapangan, $selected_date);
+    mysqli_stmt_execute($stmt_status);
+    $result_status = mysqli_stmt_get_result($stmt_status);
+    
+    $id_jadwal_harian_today = 0; // Simpan ID jadwal harian untuk kueri nanti
+
+    if ($row_status = mysqli_fetch_assoc($result_status)) {
+        $hari_status = $row_status['status_hari']; 
+        $id_jadwal_harian_today = $row_status['id_jadwal_harian']; // Ambil ID
         if ($hari_status === 'penuh') $hari_status_message = 'Jadwal penuh untuk tanggal ini.';
         if ($hari_status === 'libur') $hari_status_message = 'Lapangan libur pada tanggal ini.';
     } else {
         $hari_status = 'belum_tersedia';
         $hari_status_message = 'Jadwal untuk tanggal ini belum diatur oleh admin.';
     }
-    mysqli_stmt_close($stmt);
+    mysqli_stmt_close($stmt_status);
 }
-// --- AKHIR LOGIKA PERBAIKAN ---
 
 // JADWAL JAM (HANYA JIKA 'tersedia')
 $jadwal_list = [];
 if ($hari_status === 'tersedia') {
     $jam_min = ($hari == 'sabtu' || $hari == 'minggu') ? '07:00:00' : '08:00:00';
     $jadwal_query = "SELECT * FROM jadwal_waktu WHERE id_lapangan = ? AND jam_mulai >= ? ORDER BY jam_mulai";
-    $stmt = mysqli_prepare($conn, $jadwal_query);
-    mysqli_stmt_bind_param($stmt, "is", $selected_lapangan, $jam_min);
-    mysqli_stmt_execute($stmt);
-    $jadwal_result = mysqli_stmt_get_result($stmt);
-    while ($row = mysqli_fetch_assoc($jadwal_result)) {
-        $jadwal_list[] = $row;
+    $stmt_jam = mysqli_prepare($conn, $jadwal_query);
+    mysqli_stmt_bind_param($stmt_jam, "is", $selected_lapangan, $jam_min);
+    mysqli_stmt_execute($stmt_jam);
+    $jadwal_result = mysqli_stmt_get_result($stmt_jam);
+    while ($row_jam = mysqli_fetch_assoc($jadwal_result)) {
+        $jadwal_list[] = $row_jam;
     }
 }
 
-// CEK BOOKED
+// CEK BOOKED (LOGIKA BARU SESUAI JADWAL_DETAIL)
 $booked_slots = [];
-$check_query = "
-    SELECT jw.jam_mulai, jw.jam_selesai, db.id_jadwal_waktu
-    FROM detail_booking db
-    JOIN booking b ON db.id_booking = b.id_booking
-    JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu
-    WHERE jw.id_lapangan = ? AND b.tanggal = ? AND b.status IN ('disetujui', 'menunggu')
-";
-$stmt = mysqli_prepare($conn, $check_query);
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, "is", $selected_lapangan, $selected_date);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    while ($row = mysqli_fetch_assoc($result)) {
-        $start = substr($row['jam_mulai'], 0, 5);
-        $end = substr($row['jam_selesai'], 0, 5);
-        $booked_slots["$start-$end"] = true; 
-        $booked_slots[$row['id_jadwal_waktu']] = true;
+if ($id_jadwal_harian_today > 0) { // Hanya cek jika jadwal harian ada
+    $check_query = "SELECT id_jadwal_waktu FROM jadwal_detail 
+                    WHERE id_jadwal_harian = ? AND status = 'dibooking'";
+    
+    $stmt_booked = mysqli_prepare($conn, $check_query);
+    if ($stmt_booked) {
+        mysqli_stmt_bind_param($stmt_booked, "i", $id_jadwal_harian_today);
+        mysqli_stmt_execute($stmt_booked);
+        $result_booked = mysqli_stmt_get_result($stmt_booked);
+        while ($row_booked = mysqli_fetch_assoc($result_booked)) {
+            $booked_slots[$row_booked['id_jadwal_waktu']] = true; // Simpan berdasarkan ID
+        }
+        mysqli_stmt_close($stmt_booked);
     }
-    mysqli_stmt_close($stmt);
 }
 
-// Hitung jadwal tersedia
+// === PERBAIKAN: Perhitungan $available_count DIPINDAHKAN KE ATAS ===
 $available_count = 0;
+$is_today_check = ($selected_date == date('Y-m-d'));
+$current_time_check = date('H:i:s');
+
 foreach ($jadwal_list as $jadwal) {
-    if (!isset($booked_slots[$jadwal['id_jadwal_waktu']])) {
+    $jadwal_id = $jadwal['id_jadwal_waktu'];
+    
+    // Cek 1: Sudah dibooking?
+    $is_booked = isset($booked_slots[$jadwal_id]);
+    
+    // Cek 2: Sudah terlewat?
+    $is_past_time = false;
+    if ($is_today_check && (strtotime($jadwal['jam_mulai']) < strtotime($current_time_check))) {
+        $is_past_time = true;
+    }
+
+    // Jika TIDAK dibooking DAN TIDAK terlewat, tambahkan hitungan
+    if (!$is_booked && !$is_past_time) {
         $available_count++;
     }
 }
+// === AKHIR PERBAIKAN ===
 
-// PROSES BOOKING (LOGIKA LAMA)
+
+// PROSES BOOKING (LOGIKA LAMA - HANYA UNTUK FORM TANPA JS)
 $message = '';
-if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
-    $jadwal_id = (int)$_POST['jadwal_id'];
-    $slot_text = $_POST['slot'] ?? ''; // '08:00-09:00'
+// ... (Logika form 'book_slot' lama Anda bisa diletakkan di sini jika masih dipakai) ...
+// ... (Saat ini logika ini tidak terpakai karena AJAX) ...
 
-    if ($hari_status !== 'tersedia') {
-        $message = "<div class='message-box error'><i class='fas fa-exclamation-triangle mr-2'></i>Lapangan tidak tersedia pada hari ini!</div>";
-    } elseif ($jadwal_id && !isset($booked_slots[$jadwal_id]) && !isset($booked_slots[$slot_text])) {
-        mysqli_begin_transaction($conn);
-        try {
-            $q = "INSERT INTO booking (id_user, id_lapangan, tanggal, status, payment_status) 
-                  VALUES (?, ?, ?, 'menunggu', 'belum_bayar')";
-            $stmt = mysqli_prepare($conn, $q);
-            mysqli_stmt_bind_param($stmt, "iis", $user_id, $selected_lapangan, $selected_date);
-            mysqli_stmt_execute($stmt);
-            $booking_id = mysqli_insert_id($conn);
-
-            // Perbaikan: Ambil harga dari $lapangan
-            $harga = (float)($lapangan['harga_per_jam'] ?? 0);
-
-            $q = "INSERT INTO detail_booking (id_booking, id_jadwal_waktu, harga) VALUES (?, ?, ?)";
-            $stmt = mysqli_prepare($conn, $q);
-            mysqli_stmt_bind_param($stmt, "iid", $booking_id, $jadwal_id, $harga);
-            mysqli_stmt_execute($stmt);
-
-            mysqli_commit($conn);
-            $message = "<div class='message-box success'><i class='fas fa-check-circle mr-2'></i>Booking berhasil! Menunggu konfirmasi.</div>";
-            $booked_slots[$slot_text] = true;
-            $booked_slots[$jadwal_id] = true;
-            $available_count--;
-        } catch (Exception $e) {
-            mysqli_rollback($conn);
-            $message = "<div class='message-box error'><i class='fas fa-exclamation-triangle mr-2'></i>Gagal: " . $e->getMessage() . "</div>";
-        }
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -281,20 +244,18 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
             primary: "#0b63d6", // Biru Tema Anda
             primaryDark: "#094ea8", 
             softGray: "#f9fafb",
-            // Aksen baru
-            'primary-light': '#e7f0ff', // Biru sangat muda
-            'gray-hover': '#f4f4f5', // Abu-abu untuk hover slot
+            'primary-light': '#e7f0ff', 
+            'gray-hover': '#f4f4f5', 
           },
           boxShadow: { 
             lift: "0 18px 40px rgba(11,26,54,0.10)", 
             soft: "0 8px 24px rgba(11,26,54,0.06)",
             'lg-soft': '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)'
           },
-          // Animasi "muncul"
           animation: {
             'fade-in': 'fadeIn 0.5s ease-out forwards',
             'fade-in-delay': 'fadeIn 0.7s ease-out forwards',
-            'pop': 'pop 0.3s ease-out', // Animasi hover slot
+            'pop': 'pop 0.3s ease-out', 
           },
           keyframes: {
             fadeIn: {
@@ -310,30 +271,23 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
       },
     };
   </script>
-  
-  <style>
+
+  <script>window.USER_ID = <?= json_encode($_SESSION['id_user'] ?? 0); ?>;</script>
+
+  <style type="text/tailwindcss">
     /* Custom Styles */
     body { font-family: 'Inter', sans-serif; }
-    .nav-link { @apply relative text-slate-600; }
+    .nav-link { @apply relative text-slate-600 transition-colors duration-300; }
     .nav-link.active { @apply text-primary font-semibold; }
     .nav-link:not(.active):hover { @apply text-primary; }
     
-    /* === GARIS BIRU DI BAWAH LINK AKTIF DIHAPUS ===
-    .nav-link.active::after {
-      ...
-    }
-    */
-
-    /* PERBAIKAN: Slot Card (Sesuai Permintaan) */
     .slot-card {
       @apply border rounded-xl p-3 text-center transition-all duration-300 min-h-20 flex flex-col justify-center;
     }
     
     .slot-card.available {
-      @apply bg-white border-gray-200 text-slate-700 hover:border-primary hover:shadow-lg hover:-translate-y-1 hover:bg-gray-hover cursor-pointer;
+      @apply bg-white border-gray-200 text-slate-700 shadow-md shadow-gray-200/50 hover:border-primary hover:shadow-lg hover:-translate-y-1 hover:bg-gray-hover cursor-pointer;
       animation: pop 0.3s ease-out;
-    }
-    .slot-card.available:hover {
     }
     .slot-card.available .price {
       @apply text-green-600 font-bold;
@@ -346,94 +300,75 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
       @apply bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed;
     }
     
-    /* PERBAIKAN: Form Inputs (Lebih modern) */
     .form-control {
-      @apply w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200;
+      @apply w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 hover:border-primary/70;
     }
     
-    /* PERBAIKAN: Pesan Status (Dengan ikon dan warna tema) */
     .message-box {
       @apply p-4 rounded-lg mb-4 text-sm font-medium flex items-center border;
     }
-    .message-box.error {
-      @apply bg-red-50 text-red-700 border-red-200;
-    }
-    .message-box.success {
-      @apply bg-green-50 text-green-700 border-green-200;
-    }
-    .message-box.warning {
-      @apply bg-yellow-50 text-yellow-800 border-yellow-200;
-    }
-    .message-box.info {
-      @apply bg-primary-light text-primary border-primary/20;
-    }
+    .message-box.error { @apply bg-red-50 text-red-700 border-red-200; }
+    .message-box.success { @apply bg-green-50 text-green-700 border-green-200; }
+    .message-box.warning { @apply bg-yellow-50 text-yellow-800 border-yellow-200; }
+    .message-box.info { @apply bg-primary-light text-primary border-primary/20; }
 
     /* ---------------- Sidebar Keranjang ---------------- */
     .sidebar {
-      position: fixed;
-      top: 0;
+      @apply fixed top-0 flex flex-col z-[2000] border-l border-solid;
       right: -420px;
       width: 380px;
       height: 100vh;
       background: #fff;
       box-shadow: -10px 0 30px rgba(10,10,20,0.12);
       transition: right 0.38s cubic-bezier(.2,.9,.2,1);
-      display: flex;
-      flex-direction: column;
-      z-index: 2000;
-      border-left: 1px solid #f1f3f5;
+      border-left-color: #f1f3f5;
     }
     .sidebar.active { right: 0; }
-    .sidebar-header { padding: 18px; border-bottom: 1px solid #f3f4f6; display:flex; align-items:center; justify-content:space-between; }
-    .sidebar-body { padding: 14px; overflow-y: auto; flex: 1; }
-    .sidebar-footer { padding: 14px; border-top: 1px solid #f3f4f6; }
-    .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #475569;}
-    .keranjang-item { display:flex; justify-content:space-between; gap:10px; padding:10px 0; align-items:center; border-bottom:1px solid #f3f4f6;}
-    .keranjang-item .left { flex:1; }
-    .keranjang-item .right { text-align:right; min-width:90px; }
-    .checkout-btn { width:100%; padding:10px 12px; border-radius:8px; background:#0b63d6; color:#fff; font-weight:600; border:none; cursor:pointer; }
-    .checkout-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .sidebar-header { @apply p-[18px] border-b border-solid flex items-center justify-between; border-bottom-color: #f3f4f6; }
+    .sidebar-body { @apply p-[14px] overflow-y-auto flex-1; }
+    .sidebar-footer { @apply p-[14px] border-t border-solid; border-top-color: #f3f4f6; }
+    .close-btn { @apply bg-none border-none text-xl cursor-pointer; color: #475569;}
+    .keranjang-item { @apply flex justify-between gap-[10px] py-[10px] items-center border-b border-solid; border-bottom-color: #f3f4f6;}
+    .keranjang-item .left { @apply flex-1; }
+    .keranjang-item .right { @apply text-right min-w-[90px]; }
+    .checkout-btn { @apply w-full p-[10px_12px] rounded-lg text-white font-semibold border-none cursor-pointer; background:#0b63d6; }
+    .checkout-btn:disabled { @apply opacity-50 cursor-not-allowed; }
 
-    /* cart icon */
-    .cart-icon {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #0b63d6;
-      color: white;
-      border-radius: 999px;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 18px;
-      z-index: 2100;
-    }
-    .cart-count {
-      position:absolute;
-      top: 8px;
-      right: 8px;
-      background: #ef4444;
-      color: white;
-      border-radius: 999px;
-      padding: 2px 6px;
-      font-size: 11px;
-      font-weight:600;
-    }
-
-    /* small responsive fix */
     @media (max-width: 640px) {
       .sidebar { width: 100%; right: -100%; }
       .sidebar.active { right: 0; }
+    }
+    /* Modal Pop-up */
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(2,6,23,0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 3000;
+      padding: 20px;
+    }
+    .modal[style*="display:none"] { display:none; }
+
+    .modal-backdrop {
+      @apply fixed inset-0 z-[4000] flex items-center justify-center p-4;
+      background-color: rgba(10, 20, 40, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    .modal-backdrop.hidden {
+      display: none !important;
+    }
+    .modal-panel {
+      @apply bg-white rounded-xl shadow-lift w-full max-w-sm overflow-hidden;
     }
 
   </style>
 </head>
 <body class="bg-softGray text-slate-900 antialiased">
  
-<div id="sidebarKeranjang" class="sidebar <?= (isset($_SESSION['show_sidebar']) && $_SESSION['show_sidebar']) ? 'active' : '' ?>">
+<div id="sidebarKeranjang" class="sidebar">
    <div class="sidebar-header">
      <h4 class="font-poppins font-semibold">JADWAL DIPILIH</h4>
      <button id="closeSidebar" class="close-btn" aria-label="Tutup">&times;</button>
@@ -477,12 +412,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
           <div class="hidden lg:flex flex-1 justify-center">
             <ul id="topNav" class="flex gap-8 items-end">
               <li>
-                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
+                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm">Beranda</a>
               </li>
-              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Lapangan</a></li>
-              <li><a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a></li>
-              <li><a href="#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a></li>
-              <li><a href="about.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a></li>
+              <li><a href="#" class="nav-link px-2 py-1 text-sm active">Lapangan</a></li>
+              <li><a href="kontak.php" class="nav-link px-2 py-1 text-sm">Kontak</a></li>
               <li>
                 <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
                 <i class="fa-solid fa-cart-shopping text-lg"></i>
@@ -494,17 +427,47 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
               </li>           
             </ul>
           </div>
+          
           <div class="hidden md:flex items-center gap-4"> 
-            <a href="login.php" 
-              class="border border-primary text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary hover:text-white transition-all duration-300">
-              Masuk
-            </a>
             
-            <a href="register.php" 
-              class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primaryDark transition-all duration-300 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30">
-              Daftar
-            </a>
+            <?php if (isset($_SESSION['id_user']) && $_SESSION['nama'] !== 'User Demo'): ?>
+                
+                <?php
+                // Tentukan path foto profil
+                $foto_profil = '../assets/images/default-avatar.png'; // Sediakan gambar default
+                if (isset($_SESSION['foto_profil']) && !empty($_SESSION['foto_profil'])) {
+                    $foto_profil = '../uploads/profiles/' . htmlspecialchars($_SESSION['foto_profil']);
+                }
+                $nama_depan = explode(' ', htmlspecialchars($_SESSION['nama']))[0];
+                ?>
+
+                <a href="../DashPengguna.php" 
+                   class="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary transition-colors duration-300"
+                   title="Lihat Dashboard">
+                    <img src="<?= $foto_profil ?>" alt="Foto Profil" class="w-9 h-9 rounded-full object-cover border-2 border-primary-light">
+                    <span>Halo, <?= $nama_depan ?></span>
+                </a>
+                <a href="../auth/php/logout.php" 
+                   class="text-sm text-gray-500 hover:text-red-600"
+                   title="Keluar"
+                   id="btnLogout"> <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+
+            <?php else: ?>
+
+                <a href="../auth/login.php" 
+                  class="border border-primary text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary hover:text-white transition-all duration-300">
+                  Masuk
+                </a>
+                
+                <a href="../auth/register.php" 
+                  class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primaryDark transition-all duration-300 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30">
+                  Daftar
+                </a>
+
+            <?php endif; ?>
           </div>
+          
           <div class="lg:hidden">
             <button id="mobileBtn" class="p-2 rounded-md hover:bg-slate-100 focus:outline-none transition-colors">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6H21M3 12H21M3 18H21" stroke="#0b1a2b" stroke-width="1.5" stroke-linecap="round" /></svg>
@@ -513,7 +476,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
         </nav>
       </div>
       
-      </header>
+    </header>
 
   <main class="max-w-7xl mx-auto px-4 py-8">
     <div class="grid lg:grid-cols-2 gap-8">
@@ -543,7 +506,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
             <div class="text-xs text-primary/80">pada <?= date('d M Y', strtotime($selected_date)) ?></div>
           </div>
         </div>
-      </div>
+        </div>
 
       <div class="bg-white rounded-xl shadow-soft p-6 animate-fade-in-delay" style="animation-delay: 0.1s;">
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
@@ -599,23 +562,38 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
            
         <?php else: ?>
           <h3 class="text-lg font-bold font-poppins text-slate-800 mb-4">Pilih Jam Main</h3>
+          <?php
+          // Variabel ini sudah dihitung di bagian atas
+          $is_today = ($selected_date == date('Y-m-d'));
+          $current_time_str = date('H:i:s'); 
+          ?>
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             <?php foreach ($jadwal_list as $jadwal): 
               $start = substr($jadwal['jam_mulai'], 0, 5);
               $end = substr($jadwal['jam_selesai'], 0, 5);
-              $slot_text = "$start-$end";
               $jadwal_id = $jadwal['id_jadwal_waktu'];
-              $is_booked = isset($booked_slots[$jadwal_id]) || isset($booked_slots[$slot_text]);
-              // Perbaikan: Ambil harga dari $lapangan
+              
+              // Cek 1: Sudah dibooking?
+              $is_booked = isset($booked_slots[$jadwal_id]);
+              
+              // Cek 2: Sudah terlewat?
+              $is_past_time = false;
+              if ($is_today && (strtotime($jadwal['jam_mulai']) < strtotime($current_time_str))) {
+                  $is_past_time = true;
+              }
+              
               $harga = (float)($lapangan['harga_per_jam'] ?? 0);
             ?>
-              <?php if ($is_booked): ?>
+              <?php if ($is_booked || $is_past_time): // Gabungkan kondisi ?>
                 <div class="slot-card booked">
                   <div class="text-xs font-medium">60 Menit</div>
                   <div class="text-sm font-semibold mt-1 line-through"><?= $start ?> - <?= $end ?></div>
-                  <div class="text-sm font-medium mt-1">Dipesan</div>
-                </div>
-              <?php else: ?>
+                  
+                  <div class="text-sm font-medium mt-1">
+                      <?= $is_past_time ? 'Terlewat' : 'Dipesan' ?>
+                  </div>
+                  </div>
+              <?php else: // Jika tidak ter-booking DAN tidak terlewat ?>
                 <button 
                   type="button" 
                   class="slot-card available w-full h-full jam-main" 
@@ -658,21 +636,27 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_slot') {
     </div>
   </div>
 
-  <style>
-    .modal {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(2,6,23,0.45);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 3000;
-      padding: 20px;
-    }
-    .modal[style*="display:none"] { display:none; }
-  </style>
-
   <script src="../assets/js/booking-script.js"></script>
+  <div id="logoutModal" class="modal-backdrop hidden">
+    <div class="modal-panel animate-pop">
+        <div class="p-6 text-center">
+            <i class="fa-solid fa-triangle-exclamation text-5xl text-red-500 mb-4"></i>
+            
+            <h3 class="font-poppins font-semibold text-lg text-slate-800 mb-2">Konfirmasi Keluar</h3>
+            <p class="text-sm text-slate-500 mb-6">
+                Apakah Anda yakin ingin keluar dari akun Anda?
+            </p>
+            
+            <div class="flex justify-center gap-3">
+                <button id="cancelLogoutBtn" type="button" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                    Batal
+                </button>
+                <button id="confirmLogoutBtn" type="button" class="px-6 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+                    Ya, Keluar
+                </button>
+            </div>
+        </div>
+    </div>
+  </div>
 </body>
 </html>
