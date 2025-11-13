@@ -1,6 +1,9 @@
 <?php
 session_start();
 date_default_timezone_set('Asia/Jakarta');
+
+// Tentukan halaman aktif untuk navbar
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -43,10 +46,15 @@ date_default_timezone_set('Asia/Jakarta');
 
     <style>
       /* CSS untuk indikator navbar */
-      .nav-link.active {
-        color: #0b63d6;
-        font-weight: 600;
-      }
+.nav-link.active {
+    color: #0b63d6 !important;
+    font-weight: 600 !important;
+}
+
+#navLine {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: #0b63d6;
+}
 
       /* Animasi smooth scroll */
       html {
@@ -130,24 +138,24 @@ date_default_timezone_set('Asia/Jakarta');
             </div>
           </a>
 
-          <div class="hidden lg:flex flex-1 justify-center">
-            <ul id="topNav" class="flex gap-8 items-end">
-              <li>
-                <a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Beranda</a>
-              </li>
-              <li>
-                <a href="/BookingLapanganKel2/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a>
-              </li>
-              <li>
-                <a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a>
-              </li>
-              <li>
-                <a href="#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a>
-              </li>
-              <li>
-                <a href="kontak.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a>
-              </li>
-              
+         <div class="hidden lg:flex flex-1 justify-center">
+    <ul id="topNav" class="flex gap-8 items-end">
+        <li>
+            <a href="index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
+        </li>
+        <li>
+            <a href="/BookingLapanganKel2/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a>
+        </li>
+        <li>
+            <a href="kontak.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a>
+        </li>
+        <li>
+            <a href="member.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Member</a>
+        </li>
+        <li>
+            <a href="riwayat.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Riwayat</a>
+        </li>
+
               <li>
                 <div id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer mr-2" title="Lihat Keranjang">
                     <i class="fa-solid fa-cart-shopping text-lg"></i>
@@ -159,6 +167,14 @@ date_default_timezone_set('Asia/Jakarta');
               </li>
               </ul>
           </div>
+
+          <div class="hidden lg:block">
+    <div id="navIndicator" class="mx-auto max-w-7xl px-4">
+        <div class="h-0.5 bg-transparent relative">
+            <div id="navLine" class="absolute h-0.5 bg-primary rounded transition-all duration-300"></div>
+        </div>
+    </div>
+</div>
 
           <div class="hidden md:flex items-center gap-4"> <?php if (isset($_SESSION['id_user'])): ?>
                 
@@ -220,8 +236,6 @@ date_default_timezone_set('Asia/Jakarta');
       <div class="px-4 py-4 flex flex-col gap-2">
         <a href="#home" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors active">Beranda</a>
         <a href="#facilities" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lapangan</a>
-        <a href="#pricing" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Harga</a>
-        <a href="#location" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lokasi</a>
         <a href="about.html" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Kontak</a>
         <div class="pt-2 flex gap-2 mt-2">
           <button class="flex-1 border border-primary text-primary py-2 rounded-lg font-medium" data-modal-open="loginModal">Masuk</button>
@@ -247,12 +261,12 @@ date_default_timezone_set('Asia/Jakarta');
 
             <h1 class="font-poppins font-extrabold text-4xl md:text-5xl lg:text-6xl leading-tight mb-6">Pesan Lapangan <span class="text-accent">Lebih Cepat</span>, Main Tanpa Ribet</h1>
 
-            <p class="text-lg md:text-xl text-white/90 max-w-2xl mb-8">Pilih lapangan, cek slot tersedia, dan konfirmasi. Sistem memudahkan latihan harian hingga event—semua transparan dan aman.</p>
+            <p class="text-lg md:text-xl text-white/90 max-w-2xl mb-8">Pilih lapangan, cek ketersediaan slot, dan konfirmasi langsung. Sistem memudahkan latihan harian hingga event—semua transparan dan aman.</p>
 
             <div class="flex flex-wrap gap-4 mb-8">
               <a href="#lapangan" class="btn-primary btn-lg transform transition hover:scale-105 hover:shadow-lg">Lihat Lapangan</a>
               <button class="btn-outline btn-lg transform transition hover:scale-105" onclick="scrollToSection('penawaran')">Penawaran Spesial</button>
-              <button class="btn-ghost ml-2 transform transition hover:scale-105 flex items-center gap-2" onclick="openMap('SportField')">
+              <button class="btn-ghost ml-2 transform transition hover:scale-105 flex items-center gap-2 scroll-to-location">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -268,7 +282,8 @@ date_default_timezone_set('Asia/Jakarta');
               </div>
               <div class="bg-white/20 rounded-xl p-4 text-center backdrop-blur shadow-soft hover:scale-105 transition-transform duration-300">
                 <div class="text-xs opacity-90">Jam Operasional</div>
-                <div class="font-semibold text-lg">07.00 - 22.00</div>
+                <div class="font-semibold text-lg">Senin-Jumat 08.00 - 23.00</div>
+                <div class="font-semibold text-lg">Sabtu-Minggu 07.00 - 23.00</div>
               </div>
               <div class="bg-white/20 rounded-xl p-4 text-center backdrop-blur shadow-soft hover:scale-105 transition-transform duration-300">
                 <div class="text-xs opacity-90">DP Event</div>
@@ -441,7 +456,6 @@ date_default_timezone_set('Asia/Jakarta');
                 <li class="flex items-center gap-2">✓ Diskon 15% untuk event</li>
               </ul>
               <div class="flex gap-3">
-                <button class="flex-1 btn-outline bg-white/20 border-white text-white hover:bg-white/30" onclick="openModalById('memberModal')">Detail</button>
                 <button class="flex-1 btn-primary bg-accent border-accent hover:bg-yellow-500" onclick="handleBookingClick('Membership Weekend',150000)">Daftar</button>
               </div>
             </div>
@@ -460,7 +474,6 @@ date_default_timezone_set('Asia/Jakarta');
                 <li class="flex items-center gap-2">✓ Sponsor kit tersedia</li>
               </ul>
               <div class="flex gap-3">
-                <button class="flex-1 btn-outline" onclick="openEventInfo()">Info Lengkap</button>
                 <button class="flex-1 btn-primary" onclick="contactAdmin()">Hubungi Admin</button>
               </div>
             </div>
@@ -479,7 +492,6 @@ date_default_timezone_set('Asia/Jakarta');
                 <li class="flex items-center gap-2">✓ Bisa booking via WhatsApp</li>
               </ul>
               <div class="flex gap-3">
-                <button class="flex-1 btn-outline" onclick="scrollToSection('lapangan')">Lihat Lapangan</button>
                 <button class="flex-1 btn-primary" onclick="openWhatsApp()">Booking via WA</button>
               </div>
             </div>
@@ -526,6 +538,99 @@ date_default_timezone_set('Asia/Jakarta');
           </div>
         </div>
       </section>
+<!-- HERO LOKASI -->
+<!-- SECTION: Maps Header -->
+<section class="maps-section" id="location">
+  <div class="max-w-7xl mx-auto px-4 text-center">
+    <h1 class="text-4xl md:text-5xl font-poppins font-bold mb-4">
+      Lokasi SportField
+    </h1>
+    <p class="text-xl text-white/90 max-w-2xl mx-auto">
+      Temukan lokasi kami dengan mudah dan rencanakan kunjungan Anda
+    </p>
+  </div>
+</section>
+
+<!-- SECTION: Peta dan Informasi Lokasi -->
+<section class="location-section">
+  <div class="max-w-7xl mx-auto px-4">
+    <!-- PETA INTERAKTIF - Lebih lebar -->
+    <div class="w-full mb-12">
+      <h2 class="text-3xl font-poppins font-bold mb-6">Peta Lokasi</h2>
+
+      <div class="map-container h-96 bg-slate-200 rounded-2xl overflow-hidden">
+        <!-- Google Maps Embed -->
+        <iframe
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.317075287345!2d113.7079392747652!3d-8.165585099999999!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dd695aa99d14409%3A0x3c5639c7bcdde6cd!2sRUSH%20Badminton%20Academy!5e0!3m2!1sid!2sid!4v1710000000000!5m2!1sid!2sid"
+          width="100%"
+          height="100%"
+          style="border:0;"
+          allowfullscreen=""
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
+      </div>
+
+      <!-- Tombol Navigasi -->
+      <div class="mt-6 flex flex-wrap gap-4">
+        <a
+          href="https://www.google.com/maps/place/RUSH+Badminton+Academy/@-8.1655851,113.7101279,17z/data=!3m1!4b1!4m6!3m5!1s0x2dd695aa99d14409:0x3c5639c7bcdde6cd!8m2!3d-8.1655851!4d113.7101279!16s%2Fg%2F11gzq2dbwd?entry=ttu"
+          target="_blank"
+          class="bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primaryDark transition-all duration-300 flex items-center gap-2">
+          
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+          </svg>
+          Buka di Google Maps
+        </a>
+      </div>
+    </div>
+
+    <!-- INFORMASI LOKASI - Dipindahkan ke bawah peta -->
+    <div class="w-full">
+      <h2 class="text-3xl font-poppins font-bold mb-6">Informasi Lokasi</h2>
+
+      <div class="space-y-6">
+        
+        <!-- Alamat Detail -->
+        <div class="bg-white p-6 rounded-2xl shadow-soft">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+              <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg mb-2">RUSH Badminton Academy</h3>
+              <p class="text-slate-700">
+                Sebelah Neutron - Kampus, Jl. Kalimantan Gg. 14, Krajan Timur, 
+                Sumbersari, Kec. Sumbersari, Kabupaten Jember, Jawa Timur 68121
+              </p>
+            </div>
+          </div>
+         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+</section>
+
+    </main>
 
       <section id="testimoni" class="py-20 bg-white" data-aos="fade-up">
         <div class="max-w-7xl mx-auto px-4">
@@ -592,15 +697,20 @@ date_default_timezone_set('Asia/Jakarta');
         </div>
       </section>
 
-      <section class="py-12 bg-gradient-to-r from-primary to-primaryDark text-white">
+       <section class="py-12 bg-gradient-to-r from-primary to-primaryDark text-white">
         <div class="max-w-7xl mx-auto px-4 text-center">
           <h3 class="text-3xl font-poppins font-bold">Siap booking? Amankan jadwalmu sekarang juga</h3>
           <p class="mt-3 text-white/90">Klik booking, login, lalu pilih slot yang tersedia.</p>
           <div class="mt-6">
-            <button class="btn-white" onclick="scrollToSection('lapangan')">Lihat Lapangan</button>
-          </div>
+            <a href="/BookingLapanganKel2/BookingPengguna/booking.php" class="btn-accent text-lg px-8 py-4 inline-block">
+            <i class="fas fa-calendar-plus mr-2"></i>Booking Lapangan Sekarang
+           </a>         
+        </div>
         </div>
       </section>
+    </main>
+
+
     </main>
 
     <footer class="bg-white border-t border-slate-100">
@@ -621,8 +731,9 @@ date_default_timezone_set('Asia/Jakarta');
           </div>
           <div>
             <div class="font-semibold mb-2">Kontak</div>
-            <div class="text-sm text-slate-600">admin@sportfield.id • +62 812 3456 7890</div>
-            <div class="mt-3 text-sm text-slate-500">Alamat: Jl. Olahraga No.1</div>
+            <div class="text-sm text-slate-600">admin@sportfield.id • +62 852-3406-3810</div>
+            <div class="mt-3 text-sm text-slate-500">Sebelah Neutron - Kampus, Jl. Kalimantan Gg. 14, Krajan Timur, 
+                                                      Sumbersari, Kec. Sumbersari, Kabupaten Jember, Jawa Timur 68121</div>
           </div>
         </div>
 
@@ -723,5 +834,69 @@ date_default_timezone_set('Asia/Jakarta');
         offset: 60,
       });
     </script>
-  </body>
+    ...
+<!-- Semua konten HTML sudah di atas -->
+
+<script>
+// NAVBAR UNDERLINE FUNCTION
+function updateNavIndicator() {
+    const currentPage = window.location.pathname;
+    const navLinks = document.querySelectorAll('.nav-link');
+    const navLine = document.getElementById('navLine');
+    
+    // Remove all active classes first
+    navLinks.forEach(link => link.classList.remove('active'));
+    
+    // Determine which link should be active
+    let activeLink = null;
+    
+    if (currentPage.includes('index.php') || currentPage === '/' || currentPage === '') {
+        activeLink = document.querySelector('a[href="index.php"]');
+    } else if (currentPage.includes('booking.php')) {
+        activeLink = document.querySelector('a[href*="booking.php"]');
+    } else if (currentPage.includes('kontak.php')) {
+        activeLink = document.querySelector('a[href="kontak.php"]');
+    } else if (currentPage.includes('member.php')) {
+        activeLink = document.querySelector('a[href="member.php"]');
+    } else if (currentPage.includes('riwayat.php')) {
+        activeLink = document.querySelector('a[href="riwayat.php"]');
+    }
+    
+    // Add active class and update underline
+    if (activeLink) {
+        activeLink.classList.add('active');
+        
+        if (navLine) {
+            const parentLi = activeLink.closest('li');
+            if (parentLi) {
+                const navContainer = document.getElementById('topNav');
+                const containerRect = navContainer.getBoundingClientRect();
+                const liRect = parentLi.getBoundingClientRect();
+                
+                const left = liRect.left - containerRect.left;
+                const width = liRect.width;
+                
+                navLine.style.left = `${left}px`;
+                navLine.style.width = `${width}px`;
+            }
+        }
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    updateNavIndicator();
+    window.addEventListener('resize', updateNavIndicator);
+    
+    // Scroll to location function
+    document.querySelector(".scroll-to-location")?.addEventListener("click", function () {
+        const target = document.getElementById("location");
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth" });
+        }
+    });
+});
+</script>
+
+</body>
 </html>
