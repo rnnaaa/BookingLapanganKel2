@@ -1,5 +1,6 @@
 <?php
 ob_start();
+session_start();
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
 include('../includes/topbar.php');
@@ -8,14 +9,14 @@ include('../includes/sidebar.php');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   foreach ($_POST['jam_buka'] as $hari => $jam_buka) {
     $jam_tutup = $_POST['jam_tutup'][$hari];
-
-    // Update jam buka/tutup
-    $sql = "UPDATE jam_operasional SET jam_buka='$jam_buka', jam_tutup='$jam_tutup' WHERE hari='$hari'";
-    mysqli_query($conn, $sql);
+    $stmt = $conn->prepare("UPDATE jam_operasional SET jam_buka=?, jam_tutup=? WHERE hari=?");
+    $stmt->bind_param("sss", $jam_buka, $jam_tutup, $hari);
+    $stmt->execute();
+    $stmt->close();
   }
 
-// Setelah update jam operasional
-include_once 'sinkronisasi_jadwal.php';
+  // Jalankan sinkronisasi otomatis setelah ubah jam operasional
+  include 'jadwal_sinkronisasi.php';
 
 
   $_SESSION['toast_success'] = 'Jam operasional berhasil diperbarui!';
