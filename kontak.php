@@ -97,10 +97,10 @@
               <li>
                 <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
               </li>
-              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Lapangan</a></li>
-              <li><a href="#pricing" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Harga</a></li>
-              <li><a href="#location" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lokasi</a></li>
-              <li><a href="about.html" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Kontak</a></li>
+              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a></li>
+              <li><a href="kontak.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Kontak</a></li>
+              <li><a href="member.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Member</a></li>
+              <li><a href="riwayat.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Riwayat</a></li>
               <li>
                 <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
                 <i class="fa-solid fa-cart-shopping text-lg"></i>
@@ -135,11 +135,11 @@
     <!-- Mobile Navigation Menu -->
     <div id="mobileNav" class="lg:hidden hidden bg-white border-t border-slate-100 shadow-lg">
       <div class="px-4 py-4 flex flex-col gap-2">
-        <a href="index.html" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Beranda</a>
-        <a href="index.html#lapangan" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lapangan</a>
-        <a href="index.html#penawaran" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Harga</a>
-        <a href="index.html#location" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lokasi</a>
-        <a href="kontak.html" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors active">Kontak</a>
+        <a href="index.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Beranda</a>
+        <a href="index.php#lapangan" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lapangan</a>
+        <a href="kontak.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors active">Kontak</a>
+        <a href="member.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Member</a>
+        <a href="riwayat.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Riwayat</a>
         <div class="pt-2 flex gap-2 mt-2">
           <button class="flex-1 border border-primary text-primary py-2 rounded-lg font-medium" data-modal-open="loginModal">Masuk</button>
           <button class="flex-1 bg-primary text-white py-2 rounded-lg font-medium" data-modal-open="registerModal">Daftar</button>
@@ -363,7 +363,7 @@
           <h3 class="text-2xl md:text-3xl font-poppins font-bold mb-6">Amankan jadwalmu sekarang juga</h3>
           <p class="text-xl text-white/90 mb-8">Klik booking, login, lalu pilih slot yang tersedia.</p>
           <div class="mt-6">
-            <a href="index.html#lapangan" class="bg-white text-primary px-8 py-4 rounded-lg font-semibold text-lg hover:bg-slate-100 transition-all duration-300 inline-block">Lihat Lapangan</a>
+            <a href="index.php#lapangan" class="bg-white text-primary px-8 py-4 rounded-lg font-semibold text-lg hover:bg-slate-100 transition-all duration-300 inline-block">Lihat Lapangan</a>
           </div>
         </div>
       </section>
@@ -380,10 +380,10 @@
           <div>
             <div class="font-semibold mb-2">Navigasi</div>
             <ul class="text-sm text-slate-600 space-y-1">
-              <li><a href="index.html#lapangan" class="hover:text-primary">Lapangan</a></li>
-              <li><a href="index.html#penawaran" class="hover:text-primary">Penawaran</a></li>
-              <li><a href="index.html#fasilitas" class="hover:text-primary">Fasilitas</a></li>
-              <li><a href="kontak.html" class="hover:text-primary">Kontak</a></li>
+              <li><a href="index.php#lapangan" class="hover:text-primary">Lapangan</a></li>
+              <li><a href="member.php" class="hover:text-primary">Member</a></li>
+              <li><a href="riwayat.php" class="hover:text-primary">Riwayat</a></li>
+              <li><a href="kontak.php" class="hover:text-primary">Kontak</a></li>
             </ul>
           </div>
           <div>

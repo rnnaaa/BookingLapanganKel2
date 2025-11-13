@@ -64,11 +64,6 @@
                                 <div class="text-sm text-slate-500">Futsal • Badminton • Basket • Court</div>
                             </div>
                         </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <button class="btn-sm btn-outline hover:scale-105 transition-transform" onclick="scrollToSection('lapangan')">Detail Lapangan</button>
-                            <button class="btn-sm btn-primary hover:scale-105 transition-transform" onclick="handleBookingClick('Futsal A',150000)">Booking Sekarang</button>
-                        </div>
                     </div>
                 </div>
 
@@ -111,11 +106,6 @@
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">💡 LED</span>
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🛠️ Premium</span>
                     </div>
-
-                    <div class="flex gap-3">
-                        <button class="flex-1 btn-outline py-3" onclick="showFieldDetail('futsal-a')">Detail</button>
-                        <button class="flex-1 btn-primary py-3" onclick="handleBookingClick('Futsal A',150000)">Booking</button>
-                    </div>
                 </div>
             </article>
 
@@ -132,11 +122,6 @@
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">⚽ Futsal</span>
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🔒 Anti Slip</span>
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">💡 LED</span>
-                    </div>
-
-                    <div class="flex gap-3">
-                        <button class="flex-1 btn-outline py-3" onclick="showFieldDetail('futsal-b')">Detail</button>
-                        <button class="flex-1 btn-primary py-3" onclick="handleBookingClick('Futsal B',120000)">Booking</button>
                     </div>
                 </div>
             </article>
@@ -155,11 +140,6 @@
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🌍 International</span>
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">✨ Premium</span>
                     </div>
-
-                    <div class="flex gap-3">
-                        <button class="flex-1 btn-outline py-3" onclick="showFieldDetail('badminton')">Detail</button>
-                        <button class="flex-1 btn-primary py-3" onclick="handleBookingClick('Badminton',80000)">Booking</button>
-                    </div>
                 </div>
             </article>
 
@@ -176,10 +156,6 @@
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🏀 Basket</span>
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🏟️ Full Court</span>
                         <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">🔊 Sound System</span>
-                    </div>
-                    <div class="flex gap-3">
-                        <button class="flex-1 btn-outline py-3" onclick="showFieldDetail('basket')">Detail</button>
-                        <button class="flex-1 btn-primary py-3" onclick="handleBookingClick('Basket',200000)">Booking</button>
                     </div>
                 </div>
             </article>
