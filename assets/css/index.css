@@ -1,11 +1,13 @@
 :root {
   --primary: #0b63d6;
   --primary-dark: #094ea8;
+  --accent: #ff6b00; /* TAMBAH INI - warna orange yang lebih menarik */
   --muted: #6b7280;
   --bg: #f6f8fb;
   --card-radius: 14px;
   --shadow-soft: 0 8px 24px rgba(11, 26, 54, 0.06);
   --shadow-lift: 0 18px 40px rgba(11, 26, 54, 0.1);
+  --shadow-glow: 0 0 20px rgba(255, 107, 0, 0.15); /* TAMBAH INI */
 }
 
 /* fonts utility */
@@ -44,42 +46,37 @@ body {
   box-shadow: var(--shadow-lift);
   background: var(--primary-dark);
 }
-.btn-outline {
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  color: var(--primary);
-  padding: 0.5rem 0.8rem;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+
+/* TAMBAHKAN INI - Button Accent untuk CTA yang lebih menonjol */
+/* TESTING - Tambahkan di bagian paling bawah CSS */
+.btn-accent {
+  background: #ff6b00 !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 10px !important;
+  font-weight: bold !important;
 }
-.btn-outline:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-soft);
+
+.text-accent {
+  color: #ff6b00 !important;
 }
-.btn-ghost {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  padding: 0.5rem 0.8rem;
-  cursor: pointer;
-  transition: color 0.12s ease;
+
+.pulse-glow {
+  animation: pulse-glow 2s infinite !important;
 }
-.btn-ghost:hover {
-  color: var(--primary);
+
+.btn-accent:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-glow);
+  background: #e65c00;
 }
+
 .btn-lg {
   padding: 0.85rem 1.2rem;
   border-radius: 12px;
 }
 
 /* navbar link style - REVISI DITAMBAHKAN UNDERLINE BIRU */
-.navbar {
-  background-color: white;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
 .nav-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -92,7 +89,7 @@ body {
 
 .nav-logo a {
   font-family: "Poppins", sans-serif;
-  font-weight: 700;
+  font-weight: 700; 
   font-size: 1.5rem;
   color: var(--primary);
   text-decoration: none;
@@ -129,8 +126,12 @@ body {
 
 /* Underline biru untuk menu aktif */
 .nav-link.active {
-  color: var(--primary);
-  font-weight: 600;
+    color: #0b63d6;
+    font-weight: 600;
+}
+
+#navLine {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-link.active::after {
@@ -152,6 +153,22 @@ body {
   to {
     width: 100%;
   }
+}
+
+/* TAMBAHKAN ANIMASI BARU INI */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 107, 0, 0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .btn-login {
@@ -251,6 +268,41 @@ body {
   box-shadow: var(--shadow-lift);
 }
 
+/* TAMBAHKAN STYLE UNTUK HERO YANG LEBIH BAIK */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 50px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  max-width: 400px;
+  margin-top: 2rem;
+}
+
+.stat-item {
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.stat-item:hover {
+  transform: scale(1.05);
+}
+
 /* modal styles (improved) */
 .modal-backdrop {
   position: fixed;
@@ -336,6 +388,22 @@ body {
   justify-content: flex-end;
 }
 
+/* TAMBAHKAN FEATURE CARD STYLES */
+.feature-card {
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--primary);
+}
+
 /* form improvements */
 .form-group {
   margin-bottom: 1.25rem;
@@ -362,48 +430,194 @@ body {
   border-radius: var(--card-radius);
 }
 
-/* utility classes */
+/* ==============================
+   SECTION: MAPS
+================================*/
+.maps-section {
+  background: linear-gradient(135deg, #0b63d6 0%, #094ea8 100%);
+  padding: 5rem 0;
+  position: relative;
+  margin-top: 4rem;
+}
+
+.maps-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 1;
+}
+
+.maps-section > * {
+  position: relative;
+  z-index: 2;
+}
+
+.maps-section h1 {
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.maps-section p {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Responsive adjustment */
+@media (max-width: 768px) {
+  .maps-section {
+    padding: 3rem 0;
+  }
+}
+
+/* ==============================
+   SECTION: LOCATION
+================================*/
+.location-section {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(11, 26, 54, 0.06);
+  height: 384px; /* h-96 equivalent */
+}
+
+.location-info-card {
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px rgba(11, 26, 54, 0.06);
+  transition: all 0.3s ease;
+}
+
+.location-info-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(11, 26, 54, 0.1);
+}
+
+/* ==============================
+   UTILITY CLASSES
+================================*/
 .hidden {
   display: none !important;
 }
+
 .flex {
   display: flex;
 }
+
 .items-center {
   align-items: center;
 }
+
 .justify-between {
   justify-content: space-between;
 }
+
 .gap-4 {
   gap: 1rem;
 }
+
 .w-full {
   width: 100%;
 }
+
 .text-center {
   text-align: center;
 }
 
-/* mobile nav improvements */
+/* TAMBAHKAN UTILITY CLASSES BARU */
+.float-animation {
+  animation: float 5s ease-in-out infinite;
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+.trust-badge {
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 50px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bg-accent {
+  background-color: var(--accent);
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+/* ==============================
+   NAVIGATION (MOBILE)
+================================*/
 #mobileNav {
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
+
 #mobileNav.hidden {
   transform: translateX(-100%);
   opacity: 0;
 }
+
 #mobileNav:not(.hidden) {
   transform: translateX(0);
   opacity: 1;
 }
 
-/* smooth scrolling */
+/* Mobile nav fullscreen overlay */
+#mobileNav {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 50;
+  padding: 2rem;
+}
+
+/* ==============================
+   GLOBAL
+================================*/
+/* Animasi smooth scroll */
 html {
   scroll-behavior: smooth;
 }
 
-/* focus visible for accessibility */
+/* TAMBAHKAN ANIMASI BARU INI */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 107, 0, 0); }
+}
+
+/* TAMBAHKAN BUTTON ACCENT */
+.btn-accent {
+  background: #ff6b00;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.25);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-accent:hover {
+  background: #e65c00;
+  transform: translateY(-3px);
+  box-shadow: 0 0 20px rgba(255, 107, 0, 0.15);
+}
+
+/* Focus visible accessibility */
 button:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--primary);
@@ -411,7 +625,9 @@ a:focus-visible {
   border-radius: 4px;
 }
 
-/* responsive tweaks */
+/* ==============================
+   RESPONSIVE ADJUSTMENTS
+================================*/
 @media (max-width: 1024px) {
   .nav-container {
     gap: 0.5rem;
@@ -423,8 +639,14 @@ a:focus-visible {
 }
 
 @media (max-width: 768px) {
-  #navLine {
-    display: none; /* hide indicator on mobile for simplicity */
+  /* Mobile map adjustments */
+  .map-container {
+    height: 300px;
+    margin-bottom: 1rem;
+  }
+
+  .location-info-card {
+    margin-bottom: 1rem;
   }
 
   .modal-backdrop {
@@ -444,19 +666,6 @@ a:focus-visible {
     display: block;
     text-align: center;
   }
-
-  /* mobile nav full screen */
-  #mobileNav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    z-index: 50;
-    padding: 2rem;
-  }
 }
 
 @media (max-width: 640px) {
@@ -472,12 +681,33 @@ a:focus-visible {
     text-align: center;
     padding: 0 1rem;
   }
+
+  /* TAMBAHKAN MOBILE ENHANCEMENTS */
+  .hero-stats {
+    grid-template-columns: 1fr;
+    max-width: 300px;
+    margin: 2rem auto;
+  }
+  
+  .trust-badge {
+    position: static !important;
+    margin: 1rem auto;
+    display: inline-flex;
+  }
+  
+  .btn-lg {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
 }
 
-/* animation utilities */
+/* ==============================
+   ANIMATION UTILITIES
+================================*/
 .fade-in {
   animation: fadeIn 0.5s ease-in-out;
 }
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -492,6 +722,7 @@ a:focus-visible {
 .slide-in {
   animation: slideIn 0.3s ease-out;
 }
+
 @keyframes slideIn {
   from {
     transform: translateX(-100%);
@@ -500,3 +731,4 @@ a:focus-visible {
     transform: translateX(0);
   }
 }
+
