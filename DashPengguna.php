@@ -4,9 +4,12 @@ require 'config/database.php'; // Path ke koneksi DB
 
 // Keamanan: Pastikan pengguna sudah login
 if (!isset($_SESSION['id_user'])) {
-    header('Location: ../auth/login.php'); // Arahkan ke login jika belum
+    header('Location: auth/login.php'); // Arahkan ke login jika belum
     exit;
 }
+
+// Definisikan $base_url agar path logo benar
+$base_url = '/BookingLapanganKel2'; 
 
 // 1. Ambil semua data pengguna dari DB
 $user_id = $_SESSION['id_user'];
@@ -17,12 +20,11 @@ $user = $stmt_user->get_result()->fetch_assoc();
 
 if (!$user) {
     session_destroy();
-    header('Location: ../auth/login.php');
+    header('Location: auth/login.php');
     exit;
 }
 
-// 2. Ambil data booking pengguna (untuk statistik dan chart)
-// CATATAN: Ini adalah kueri yang LEBIH BARU sesuai database (7).sql Anda
+// 2. Ambil data booking pengguna
 $bookings = [];
 $stmt_booking = $conn->prepare("
     SELECT 
@@ -57,12 +59,10 @@ $pekerjaan_display = htmlspecialchars($user['pekerjaan'] ?? '');
 $pekerjaan_lain_display = htmlspecialchars($user['pekerjaan_lain'] ?? '');
 
 // Tentukan path foto profil
-$foto_profil_path = '../assets/images/default-avatar.png'; // Gambar default
+$foto_profil_path = 'assets/images/default-avatar.png'; // Gambar default
 if (!empty($user['foto_profil'])) {
-    // Asumsi path 'uploads/profiles/' ada di folder root
-    $foto_profil_path = '../uploads/profiles/' . htmlspecialchars($user['foto_profil']);
+    $foto_profil_path = 'uploads/profiles/' . htmlspecialchars($user['foto_profil']);
 }
-
 
 // Daftar pekerjaan untuk dropdown
 $daftar_pekerjaan = [
@@ -78,53 +78,96 @@ $daftar_pekerjaan = [
     <title>Dashboard — <?= $nama_depan ?> | SportField</title>
     
     <link rel="stylesheet" href="assets/css/dashboard.css" /> 
-    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        .nav .logo {
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .nav .logo .logo-mark {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: white;
+            padding: 4px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .nav .logo:hover .logo-mark {
+            transform: scale(1.1) rotate(5deg);
+        }
+        .nav .logo .logo-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        .nav .logo .logo-text {
+            display: block;
+        }
+        .nav .logo .title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: white;
+            line-height: 1.2;
+        }
+        .nav .logo .subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.75rem;
+            color: #e0e0e0;
+            opacity: 0.9;
+        }
+        /* Sembunyikan logo text di layar kecil agar tidak menabrak */
+        @media (max-width: 600px) {
+            .nav .logo .logo-text {
+                display: none;
+            }
+        }
+    </style>
   </head>
-  <body>
-    <header class="nav">
-      <div class="nav-left">
-        <div class="logo">
-          <a href="../index.php" class="logo-mark" style="background: none; padding: 0;">
-            <img src="../assets/images/LogoRush.png" alt="Logo" style="width: 44px; height: 44px; border-radius: 9px; object-fit: contain;">
-          </a>
-          <div class="logo-text">
-            <div class="title">Rush Academy</div>
-            <div class="subtitle">Booking Lapangan</div>
-          </div>
-        </div>
-        <nav class="main-menu">
-          <a href="#" class="active">Dashboard</a>
-          <a id="nav-jadwal" href="booking.php">Jadwal</a>
-          <a id="nav-pembayaran" href="#">Pembayaran</a>
-        </nav>
-      </div>
+  
+  <body> 
+    
+    <nav class="nav"> 
+        
+        <div class="nav-left">
+            <a href="<?= $base_url ?>/index.php" class="logo">
+                <div class="logo-mark">
+                    <img src="assets/images/LogoRush.png" alt="Logo">
+                </div>
+                <div class="logo-text">
+                    <div class="title">Rush Badminton Academy</div>
+                    <div class="subtitle">Booking Lapangan Online</div>
+                </div>
+            </a>
+            </div>
 
-      <div class="nav-right">
-        <div class="today" id="todayDate"></div>
-        <div class="profile" id="profileToggle" tabindex="0" aria-haspopup="true">
-          <img id="profileAvatar" src="<?= $foto_profil_path ?>" alt="avatar" />
+        <div class="nav-right">
+            <div class="today" id="todayDate"></div>
+            <div class="profile" id="profileToggle" tabindex="0" aria-haspopup="true">
+                <img id="profileAvatar" src="<?= $foto_profil_path ?>" alt="avatar" />
+            </div>
+            <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
+                <button id="btnEditProfile">Edit Profil</button>
+                <button id="btnLogout" class="danger">Keluar</button>
+            </div>
         </div>
-        <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
-          <button id="btnEditProfile">Edit Profil</button>
-          <button id="btnLogout" class="danger">Keluar</button>
-        </div>
-      </div>
-    </header>
 
+    </nav>
     <main class="wrap">
       <?php
-      // Tampilkan pesan sukses jika ada
       if (isset($_SESSION['booking_success'])) {
           echo '<div class="card fade-in" style="background-color: #f0fdf4; border: 1px solid #a7f3d0; color: #15803d; margin-bottom: var(--gap);">';
           echo '<h4 style="margin-top:0; margin-bottom: 5px; font-size: 16px;">Booking Berhasil!</h4>';
           echo '<p style="margin:0; font-size: 14px;">' . htmlspecialchars($_SESSION['booking_success']) . '</p>';
           echo '</div>';
-          unset($_SESSION['booking_success']); // Hapus pesan setelah ditampilkan
+          unset($_SESSION['booking_success']);
       }
       
-      // Tampilkan pesan error jika ada (meskipun harusnya tidak terjadi)
       if (isset($_SESSION['booking_error'])) {
           echo '<div class="card fade-in" style="background-color: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; margin-bottom: var(--gap);">';
           echo '<h4 style="margin-top:0; margin-bottom: 5px; font-size: 16px;">Booking Gagal</h4>';
@@ -139,7 +182,7 @@ $daftar_pekerjaan = [
           <p class="muted">Cek ringkasan booking dan jadwal favoritmu di sini.</p>
         </div>
         <div class="welcome-right">
-          <a id="btnQuickBook" href="booking.php" class="primary small pulse">Booking Sekarang</a>
+          <a id="btnQuickBook" href="<?= $base_url ?>/BookingPengguna/booking.php" class="primary small pulse">Booking Sekarang</a>
         </div>
       </section>
 
@@ -193,7 +236,7 @@ $daftar_pekerjaan = [
         </aside>
       </section>
       
-      </main>
+    </main>
 
     <div class="modal-bg" id="profileModal" aria-hidden="true">
       <div class="modal card scale-in">
@@ -228,12 +271,10 @@ $daftar_pekerjaan = [
                 <?php
                 $pekerjaanDitemukan = false;
                 foreach ($daftar_pekerjaan as $pekerjaan) {
-                    // Gunakan strcasecmp untuk perbandingan case-insensitive
                     $selected = (strcasecmp($pekerjaan_display, $pekerjaan) == 0) ? 'selected' : '';
                     if ($selected) $pekerjaanDitemukan = true;
                     echo "<option value=\"$pekerjaan\" $selected>" . htmlspecialchars($pekerjaan) . "</option>";
                 }
-                // Jika pekerjaan user adalah "Lainnya" atau tidak ada di daftar
                 $selectedLainnya = (!$pekerjaanDitemukan && !empty($pekerjaan_display)) || (strcasecmp($pekerjaan_display, 'Lainnya') == 0) ? 'selected' : '';
                 ?>
                 <option value="Lainnya" <?= $selectedLainnya ?>>Lainnya</option>
@@ -244,21 +285,6 @@ $daftar_pekerjaan = [
                    style="<?= $selectedLainnya ? 'display: block;' : 'display: none;' ?>" />
           </div>
 
-          <div class="form-section">
-            <h4>Ubah Password</h4>
-            <label for="inputPassword">Password Baru</label>
-            <div class="password-container">
-              <input id="inputPassword" type="password" placeholder="Kosongkan jika tidak ingin mengubah" />
-              <button type="button" class="password-toggle" id="togglePassword">👁️</button>
-            </div>
-
-            <label for="inputConfirmPassword">Konfirmasi Password Baru</label>
-            <div class="password-container">
-              <input id="inputConfirmPassword" type="password" placeholder="Konfirmasi password baru" />
-              <button type="button" class="password-toggle" id="toggleConfirmPassword">👁️</button>
-            </div>
-          </div>
-
           <div class="modal-actions">
             <button type="button" id="saveProfile" class="primary">Simpan Perubahan</button>
             <button type="button" id="cancelProfile" class="btn-ghost">Batal</button>
@@ -266,7 +292,12 @@ $daftar_pekerjaan = [
         </form>
       </div>
     </div>
-
+    
+    <footer style="background-color: white; border-top: 1px solid #e5e7eb; margin-top: 4rem; font-family: 'Inter', sans-serif;">
+        <div style="max-width: 1160px; margin: 0 auto; padding: 2.5rem 1rem; text-align: center; font-size: 0.75rem; color: #64748b;">
+            © 2025 SportField — Semua hak dilindungi
+        </div>
+    </footer>
     <script>
         // Mengirim data PHP ke window agar bisa dibaca oleh dashboard.js
         window.INJECTED_USER_DATA = <?php echo json_encode($user); ?>;
@@ -274,5 +305,6 @@ $daftar_pekerjaan = [
     </script>
     
     <script src="assets/js/dashboard.js"></script>
+
   </body>
 </html>

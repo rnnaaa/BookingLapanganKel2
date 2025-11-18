@@ -1,5 +1,6 @@
 // assets/js/booking-script.js
-// VERSI BARU DENGAN MODAL LOGOUT KUSTOM
+// VERSI MODIFIKASI: Pop-up konfirmasi dihapus.
+// Klik jam = langsung tambah ke keranjang + buka sidebar.
 
 document.addEventListener("DOMContentLoaded", function () {
   // === PATH ABSOLUT (Sesuaikan '/BookingLapanganKel2' jika perlu) ===
@@ -19,10 +20,12 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   // =======================
 
-  const modal = document.getElementById("bookingModal");
-  const closeBookingModal = document.getElementById("closeBookingModal");
-  const btnCheckoutModal = document.getElementById("btnCheckout");
-  const btnKeranjangModal = document.getElementById("btnKeranjang");
+  // Variabel untuk pop-up konfirmasi TELAH DIHAPUS
+  // const modal = document.getElementById("bookingModal");
+  // const closeBookingModal = document.getElementById("closeBookingModal");
+  // const btnCheckoutModal = document.getElementById("btnCheckout");
+  // const btnKeranjangModal = document.getElementById("btnKeranjang");
+
   const cartIcon = document.getElementById("cartIcon");
   const sidebar = document.getElementById("sidebarKeranjang");
   const closeSidebar = document.getElementById("closeSidebar");
@@ -30,13 +33,21 @@ document.addEventListener("DOMContentLoaded", function () {
   const cartCount = document.getElementById("cartCount");
   const checkoutBtn = document.getElementById("checkoutBtn");
 
-  let selectedSlot = null;
+  // Variabel global selectedSlot TELAH DIHAPUS
+  // let selectedSlot = null;
+
+  // Kode untuk memindahkan modal TELAH DIHAPUS
+  // if (modal && modal.parentElement && modal.parentElement !== document.body) { ... }
 
   // --- LOGIKA HANYA UNTUK HALAMAN BOOKING.PHP ---
 
+  // === LOGIKA KLIK JAM DIUBAH ===
+  // Sekarang, klik jam akan langsung menambahkan ke keranjang
   document.querySelectorAll(".jam-main").forEach((btn) => {
     btn.addEventListener("click", function () {
-      selectedSlot = {
+      
+      // 1. Ambil data dari slot yang diklik
+      const slotData = {
         id_jadwal_waktu: this.dataset.id,
         id_lapangan: this.dataset.lapangan,
         tanggal: this.dataset.tanggal,
@@ -44,66 +55,18 @@ document.addEventListener("DOMContentLoaded", function () {
         harga: this.dataset.harga,
         nama_lapangan: document.querySelector("h1")?.textContent || "Lapangan",
       };
-      if (modal) modal.style.display = "flex";
-    });
-  });
 
-  if (closeBookingModal) {
-    closeBookingModal.addEventListener("click", () => (modal.style.display = "none"));
-  }
-  window.addEventListener("click", (e) => {
-    if (e.target === modal) modal.style.display = "none";
-  });
-
-  if (btnCheckoutModal) {
-    btnCheckoutModal.addEventListener("click", () => {
-      if (!selectedSlot) return;
-      if (!isLoggedIn()) {
-        alert("Anda harus login terlebih dahulu untuk melanjutkan checkout.");
-        window.location.href = loginPage;
-        return;
-      }
+      // 2. Siapkan data untuk dikirim (sama seperti logika btnKeranjang sebelumnya)
       const data = new URLSearchParams();
       data.append("action", "add_to_cart");
-      data.append("id_jadwal_waktu", selectedSlot.id_jadwal_waktu);
-      data.append("id_lapangan", selectedSlot.id_lapangan);
-      data.append("tanggal", selectedSlot.tanggal);
-      data.append("jam", selectedSlot.jam);
-      data.append("harga", selectedSlot.harga);
-      data.append("nama_lapangan", selectedSlot.nama_lapangan);
+      data.append("id_jadwal_waktu", slotData.id_jadwal_waktu);
+      data.append("id_lapangan", slotData.id_lapangan);
+      data.append("tanggal", slotData.tanggal);
+      data.append("jam", slotData.jam);
+      data.append("harga", slotData.harga);
+      data.append("nama_lapangan", slotData.nama_lapangan);
 
-      fetch(bookingEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: data.toString(),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          if (res.status === "ok" || res.message === "Slot sudah ada di keranjang.") {
-            window.location.href = productPage + "?cart=1";
-          } else {
-            alert(res.message || "Gagal menambahkan ke keranjang");
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          alert("Terjadi kesalahan jaringan.");
-        });
-    });
-  }
-
-  if (btnKeranjangModal) {
-    btnKeranjangModal.addEventListener("click", () => {
-      if (!selectedSlot) return;
-      const data = new URLSearchParams();
-      data.append("action", "add_to_cart");
-      data.append("id_jadwal_waktu", selectedSlot.id_jadwal_waktu);
-      data.append("id_lapangan", selectedSlot.id_lapangan);
-      data.append("tanggal", selectedSlot.tanggal);
-      data.append("jam", selectedSlot.jam);
-      data.append("harga", selectedSlot.harga);
-      data.append("nama_lapangan", selectedSlot.nama_lapangan);
-
+      // 3. Kirim data ke server
       fetch(bookingEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -112,10 +75,12 @@ document.addEventListener("DOMContentLoaded", function () {
         .then((r) => r.json())
         .then((res) => {
           if (res.status === "ok") {
-            addItemToSidebar(selectedSlot);
+            // 4. Jika sukses, tambahkan item ke UI sidebar
+            addItemToSidebar(slotData);
             if (cartCount) cartCount.textContent = res.count ?? parseInt(cartCount.textContent || "0") + 1;
             if (checkoutBtn) checkoutBtn.disabled = false;
-            if (modal) modal.style.display = "none";
+            
+            // 5. Buka sidebar sebagai konfirmasi
             if (sidebar) sidebar.classList.add("active");
           } else {
             alert(res.message || "Gagal menambahkan ke keranjang");
@@ -126,9 +91,17 @@ document.addEventListener("DOMContentLoaded", function () {
           alert("Terjadi kesalahan jaringan.");
         });
     });
-  }
+  });
+
+  // Semua event listener untuk modal (close, checkout, keranjang) TELAH DIHAPUS
+  // if (closeBookingModal) { ... }
+  // window.addEventListener("click", (e) => { ... });
+  // if (btnCheckoutModal) { ... }
+  // if (btnKeranjangModal) { ... }
+
 
   // --- LOGIKA UNTUK SEMUA HALAMAN (INDEX & BOOKING) ---
+  // (Logika ini tetap ada dan tidak berubah)
 
   if (cartIcon) {
     cartIcon.addEventListener("click", (e) => {
@@ -194,6 +167,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // === PERBAIKAN LOGIKA LOGOUT ===
+  // (Logika ini tetap ada dan tidak berubah)
   const btnLogoutBooking = document.getElementById("btnLogout");
   const logoutModal = document.getElementById("logoutModal");
   const cancelLogoutBtn = document.getElementById("cancelLogoutBtn");
@@ -202,20 +176,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (btnLogoutBooking) {
     btnLogoutBooking.addEventListener("click", function (e) {
-      // 1. Selalu cegah link default
       e.preventDefault();
-      // 2. Simpan URL logout dari link <a>
       logoutUrl = this.href;
-      // 3. Tampilkan modal kustom (dengan animasi fade-in)
       if (logoutModal) {
         logoutModal.classList.remove("hidden");
-        // Tambahkan animasi fade-in saat ditampilkan
         logoutModal.classList.add("animate-fade-in");
       }
     });
   }
 
-  // Fungsi untuk menutup modal logout
   const closeLogoutModal = () => {
     if (logoutModal) {
       logoutModal.classList.add("hidden");
@@ -223,24 +192,20 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   };
 
-  // Tambahkan event ke tombol "Batal"
   if (cancelLogoutBtn) {
     cancelLogoutBtn.addEventListener("click", closeLogoutModal);
   }
 
-  // Tambahkan event ke tombol "Ya, Keluar"
   if (confirmLogoutBtn) {
     confirmLogoutBtn.addEventListener("click", () => {
       if (logoutUrl) {
-        window.location.href = logoutUrl; // Arahkan ke URL yang disimpan
+        window.location.href = logoutUrl; 
       }
     });
   }
 
-  // Tambahkan event klik di luar modal (backdrop)
   if (logoutModal) {
     logoutModal.addEventListener("click", (e) => {
-      // Cek jika yang diklik adalah backdrop-nya, bukan panel modal
       if (e.target === logoutModal) {
         closeLogoutModal();
       }
@@ -249,6 +214,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // === AKHIR PERBAIKAN LOGIKA LOGOUT ===
 
   // --- FUNGSI HELPERS ---
+  // (Fungsi ini tetap ada dan tidak berubah)
   function reindexRemoveButtons() {
     if (!keranjangList) return;
     const buttons = keranjangList.querySelectorAll(".remove-item-btn");
