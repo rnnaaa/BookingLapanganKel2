@@ -1,0 +1,225 @@
+/* auth.css - VERSI BARU (Tema Serasi) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap");
+
+:root {
+  --color-primary: #0b63d6;
+  --color-primary-dark: #094ea8;
+  --color-soft-gray: #f6f8fb;
+  --color-text-primary: #1e293b; /* slate-800 */
+  --color-text-secondary: #475569; /* slate-600 */
+  --color-text-tertiary: #64748b; /* slate-500 */
+  --font-sans: "Inter", sans-serif;
+  --font-poppins: "Poppins", sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-soft-gray);
+  color: var(--color-text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem 1rem;
+  box-sizing: border-box;
+}
+
+main {
+  width: 100%;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 32rem; /* 512px */
+  margin: 1rem auto;
+  background-color: #ffffff;
+  border-radius: 0.75rem; /* rounded-xl */
+  box-shadow: 0 8px 24px rgba(11, 26, 54, 0.06); /* shadow-soft */
+  padding: 2rem; /* p-8 */
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Ukuran kartu lebih kecil untuk login & forgot */
+.auth-card.max-w-md {
+  max-width: 28rem; /* 448px */
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card h1 {
+  font-family: var(--font-poppins);
+  font-size: 1.5rem; /* text-2xl */
+  font-weight: 700;
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 1.5rem; /* mb-6 */
+}
+
+.auth-card .subtitle {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin-top: -1rem;
+  margin-bottom: 1.5rem; /* mb-6 */
+}
+
+.form-group {
+  margin-bottom: 1.25rem; /* mb-5 */
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem; /* gap-5 */
+  margin-bottom: 1.25rem; /* mb-5 */
+}
+
+@media (min-width: 640px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr); /* sm:grid-cols-2 */
+  }
+}
+
+.form-group label,
+.form-grid label {
+  display: block;
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500;
+  margin-bottom: 0.35rem; /* mb-1.5 */
+  color: var(--color-text-secondary);
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem 1rem; /* py-3 px-4 */
+  border: 1px solid #cbd5e1; /* border-gray-300 */
+  border-radius: 0.5rem; /* rounded-lg */
+  font-size: 1rem; /* text-base */
+  background-color: #ffffff;
+  transition: all 0.2s;
+  box-sizing: border-box; /* Penting untuk padding */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+select.form-control {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(11, 99, 214, 0.2); /* ring-primary/30 */
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper {
+  position: relative;
+  /* ensure the wrapper sizes to input and allows absolute centering */
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem; /* small gap from edge */
+  transform: translateY(-50%);
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+}
+
+/* Give inputs inside password-wrapper extra right padding so text doesn't run under the icon */
+.password-wrapper .form-control {
+  padding-right: 3.25rem; /* enough for 44px icon + spacing */
+}
+
+/* Slightly reduce icon size to visually align with input text */
+.password-toggle .icon-eye,
+.password-toggle .icon-eye-slash {
+  width: 1.1rem !important;
+  height: 1.1rem !important;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem; /* mb-6 */
+}
+
+.form-link {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.form-link:hover {
+  text-decoration: underline;
+}
+
+.btn-primary {
+  width: 100%;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  padding: 0.85rem 1rem; /* py-3.5 */
+  border: none;
+  border-radius: 0.5rem; /* rounded-lg */
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 1rem; /* mt-4 */
+}
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.auth-footer {
+  text-align: center;
+  font-size: 0.875rem; /* text-sm */
+  color: var(--color-text-tertiary);
+  margin-top: 1.5rem; /* mt-6 */
+}
+
+/* Utility classes untuk pesan error/sukses */
+.alert {
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+}
+.alert-error {
+  background-color: #fef2f2; /* red-50 */
+  color: #b91c1c; /* red-700 */
+  border-color: #fecaca; /* red-200 */
+}
+.alert-success {
+  background-color: #f0fdf4; /* green-50 */
+  color: #15803d; /* green-700 */
+  border-color: #bbf7d0; /* green-200 */
+}
