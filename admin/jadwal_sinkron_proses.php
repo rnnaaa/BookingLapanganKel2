@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);

@@ -58,18 +58,10 @@ date_default_timezone_set('Asia/Jakarta');
                     'belum_member'
                   ) AS status_member,
 
-                  (
-                    SELECT COUNT(*) 
-                    FROM booking b 
-                    WHERE b.id_user = u.id_user
-                  ) AS total_booking_user,
+                  (SELECT COUNT(*) FROM booking b WHERE b.id_user = u.id_user) AS total_booking_user,
 
-                  (
-                    SELECT COUNT(*)
-                    FROM member_jadwal mj
-                    WHERE mj.id_member IN (
-                      SELECT m2.id_member FROM member m2 WHERE m2.id_user = u.id_user
-                    )
+                  (SELECT COUNT(*) FROM member_jadwal mj 
+                   WHERE mj.id_member IN (SELECT m2.id_member FROM member m2 WHERE m2.id_user = u.id_user)
                   ) AS total_jadwal_member,
 
                   (
@@ -109,56 +101,90 @@ date_default_timezone_set('Asia/Jakarta');
                 while ($row = mysqli_fetch_assoc($result)):
 
                   // Badge Role
-                  if ($row['role'] == 'member') {
-                      $roleBadge = '<span class="badge bg-info">Member</span>';
+                  $roleBadge = ($row['role'] == 'member')
+                    ? '<span class="badge bg-info">Member</span>'
+                    : '<span class="badge bg-secondary">User</span>';
+
+
+                  // No HP: jika null / kosong → badge abu-abu
+                  $nohp_raw = $row['no_hp'] ?? '';
+                  if ($nohp_raw === null || $nohp_raw === '' || $nohp_raw === '-') {
+                    $nohp_badge = '<span class="badge bg-secondary">-</span>';
                   } else {
-                      $roleBadge = '<span class="badge bg-secondary">User</span>';
+                    $nohp_badge = htmlspecialchars($nohp_raw);
                   }
 
                   // Badge Status Member
                   $statusMember = strtolower($row['status_member']);
                   if ($statusMember == 'aktif') {
-                      $memberBadge = '<span class="badge bg-success">Aktif</span>';
+                    $memberBadge = '<span class="badge bg-success">Aktif</span>';
                   } elseif ($statusMember == 'nonaktif') {
-                      $memberBadge = '<span class="badge bg-secondary">Nonaktif</span>';
+                    $memberBadge = '<span class="badge bg-secondary">Nonaktif</span>';
                   } else {
-                      $memberBadge = '<span class="badge bg-light text-muted">Belum Member</span>';
+                    $memberBadge = '<span class="badge bg-light text-muted">Belum Member</span>';
                   }
 
                   // Format angka
                   $totalBookingUser = (int)$row['total_booking_user'];
                   $totalJadwalMember = (int)$row['total_jadwal_member'];
                   $totalPembayaran = (float)$row['total_pembayaran'];
+
+                  // No HP: deteksi null / '-' → buat abu-abu
+                  $nohp_raw = $row['no_hp'] ?? '-';
+                  $nohp_display = htmlspecialchars($nohp_raw);
+
+                  $nohp_style = ($nohp_raw === null || $nohp_raw === '' || $nohp_raw === '-')
+                    ? "background-color:#e0e0e0; text-align:center; font-weight:bold;"
+                    : "";
               ?>
-              <tr id="user-<?= $row['id_user'] ?>">
-                <td class="text-center"><?= $no++ ?></td>
-                <td><?= htmlspecialchars($row['nama']) ?></td>
-                <td><?= htmlspecialchars($row['email']) ?></td>
-                <td><?= htmlspecialchars($row['no_hp']) ?></td>
-                <td class="text-center"><?= $roleBadge ?></td>
-                <td class="text-center"><?= $memberBadge ?></td>
 
-                <!-- Total Booking -->
-                <td class="text-center">
-                  <span class="badge bg-primary"><?= $totalBookingUser ?></span>
-                </td>
+                  <tr id="user-<?= $row['id_user'] ?>">
+                    <td class="text-center"><?= $no++ ?></td>
 
-                <!-- Total Jadwal -->
-                <td class="text-center">
-                  <span class="badge bg-success"><?= $totalJadwalMember ?></span>
-                </td>
+                    <!-- Nama -->
+                    <td><?= htmlspecialchars($row['nama'] ?? '-') ?></td>
 
-                <!-- Total Pembayaran -->
-                <td class="text-center fw-bold">Rp <?= number_format($totalPembayaran, 0, ',', '.') ?></td>
+                    <!-- Email -->
+                    <td><?= htmlspecialchars($row['email'] ?? '-') ?></td>
 
-                <td class="text-center"><?= date('d-m-Y', strtotime($row['created_at'])) ?></td>
-                <td class="text-center">
-                  <button class="btn btn-sm btn-danger btn-delete" data-id="<?= $row['id_user'] ?>" title="Hapus">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </td>
-              </tr>
-              <?php endwhile; } ?>
+                    <!-- No HP -->
+                    <td class="text-center"><?= $nohp_badge ?></td>
+
+                    <!-- Role -->
+                    <td class="text-center"><?= $roleBadge ?></td>
+
+                    <!-- Status Member -->
+                    <td class="text-center"><?= $memberBadge ?></td>
+
+                    <!-- Total Booking -->
+                    <td class="text-center">
+                      <span class="badge bg-primary"><?= $totalBookingUser ?></span>
+                    </td>
+
+                    <!-- Total Jadwal -->
+                    <td class="text-center">
+                      <span class="badge bg-success"><?= $totalJadwalMember ?></span>
+                    </td>
+
+                    <!-- Total Pembayaran -->
+                    <td class="text-center fw-bold">
+                      Rp <?= number_format($totalPembayaran, 0, ',', '.') ?>
+                    </td>
+
+                    <!-- Tgl Daftar -->
+                    <td class="text-center">
+                      <?= !empty($row['created_at']) ? date('d-m-Y', strtotime($row['created_at'])) : '-' ?>
+                    </td>
+
+                    <td class="text-center">
+                      <button class="btn btn-sm btn-danger btn-delete" data-id="<?= $row['id_user'] ?>" title="Hapus">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+
+              <?php endwhile;
+              } ?>
             </tbody>
           </table>
         </div>
@@ -170,21 +196,21 @@ date_default_timezone_set('Asia/Jakarta');
 <?php include_once('../includes/footer.php'); ?>
 
 <script>
-$(function(){
-  $('.btn-delete').click(function(){
-    const id = $(this).data('id');
-    Swal.fire({
-      title: 'Yakin ingin menghapus?',
-      text: 'Data pengguna ini akan dihapus permanen!',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Ya, hapus',
-      cancelButtonText: 'Batal'
-    }).then((result) => {
-      if(result.isConfirmed){
-        window.location.href = 'users_hapus.php?id=' + id;
-      }
+  $(function() {
+    $('.btn-delete').click(function() {
+      const id = $(this).data('id');
+      Swal.fire({
+        title: 'Yakin ingin menghapus?',
+        text: 'Data pengguna ini akan dihapus permanen!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, hapus',
+        cancelButtonText: 'Batal'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.location.href = 'users_hapus.php?id=' + id;
+        }
+      });
     });
   });
-});
 </script>
