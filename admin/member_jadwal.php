@@ -8,7 +8,9 @@ require_once __DIR__ . '/../config/database.php';
 
 $id_member = intval($_GET['id_member'] ?? 0);
 
-// === AMBIL DATA MEMBER ===
+/* ============================================================
+   AMBIL DATA MEMBER
+============================================================ */
 $member_info = null;
 if ($id_member > 0) {
     $stmt = $conn->prepare("
@@ -26,8 +28,11 @@ if ($id_member > 0) {
     $stmt->close();
 }
 
-// === PROSES SIMPAN ===
+/* ============================================================
+   PROSES SIMPAN JADWAL
+============================================================ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     $id_member_post = intval($_POST['id_member'] ?? 0);
     $id_lapangan = intval($_POST['id_lapangan'] ?? 0);
     $tanggal_booking = $_POST['tanggal_booking'] ?? '';
@@ -42,75 +47,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $conn->begin_transaction();
+
     try {
-        // Validasi masa aktif member
-        $m = $conn->query("
+        /* ============================================================
+           VALIDASI MASA AKTIF MEMBER
+        ============================================================ */
+        $stmt = $conn->prepare("
             SELECT tanggal_mulai, tanggal_berakhir 
             FROM member 
-            WHERE id_member={$id_member_post} AND status='aktif'
+            WHERE id_member=? AND status='aktif'
             LIMIT 1
-        ")->fetch_assoc() ?? null;
-        if (!$m) throw new Exception("⚠️ Member tidak aktif atau tidak ditemukan.");
-        if ($tanggal_booking < $m['tanggal_mulai'] || $tanggal_booking > $m['tanggal_berakhir'])
-            throw new Exception("⚠️ Tanggal di luar masa aktif member.");
-
-        // Cek jadwal minggu yang sama
-        $week_start = date('Y-m-d', strtotime('monday this week', strtotime($tanggal_booking)));
-        $week_end   = date('Y-m-d', strtotime('sunday this week', strtotime($tanggal_booking)));
-        $cek = $conn->query("
-            SELECT 1 FROM member_jadwal 
-            WHERE id_member={$id_member_post} 
-            AND tanggal_booking BETWEEN '{$week_start}' AND '{$week_end}'
-            AND status='aktif'
         ");
-        if ($cek->num_rows) throw new Exception("⚠️ Member ini sudah punya jadwal di minggu yang sama.");
+        $stmt->bind_param("i", $id_member_post);
+        $stmt->execute();
+        $m = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
 
-        // Validasi slot
+        if (!$m) throw new Exception("⚠️ Member tidak aktif atau tidak ditemukan.");
+
+        if ($tanggal_booking < $m['tanggal_mulai'] || $tanggal_booking > $m['tanggal_berakhir']) {
+            throw new Exception("⚠️ Tanggal di luar masa aktif member.");
+        }
+
+        /* ============================================================
+           VALIDASI PER MINGGU HANYA 1x
+        ============================================================ */
+        $ts = strtotime($tanggal_booking);
+        $week_start = date('Y-m-d', strtotime("monday this week", $ts));
+        $week_end   = date('Y-m-d', strtotime("sunday this week", $ts));
+
         $stmt = $conn->prepare("
-            SELECT jd.id_detail, jd.status, jh.tanggal, jh.id_lapangan, jw.jam_mulai, jw.jam_selesai
+            SELECT 1 
+            FROM member_jadwal 
+            WHERE id_member=? 
+              AND tanggal_booking BETWEEN ? AND ?
+              AND status='aktif'
+            LIMIT 1
+        ");
+        $stmt->bind_param("iss", $id_member_post, $week_start, $week_end);
+        $stmt->execute();
+        $cek = $stmt->get_result();
+        $stmt->close();
+
+        if ($cek->num_rows) {
+            throw new Exception("⚠️ Member sudah punya jadwal di minggu tersebut.");
+        }
+
+        /* ============================================================
+           VALIDASI SLOT TERSEDIA
+        ============================================================ */
+        $stmt = $conn->prepare("
+            SELECT jd.id_detail, jd.status, 
+                   jh.tanggal, jh.id_lapangan,
+                   jw.jam_mulai, jw.jam_selesai
             FROM jadwal_detail jd
             JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian
             JOIN jadwal_waktu jw ON jd.id_jadwal_waktu = jw.id_jadwal_waktu
-            WHERE jd.id_detail = ?
+            WHERE jd.id_detail=?
             LIMIT 1
         ");
         $stmt->bind_param("i", $id_detail);
         $stmt->execute();
-        $slotRow = $stmt->get_result()->fetch_assoc() ?? null;
+        $slot = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        if (!$slotRow) throw new Exception("⚠️ Slot tidak ditemukan.");
-        if ($slotRow['status'] !== 'tersedia') throw new Exception("⚠️ Slot sudah dibooking orang lain.");
-        if ($slotRow['tanggal'] != $tanggal_booking) throw new Exception("⚠️ Slot tanggal tidak cocok.");
-        if (intval($slotRow['id_lapangan']) !== $id_lapangan) throw new Exception("⚠️ Slot lapangan tidak cocok.");
+        if (!$slot) throw new Exception("⚠️ Slot tidak ditemukan.");
+        if ($slot['status'] !== 'tersedia') throw new Exception("⚠️ Slot sudah dibooking.");
+        if ($slot['tanggal'] != $tanggal_booking) throw new Exception("⚠️ Tanggal slot tidak sesuai.");
+        if ($slot['id_lapangan'] != $id_lapangan) throw new Exception("⚠️ Lapangan tidak cocok.");
 
-        // Ambil harga member (jika diperlukan)
-        $harga = $conn->query("SELECT harga_per_jam_member FROM lapangan WHERE id_lapangan={$id_lapangan} LIMIT 1")
-                      ->fetch_assoc()['harga_per_jam_member'] ?? 0;
+        /* ============================================================
+           AMBIL HARGA MEMBER
+        ============================================================ */
+        $harga = $conn->query("
+            SELECT harga_per_jam_member 
+            FROM lapangan 
+            WHERE id_lapangan={$id_lapangan}
+            LIMIT 1
+        ")->fetch_assoc()['harga_per_jam_member'] ?? 0;
+
         if ($harga <= 0) {
-            // bukan blocker jika tidak dipakai, tapi sesuai logika sebelumnya kita butuh harga
-            throw new Exception("⚠️ Harga per jam member belum diatur pada lapangan ini.");
+            throw new Exception("⚠️ Harga member belum diatur.");
         }
 
-        // Simpan ke member_jadwal
+        /* ============================================================
+           INSERT member_jadwal
+        ============================================================ */
         $stmt = $conn->prepare("
-            INSERT INTO member_jadwal 
-            (id_member, id_lapangan, tanggal_booking, jam_mulai, jam_selesai, harga_per_jam_member, id_detail, status, created_at, updated_at)
+            INSERT INTO member_jadwal
+            (id_member, id_lapangan, tanggal_booking, jam_mulai, jam_selesai,
+             harga_per_jam_member, id_detail, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW(), NOW())
         ");
-        $stmt->bind_param("iisssdi", $id_member_post, $id_lapangan, $tanggal_booking, $jam_mulai, $jam_selesai, $harga, $id_detail);
+        $stmt->bind_param("iisssdi",
+            $id_member_post, $id_lapangan, $tanggal_booking,
+            $jam_mulai, $jam_selesai, $harga, $id_detail
+        );
         $stmt->execute();
+        $last_id = $conn->insert_id;
         $stmt->close();
 
-        // Update slot ke 'dibooking'
-        $upd = $conn->prepare("UPDATE jadwal_detail SET status='dibooking' WHERE id_detail=? AND status='tersedia' LIMIT 1");
-        $upd->bind_param("i", $id_detail);
-        $upd->execute();
-        if ($upd->affected_rows === 0) throw new Exception("⚠️ Slot sudah diambil orang lain.");
-        $upd->close();
+        /* ============================================================
+           UPDATE jadwal_detail + isi id_member_jadwal
+        ============================================================ */
+        $stmt = $conn->prepare("
+            UPDATE jadwal_detail 
+            SET status='dibooking', id_member_jadwal=?
+            WHERE id_detail=? AND status='tersedia'
+            LIMIT 1
+        ");
+        $stmt->bind_param("ii", $last_id, $id_detail);
+        $stmt->execute();
 
+        if ($stmt->affected_rows === 0) {
+            throw new Exception("⚠️ Slot tidak tersedia atau sudah dipakai.");
+        }
+
+        $stmt->close();
         $conn->commit();
+
         $_SESSION['toast_success'] = "✅ Jadwal berhasil ditambahkan!";
+
     } catch (Exception $e) {
         $conn->rollback();
         $_SESSION['toast_error'] = $e->getMessage();
@@ -120,7 +177,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// === DATA UNTUK FORM & TABEL ===
+/* ============================================================
+   DATA TABEL
+============================================================ */
 $qMembers = $conn->query("
     SELECT m.id_member, u.nama AS nama_user, l.nama_lapangan, m.id_lapangan 
     FROM member m
@@ -268,7 +327,7 @@ include('../includes/sidebar.php');
 <script>
 $(function() {
   $('#id_member').select2({ theme: 'bootstrap4', placeholder: "Cari dan Pilih Member", allowClear: true, width: '100%' });
-  $('#tblMemberJadwal').DataTable();
+  // $('#tblMemberJadwal').DataTable();
   const alertElement = $('#alert-message');
   if (alertElement.length) setTimeout(() => alertElement.fadeOut(800), 2000);
 });

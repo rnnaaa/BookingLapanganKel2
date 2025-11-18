@@ -10,9 +10,11 @@ include('../includes/sidebar.php');
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1><i class="fas fa-coins mr-2"></i> Manajemen Keuangan</h1>
-      <a href="keuangan_tambah.php" class="btn btn-primary">
+
+      <!-- TOMBOL TAMBAH DIHAPUS -->
+      <!-- <a href="keuangan_tambah.php" class="btn btn-primary">
         <i class="fas fa-plus-circle"></i> Tambah Transaksi
-      </a>
+      </a> -->
     </div>
   </section>
 
@@ -39,6 +41,7 @@ include('../includes/sidebar.php');
                 <th>Sumber</th>
                 <th>Keterangan</th>
                 <th>Jumlah</th>
+                <!-- Kolom Aksi tetap ada tapi hanya hapus -->
                 <th>Aksi</th>
               </tr>
             </thead>
@@ -65,11 +68,9 @@ include('../includes/sidebar.php');
                 <td class="text-right font-weight-bold <?= $warna ?>">
                   Rp <?= number_format($row['jumlah'], 0, ',', '.') ?>
                 </td>
+
+                <!-- EDIT DIHAPUS, HANYA HAPUS -->
                 <td class="text-center">
-                  <a href="keuangan_edit.php?id=<?= $row['id_keuangan'] ?>" 
-                     class="btn btn-sm btn-warning" title="Edit">
-                    <i class="fas fa-edit"></i>
-                  </a>
                   <a href="keuangan_hapus.php?id=<?= $row['id_keuangan'] ?>" 
                      class="btn btn-sm btn-danger btn-delete" title="Hapus">
                     <i class="fas fa-trash"></i>

@@ -1,203 +1,164 @@
 <?php
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 require_once __DIR__ . '/../config/database.php';
+date_default_timezone_set('Asia/Jakarta');
+
+// if (!isset($_SESSION['id_user'])) {
+//     die("Unauthorized access.");
+// }
+
+// Ambil data pengeluaran
+$qData = mysqli_query($conn, "
+    SELECT p.*, u.nama AS input_by_nama
+    FROM pengeluaran p
+    LEFT JOIN users u ON p.input_by = u.id_user
+    ORDER BY p.tanggal DESC
+");
+
 include('../includes/header.php');
 include('../includes/topbar.php');
 include('../includes/sidebar.php');
-
-/**
- * Deteksi nama kolom penting pada tabel `pengeluaran`.
- * Kita cari kolom untuk: tanggal, kategori, deskripsi, jumlah, id.
- * Jika tidak ditemukan, fallback ke nama yang sering dipakai.
- */
-$cols = [];
-$colRes = mysqli_query($conn, "SHOW COLUMNS FROM pengeluaran");
-while ($c = mysqli_fetch_assoc($colRes)) {
-  $cols[] = $c['Field'];
-}
-
-function find_col($candidates, $cols, $fallback = null) {
-  foreach ($candidates as $cand) {
-    if (in_array($cand, $cols)) return $cand;
-  }
-  return $fallback;
-}
-
-$id_col = find_col(['id_pengeluaran','id'], $cols, 'id_pengeluaran');
-$date_col = find_col(['tanggal_pengeluaran','tanggal','tgl','date'], $cols, null);
-$category_col = find_col(['kategori_pengeluaran','kategori','category'], $cols, null);
-$desc_col = find_col(['deskripsi_pengeluaran','deskripsi','description'], $cols, null);
-$amount_col = find_col(['jumlah_pengeluaran','jumlah','amount','nominal'], $cols, null);
-
-// Jika date_col null => set ke first date-like fallback to avoid crash (but will likely be null)
-if (!$date_col) {
-  // jika tidak ada kolom tanggal, ambil first DATE or DATETIME column
-  $colRes2 = mysqli_query($conn, "SHOW COLUMNS FROM pengeluaran");
-  while ($c = mysqli_fetch_assoc($colRes2)) {
-    $type = strtolower($c['Type']);
-    if (strpos($type,'date') !== false || strpos($type,'timestamp') !== false || strpos($type,'datetime') !== false) {
-      $date_col = $c['Field'];
-      break;
-    }
-  }
-}
-
-// Jika masih null, set fallback to first column after id
-if (!$date_col) {
-  foreach ($cols as $c) {
-    if ($c !== $id_col) { $date_col = $c; break; }
-  }
-}
-
 ?>
-<div class="content-wrapper animate__animated animate__fadeIn">
-  <section class="content-header">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
-      <h1><i class="fas fa-receipt mr-2"></i> Manajemen Pengeluaran</h1>
-      <!-- tombol modal: nama fields akan di-render sesuai kolom terdeteksi -->
-      <a href="#" class="btn btn-primary shadow-sm" data-toggle="modal" data-target="#modalPengeluaran">
-        <i class="fas fa-plus-circle"></i> Tambah Pengeluaran
-      </a>
-    </div>
-  </section>
 
-  <section class="content">
-    <div class="container-fluid">
-      <div class="card shadow-lg border-0">
-        <div class="card-header bg-danger text-white">
-          <h3 class="card-title"><i class="fas fa-list mr-2"></i> Data Pengeluaran</h3>
+<div class="content-wrapper animate__animated animate__fadeIn">
+
+<!-- HEADER -->
+<section class="content-header">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+        <h1><i class="fas fa-wallet mr-2"></i> Data Pengeluaran</h1>
+
+        <!-- Tombol seperti di member -->
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="collapse" data-bs-target="#formTambah">
+            <i class="fas fa-plus-circle"></i> Tambah Pengeluaran
+        </button>
+    </div>
+</section>
+
+<section class="content">
+
+<!-- ===== FORM TAMBAH ===== -->
+<div class="collapse mt-3" id="formTambah">
+    <div class="card card-primary shadow-lg border-0">
+
+        <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
+            <h3 class="card-title mb-0"><i class="fas fa-plus-circle"></i> Tambah Pengeluaran</h3>
         </div>
 
-        <!-- MODAL: form field names mengikuti nama kolom sebenarnya -->
-        <div class="modal fade" id="modalPengeluaran" tabindex="-1">
-          <div class="modal-dialog">
-            <div class="modal-content">
+        <form id="formPengeluaran">
+            <div class="card-body row g-3">
 
-              <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="fas fa-plus-circle mr-1"></i>Tambah Pengeluaran</h5>
-                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-              </div>
-
-              <form id="formPengeluaran">
-                <div class="modal-body">
-                  <?php if ($date_col): ?>
-                  <div class="form-group">
+                <div class="col-md-4">
                     <label>Tanggal</label>
-                    <input type="date" name="<?= htmlspecialchars($date_col) ?>" class="form-control" required>
-                  </div>
-                  <?php endif; ?>
+                    <input type="date" name="tanggal" class="form-control"
+                        value="<?= date('Y-m-d') ?>" required>
+                </div>
 
-                  <?php if ($category_col): ?>
-                  <div class="form-group">
+                <div class="col-md-4">
                     <label>Kategori</label>
-                    <input type="text" name="<?= htmlspecialchars($category_col) ?>" class="form-control" required>
-                  </div>
-                  <?php endif; ?>
+                    <input type="text" name="kategori" class="form-control"
+                        placeholder="Contoh: Listrik, Perbaikan" required>
+                </div>
 
-                  <?php if ($desc_col): ?>
-                  <div class="form-group">
-                    <label>Deskripsi</label>
-                    <textarea name="<?= htmlspecialchars($desc_col) ?>" class="form-control" required></textarea>
-                  </div>
-                  <?php endif; ?>
-
-                  <?php if ($amount_col): ?>
-                  <div class="form-group">
+                <div class="col-md-4">
                     <label>Jumlah (Rp)</label>
-                    <input type="number" name="<?= htmlspecialchars($amount_col) ?>" class="form-control" required>
-                  </div>
-                  <?php endif; ?>
+                    <input type="number" step="0.01" name="jumlah"
+                        class="form-control" required>
                 </div>
 
-                <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                  <button type="submit" class="btn btn-primary">Simpan</button>
+                <div class="col-md-12">
+                    <label>Keterangan</label>
+                    <textarea name="keterangan" class="form-control"
+                        placeholder="Opsional"></textarea>
                 </div>
-              </form>
 
             </div>
-          </div>
-        </div>
-        <!-- END MODAL -->
 
-        <div class="card-body">
-          <table id="example1" class="table table-bordered table-striped table-hover">
+            <div class="card-footer text-end">
+                <button type="button" onclick="simpanPengeluaran()" class="btn btn-success">
+                    <i class="fas fa-save"></i> Simpan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== TABEL ===== -->
+<div class="card shadow-lg border-0 mt-4">
+
+    <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
+        <h3 class="card-title mb-0"><i class="fas fa-list"></i> Daftar Pengeluaran</h3>
+    </div>
+
+    <div class="card-body table-responsive">
+        <table id="tblPengeluaran" class="table table-bordered table-striped table-hover align-middle w-100">
             <thead class="bg-light text-center">
-              <tr>
-                <th>No</th>
-                <th>Tanggal</th>
-                <th>Kategori</th>
-                <th>Deskripsi</th>
-                <th>Jumlah</th>
-                <th>Aksi</th>
-              </tr>
+                <tr>
+                    <th>No</th>
+                    <th>Tanggal</th>
+                    <th>Kategori</th>
+                    <th>Keterangan</th>
+                    <th>Jumlah</th>
+                    <th>Input By</th>
+                    <th>Aksi</th>
+                </tr>
             </thead>
             <tbody>
-              <?php
-              // Ambil data, urut berdasarkan kolom tanggal yang terdeteksi
-              $order_by = $date_col ? $date_col : $id_col;
-              $sql = "SELECT * FROM pengeluaran ORDER BY `$order_by` DESC";
-              $res = mysqli_query($conn, $sql);
-              $no = 1;
-              while ($row = mysqli_fetch_assoc($res)):
-              ?>
-              <tr>
-                <td class="text-center"><?= $no++ ?></td>
-                <td class="text-center">
-                  <?php
-                    $d = $row[$date_col] ?? null;
-                    echo $d ? date('d-m-Y', strtotime($d)) : '-';
-                  ?>
-                </td>
-                <td><span class="badge bg-info"><?= htmlspecialchars($row[$category_col] ?? '-') ?></span></td>
-                <td><?= htmlspecialchars($row[$desc_col] ?? '-') ?></td>
-                <td class="text-right text-danger font-weight-bold">
-                  Rp <?= number_format($row[$amount_col] ?? 0, 0, ',', '.') ?>
-                </td>
-                <td class="text-center">
-                  <a href="pengeluaran_edit.php?id=<?= $row[$id_col] ?>" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></a>
-                  <a href="pengeluaran_hapus.php?id=<?= $row[$id_col] ?>" class="btn btn-sm btn-danger btn-delete"><i class="fas fa-trash"></i></a>
-                </td>
-              </tr>
-              <?php endwhile; ?>
-            </tbody>
-          </table>
-        </div>
+            <?php $no=1; while($p=mysqli_fetch_assoc($qData)): ?>
+                <tr>
+                    <td class="text-center"><?= $no++ ?></td>
+                    <td class="text-center"><?= date('d-m-Y', strtotime($p['tanggal'])) ?></td>
+                    <td class="text-center"><?= htmlspecialchars($p['kategori']) ?></td>
+                    <td><?= htmlspecialchars($p['keterangan'] ?? '-') ?></td>
+                    <td class="text-end fw-bold text-danger">Rp <?= number_format($p['jumlah'],0,',','.') ?></td>
+                    <td class="text-center"><?= htmlspecialchars($p['input_by_nama'] ?? '-') ?></td>
 
-      </div>
+                    <td class="text-center">
+                        <a href="pengeluaran_edit.php?id=<?= $p['id_pengeluaran'] ?>"
+                           class="btn btn-warning btn-sm">
+                            <i class="fas fa-edit"></i>
+                        </a>
+
+                        <a href="pengeluaran_hapus.php?id=<?= $p['id_pengeluaran'] ?>"
+                           class="btn btn-danger btn-sm"
+                           onclick="return confirm('Yakin ingin menghapus?');">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+            <?php endwhile; ?>
+            </tbody>
+        </table>
     </div>
-  </section>
+
+</div>
+
+</section>
 </div>
 
 <?php include('../includes/footer.php'); ?>
 
 <script>
-/*
-AJAX submit:
-- data sent will include fields with names exactly sesuai nama kolom yang terdeteksi,
-  karena form di-render oleh PHP di atas menggunakan nama kolom aktual.
-- server akan merespon JSON { success: true } atau { success: false, message: "..."}
-*/
-$("#formPengeluaran").on("submit", function(e){
-  e.preventDefault();
-  const $form = $(this);
-  $.ajax({
-    url: "pengeluaran_simpan_ajax.php",
-    type: "POST",
-    data: $form.serialize(),
-    dataType: "json"
-  }).done(function(resp){
-    if (resp.success) {
-      $("#modalPengeluaran").modal("hide");
-      toastr.success(resp.message || "Pengeluaran berhasil ditambahkan!");
-      // refresh table (simple) — reload halaman untuk memastikan DataTables reinit
-      setTimeout(() => location.reload(), 700);
-    } else {
-      toastr.error(resp.message || "Gagal menambahkan pengeluaran!");
-      console.error("Server error:", resp);
-    }
-  }).fail(function(xhr, status, err){
-    toastr.error("Terjadi kesalahan koneksi (AJAX). Cek console.");
-    console.error("AJAX fail:", status, err, xhr.responseText);
-  });
+$(document).ready(function() {
+    $('#tblPengeluaran').DataTable();
 });
+
+// AJAX SIMPAN
+function simpanPengeluaran() {
+    let data = $('#formPengeluaran').serialize();
+
+    $.post("pengeluaran_tambah.php", data, function(res) {
+        try {
+            let x = JSON.parse(res);
+
+            if (x.status === 'success') {
+                location.reload();
+            } else {
+                alert("Gagal: " + x.message);
+            }
+
+        } catch (e) {
+            alert("Terjadi kesalahan.");
+        }
+    });
+}
 </script>
