@@ -1,80 +1,63 @@
 <?php
-header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
-
 date_default_timezone_set('Asia/Jakarta');
 
-if (!isset($_GET['id_lapangan']) || !isset($_GET['tanggal'])) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Parameter id_lapangan dan tanggal wajib diisi.'
-    ]);
+// --- Validasi parameter ---
+$id_lapangan = intval($_GET['id_lapangan'] ?? 0);
+$tanggal = $_GET['tanggal'] ?? '';
+
+if (!$id_lapangan || !$tanggal) {
+    echo json_encode(['status' => 'error', 'message' => 'Parameter tidak lengkap.']);
     exit;
 }
 
-$id_lapangan = intval($_GET['id_lapangan']);
-$tanggal = $_GET['tanggal'];
+// --- Cek jadwal_harian ---
+$stmt = $conn->prepare("
+    SELECT id_jadwal_harian 
+    FROM jadwal_harian 
+    WHERE id_lapangan = ? AND tanggal = ?
+    LIMIT 1
+");
+$stmt->bind_param('is', $id_lapangan, $tanggal);
+$stmt->execute();
+$res = $stmt->get_result();
+$row = $res->fetch_assoc();
+$stmt->close();
 
-try {
-    // ambil hari dari tanggal (Senin, Selasa, dst)
-    $hari = date('l', strtotime($tanggal));
-    $hariMap = [
-        'Sunday' => 'Minggu',
-        'Monday' => 'Senin',
-        'Tuesday' => 'Selasa',
-        'Wednesday' => 'Rabu',
-        'Thursday' => 'Kamis',
-        'Friday' => 'Jumat',
-        'Saturday' => 'Sabtu'
-    ];
-    $hari_id = $hariMap[$hari];
-
-    // ambil semua slot waktu dari tabel jadwal_waktu untuk lapangan tersebut
-    $query = "
-        SELECT 
-            jw.id_jadwal_waktu,
-            jw.jam_mulai,
-            jw.jam_selesai,
-            COALESCE(mj.id_member, NULL) AS id_member,
-            COALESCE(u.nama, NULL) AS nama_member
-        FROM jadwal_waktu jw
-        LEFT JOIN member_jadwal mj 
-            ON jw.id_lapangan = mj.id_lapangan 
-            AND mj.jam_mulai = jw.jam_mulai 
-            AND mj.tanggal_booking = ?
-        LEFT JOIN member m ON mj.id_member = m.id_member
-        LEFT JOIN users u ON m.id_user = u.id_user
-        WHERE jw.id_lapangan = ?
-        ORDER BY jw.jam_mulai ASC
-    ";
-
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param('si', $tanggal, $id_lapangan);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    $slots = [];
-    while ($row = $result->fetch_assoc()) {
-        $slots[] = [
-            'id_jadwal_waktu' => $row['id_jadwal_waktu'],
-            'jam_mulai' => $row['jam_mulai'],
-            'jam_selesai' => $row['jam_selesai'],
-            'status' => $row['id_member'] ? 'booked' : 'available',
-            'nama_member' => $row['nama_member']
-        ];
-    }
-
-    echo json_encode([
-        'status' => 'success',
-        'hari' => $hari_id,
-        'tanggal' => $tanggal,
-        'slots' => $slots
-    ]);
-
-} catch (Exception $e) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-    ]);
+// Jika belum ada jadwal harian
+if (!$row) {
+    echo json_encode(['status' => 'error', 'message' => 'Belum ada jadwal untuk tanggal ini. Jalankan sinkronisasi dulu.']);
+    exit;
 }
-?>
+
+$id_jadwal_harian = $row['id_jadwal_harian'];
+
+// --- Ambil detail jadwal ---
+$stmt2 = $conn->prepare("
+    SELECT 
+        jd.id_detail, 
+        jw.jam_mulai, 
+        jw.jam_selesai, 
+        jd.status
+    FROM jadwal_detail jd
+    JOIN jadwal_waktu jw ON jd.id_jadwal_waktu = jw.id_jadwal_waktu
+    WHERE jd.id_jadwal_harian = ?
+    ORDER BY jw.jam_mulai ASC
+");
+$stmt2->bind_param('i', $id_jadwal_harian);
+$stmt2->execute();
+$result = $stmt2->get_result();
+
+$slots = [];
+while ($r = $result->fetch_assoc()) {
+    $slots[] = [
+        'id_detail' => $r['id_detail'],
+        'jam_mulai' => substr($r['jam_mulai'], 0, 5),
+        'jam_selesai' => substr($r['jam_selesai'], 0, 5),
+        'status' => $r['status']
+    ];
+}
+
+$stmt2->close();
+
+echo json_encode(['status' => 'success', 'slots' => $slots]);

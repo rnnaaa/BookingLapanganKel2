@@ -1,13 +1,12 @@
 /** dashboard.js
  * VERSI DIPERBAIKI:
- * Mengambil data dari 'window.INJECTED_USER_DATA'
- * Menyesuaikan logika pop-up agar sesuai dengan CSS
- * Memfungsikan tombol logout
+ * - Menghapus logika password (FIXING TYPEERROR)
+ * - Memperbaiki logika dropdown profil (FIXING ARIA-HIDDEN)
+ * - Memfungsikan 'fetch' (AJAX) pada 'saveProfile()' ke 'update_profile.php'
  */
 
 /* ---------- Mengambil data asli dari PHP ---------- */
-// Data ini disuntikkan oleh DashPengguna.php
-const USER = window.INJECTED_USER_DATA || { nama: "User Error", email: "error@mail.com", foto_profil: null, no_hp: '', pekerjaan: '' };
+const USER = window.INJECTED_USER_DATA || { nama: "User Error", email: "error@mail.com", foto_profil: null, no_hp: '', pekerjaan: '', pekerjaan_lain: '' };
 const BOOKINGS = window.INJECTED_BOOKING_DATA || [];
 
 /* ---------- render helpers ---------- */
@@ -21,21 +20,21 @@ function $all(sel) {
 // Helper untuk path foto profil
 function getAvatarPath(foto_profil) {
     if (foto_profil) {
-        return `../uploads/profiles/${foto_profil}`; // Asumsi path
+        // Path dari root, karena dashboard.js ada di assets/js/
+        return `uploads/profiles/${foto_profil}`; 
     }
-    return '../assets/images/default-avatar.png'; // Path default
+    return 'assets/images/default-avatar.png'; 
 }
 
 /* populate header / profile */
 document.addEventListener("DOMContentLoaded", () => {
-  // header values (dari data asli)
-  $("#userName").textContent = USER.nama.split(' ')[0]; // Ambil nama depan
+  // header values
+  $("#userName").textContent = USER.nama.split(' ')[0]; 
   $("#profileAvatar").src = getAvatarPath(USER.foto_profil);
   $("#todayDate").textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-  // stats (dari data asli)
+  // stats
   const total = BOOKINGS.length;
-  // Status 'disetujui' atau 'menunggu'
   const active = BOOKINGS.filter((b) => b.status === "menunggu" || b.status === "disetujui").length;
   const hours = BOOKINGS.reduce((s, b) => s + (parseInt(b.total_jam) || 0), 0);
   const lastPayment = BOOKINGS.slice()
@@ -47,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#statHours").textContent = hours + " jam";
   $("#statLastPayment").textContent = lastPayment ? "Rp " + parseFloat(lastPayment.total_amount).toLocaleString('id-ID') : "-";
 
-  // next booking (dari data asli)
+  // next booking
   const next = BOOKINGS.find((b) => b.status === "disetujui" && new Date(b.tanggal) >= new Date()) || null;
   const nb = $("#nextBookingBox");
   if (next) {
@@ -57,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     nb.textContent = "Tidak ada jadwal aktif";
   }
 
-  // favorites (dari data asli)
+  // favorites
   const favMap = BOOKINGS.reduce((m, b) => {
     if (b.status !== "dibatalkan") {
       m[b.nama_lapangan] = (m[b.nama_lapangan] || 0) + 1;
@@ -88,62 +87,54 @@ document.addEventListener("DOMContentLoaded", () => {
     favBox.textContent = "Belum ada data favorit";
   }
 
-  // === PERBAIKAN: Logika dropdown disesuaikan dengan CSS (menggunakan .show) ===
+  // === PERBAIKAN: Logika dropdown (Fixing ARIA-HIDDEN) ===
   const profileToggle = $("#profileToggle");
   const dropdown = $("#profileDropdown");
   if (profileToggle && dropdown) {
       profileToggle.addEventListener("click", (e) => {
         e.stopPropagation();
-        dropdown.classList.toggle("show"); // 'show' akan memicu CSS
+        const isHidden = dropdown.classList.toggle("show");
+        dropdown.setAttribute("aria-hidden", !isHidden);
       });
 
       document.addEventListener("click", (e) => {
         if (!profileToggle.contains(e.target) && !dropdown.contains(e.target)) {
           dropdown.classList.remove("show");
+          dropdown.setAttribute("aria-hidden", "true");
         }
       });
+      
+      // Mengatur fokus saat dropdown ditutup
+      dropdown.addEventListener("transitionend", (e) => {
+          if (!dropdown.classList.contains("show")) {
+              profileToggle.focus();
+          }
+      });
   }
+  // === AKHIR PERBAIKAN DROPDOWN ===
   
-  // === PERBAIKAN: Tombol Logout difungsikan ===
+  // Tombol Logout
   if ($("#btnLogout")) {
       $("#btnLogout").addEventListener("click", () => {
+        const baseUrl = window.location.origin + "/BookingLapanganKel2";
         if (confirm("Yakin ingin keluar?")) {
-          window.location.href = 'auth/php/logout.php';
+          window.location.href = baseUrl + '/auth/php/logout.php';
         }
       });
   }
   
+  // Tombol Edit Profil
   if ($("#btnEditProfile")) $("#btnEditProfile").addEventListener("click", openProfileModal);
 
-  // profile modal initialization
+  // Inisialisasi Modal Profil
   initializeProfileModal();
 
   // Quick booking button
   if ($("#btnQuickBook")) {
       $("#btnQuickBook").addEventListener("click", () => {
-        window.location.href = "booking.php"; // Mengarahkan ke booking.php
+        const baseUrl = window.location.origin + "/BookingLapanganKel2";
+        window.location.href = baseUrl + "/BookingPengguna/booking.php";
       });
-  }
-
-  // Navigation buttons
-  if ($("#nav-jadwal")) {
-      $("#nav-jadwal").addEventListener("click", (e) => {
-        e.preventDefault();
-        window.location.href = "booking.php";
-      });
-  }
-  if ($("#nav-pembayaran")) {
-      $("#nav-pembayaran").addEventListener("click", (e) => {
-        e.preventDefault();
-        showNotification("Membuka halaman Pembayaran...", "info");
-      });
-  }
-
-  // Promo button
-  if ($(".promo-content .primary")) {
-    $(".promo-content .primary").addEventListener("click", () => {
-      showNotification("Menampilkan detail promo...", "info");
-    });
   }
 
   // build chart
@@ -154,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function initializeProfileModal() {
   if (!$("#profileModal")) return;
 
-  // Set initial values (dari data asli)
+  // Set initial values
   $("#inputName").value = USER.nama;
   $("#inputEmail").value = USER.email;
   $("#inputPhone").value = USER.no_hp || "";
@@ -162,13 +153,12 @@ function initializeProfileModal() {
   $("#profileNameDisplay").textContent = USER.nama;
   $("#profileEmailDisplay").textContent = USER.email;
 
-  // Set job value (dari data asli)
+  // Set job value
   const jobSelect = $("#inputJob");
   const jobCustom = $("#inputJobCustom");
   
   if (USER.pekerjaan) {
       let jobFound = false;
-      // Cek apakah ada di <option>
       jobSelect.querySelectorAll("option").forEach(opt => {
           if (opt.value.toLowerCase() === USER.pekerjaan.toLowerCase()) {
               opt.selected = true;
@@ -176,10 +166,12 @@ function initializeProfileModal() {
           }
       });
 
-      // Jika tidak ada di <option>
-      if (!jobFound) {
+      if (!jobFound && USER.pekerjaan) {
           jobSelect.value = "Lainnya";
-          jobCustom.value = USER.pekerjaan_lain || USER.pekerjaan;
+          jobCustom.value = USER.pekerjaan_lain || USER.pekerjaan; 
+          jobCustom.style.display = "block";
+      } else if (jobSelect.value === 'Lainnya') {
+          jobCustom.value = USER.pekerjaan_lain || '';
           jobCustom.style.display = "block";
       }
   }
@@ -195,25 +187,14 @@ function initializeProfileModal() {
     }
   });
 
-  // Password toggle
-  $("#togglePassword").addEventListener("click", function () {
-    const passwordInput = $("#inputPassword");
-    const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
-    passwordInput.setAttribute("type", type);
-    this.textContent = type === "password" ? "👁️" : "🙈";
-  });
-
-  $("#toggleConfirmPassword").addEventListener("click", function () {
-    const passwordInput = $("#inputConfirmPassword");
-    const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
-    passwordInput.setAttribute("type", type);
-    this.textContent = type === "password" ? "👁️" : "🙈";
-  });
+  // === PERBAIKAN: Logika password dihapus (FIXING TYPEERROR) ===
+  // $("#togglePassword").addEventListener("click", ...);
+  // $("#toggleConfirmPassword").addEventListener("click", ...);
+  // === AKHIR PERBAIKAN ===
 
   // Avatar edit button
   $(".avatar-edit").addEventListener("click", function () {
     showNotification("Fitur upload foto profil akan datang!", "info");
-    // Di sini Anda akan memicu <input type="file">
   });
 
   // Save profile
@@ -223,7 +204,6 @@ function initializeProfileModal() {
   $("#cancelProfile").addEventListener("click", closeProfileModal);
   $("#closeProfileModal").addEventListener("click", closeProfileModal);
   
-  // Klik background untuk menutup
   $("#profileModal").addEventListener("click", function(e) {
       if (e.target === $("#profileModal")) {
           closeProfileModal();
@@ -231,66 +211,87 @@ function initializeProfileModal() {
   });
 }
 
+/**
+ * ========================================================
+ * FUNGSI SAVEPROFILE (Sudah Benar)
+ * Menggunakan Fetch untuk mengirim data ke update_profile.php
+ * ========================================================
+ */
 function saveProfile() {
   const name = $("#inputName").value.trim();
   const email = $("#inputEmail").value.trim();
   const phone = $("#inputPhone").value.trim();
   const jobSelect = $("#inputJob").value;
   const jobCustom = $("#inputJobCustom").value.trim();
-  const password = $("#inputPassword").value;
-  const confirmPassword = $("#inputConfirmPassword").value;
 
-  // Basic validation
+  // 1. Validasi Sisi Klien
   if (!name || !email || !phone) {
     showNotification("Nama, email, dan nomor HP harus diisi", "error");
     return;
   }
-  if (password && password !== confirmPassword) {
-    showNotification("Konfirmasi password tidak sesuai", "error");
-    return;
-  }
-  if (password && password.length < 6) {
-    showNotification("Password minimal 6 karakter", "error");
-    return;
-  }
-  let finalJob = (jobSelect === "Lainnya") ? jobCustom : jobSelect;
   if (jobSelect === "Lainnya" && !jobCustom) {
       showNotification("Silakan tulis pekerjaan Anda", "error");
       return;
   }
 
-  // PENTING:
-  // Di sini Anda harusnya mengambil data form dan mengirimkannya
-  // ke file PHP (misal 'update_profile.php') menggunakan AJAX/fetch
-  // untuk MENYIMPAN ke database.
-  
-  // Untuk saat ini, kita hanya simulasi sukses:
-  showNotification("Profil berhasil diperbarui! (Simulasi)", "success");
-  
-  // Update UI secara lokal (simulasi)
-  $("#userName").textContent = name.split(' ')[0];
-  $("#profileNameDisplay").textContent = name;
-  $("#profileEmailDisplay").textContent = email;
-  
-  closeProfileModal();
+  // 2. Siapkan FormData
+  const formData = new FormData();
+  formData.append('nama', name);
+  formData.append('email', email);
+  formData.append('no_hp', phone);
+  formData.append('pekerjaan', jobSelect);
+  formData.append('pekerjaan_lain', jobCustom);
+
+  // 3. Kirim ke Server (update_profile.php)
+  fetch('update_profile.php', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // 4. Jika Sukses
+      showNotification(data.message, "success");
+      
+      // 5. Perbarui UI & data global (USER) secara lokal
+      $("#userName").textContent = name.split(' ')[0];
+      $("#profileNameDisplay").textContent = name;
+      $("#profileEmailDisplay").textContent = email;
+      
+      // Update data global
+      USER.nama = name;
+      USER.email = email;
+      USER.no_hp = phone;
+      USER.pekerjaan = jobSelect;
+      USER.pekerjaan_lain = jobCustom;
+      
+      closeProfileModal();
+    } else {
+      // 6. Jika Gagal (misal: email duplikat)
+      showNotification(data.message, "error");
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showNotification("Terjadi kesalahan. Gagal menghubungi server.", "error");
+  });
 }
 
 /* ---------- small helper functions ---------- */
 function formatDate(d) {
   try {
-    const dt = new Date(d + 'T00:00:00'); // Pastikan zona waktu benar
+    const dt = new Date(d + 'T00:00:00'); 
     return dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
   } catch {
     return d;
   }
 }
 
-// === PERBAIKAN: Fungsi modal disesuaikan dengan CSS (menggunakan .show) ===
 function openProfileModal() {
   const modal = $("#profileModal");
   if (modal) {
     modal.setAttribute("aria-hidden", "false");
-    modal.classList.add("show"); // Menjalankan animasi fadeIn
+    modal.classList.add("show");
   }
 }
 
@@ -298,15 +299,13 @@ function closeProfileModal() {
   const modal = $("#profileModal");
   if (modal) {
     modal.setAttribute("aria-hidden", "true");
-    modal.classList.remove("show"); // Menghapus kelas show
+    modal.classList.remove("show");
   }
 }
-// === AKHIR PERBAIKAN ===
 
 function showNotification(message, type = "info") {
   const notification = document.createElement("div");
   notification.className = `notification ${type}`;
-  // Style notifikasi sudah ada di dashboard.css, tidak perlu inline style
   notification.textContent = message;
   document.body.appendChild(notification);
   setTimeout(() => {
@@ -319,7 +318,7 @@ function showNotification(message, type = "info") {
   }, 3000);
 }
 
-/* ---------- CHART (Menggunakan data asli) ---------- */
+/* ---------- CHART (Tidak berubah) ---------- */
 function buildHourChart() {
   if (!$("#hourChart")) return;
 

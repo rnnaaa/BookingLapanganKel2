@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 // ---------------- DB CONFIG - EDIT INI SESUAI SERVERMU ----------------
 $DB_HOST = '127.0.0.1';
-$DB_NAME = 'booking_badmintoon'; // ganti sesuai db mu
+$DB_NAME = 'bookinglapanganb2'; // ganti sesuai db mu
 $DB_USER = 'root';
 $DB_PASS = '';
 $DB_CHAR = 'utf8mb4';
