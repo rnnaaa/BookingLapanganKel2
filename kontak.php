@@ -72,29 +72,6 @@ require 'include_user/header.php';
                 required
               >
             </div>
-<<<<<<< HEAD
-          </a>
-          <div class="hidden lg:flex flex-1 justify-center">
-            <ul id="topNav" class="flex gap-8 items-end">
-              <li>
-                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
-              </li>
-              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a></li>
-              <li><a href="kontak.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Kontak</a></li>
-              <li><a href="member.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Member</a></li>
-              <li><a href="riwayat.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Riwayat</a></li>
-              <li>
-                <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
-                <i class="fa-solid fa-cart-shopping text-lg"></i>
-                <span id="cartCount"
-                      class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-semibold rounded-full px-1.5 py-0.5">
-                  <?= count($_SESSION['keranjang'] ?? []) ?>
-                </span>
-                </a>
-              </li>           
-            </ul>
-=======
->>>>>>> c1156a84b9a5c90545d726a175172cd2f8054c82
           </div>
 
           <div class="mb-4">
@@ -156,28 +133,12 @@ require 'include_user/header.php';
           </div>
         </form>
       </div>
-<<<<<<< HEAD
-      
-      </header>
-    <!-- Mobile Navigation Menu -->
-    <div id="mobileNav" class="lg:hidden hidden bg-white border-t border-slate-100 shadow-lg">
-      <div class="px-4 py-4 flex flex-col gap-2">
-        <a href="index.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Beranda</a>
-        <a href="index.php#lapangan" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lapangan</a>
-        <a href="kontak.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors active">Kontak</a>
-        <a href="member.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Member</a>
-        <a href="riwayat.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Riwayat</a>
-        <div class="pt-2 flex gap-2 mt-2">
-          <button class="flex-1 border border-primary text-primary py-2 rounded-lg font-medium" data-modal-open="loginModal">Masuk</button>
-          <button class="flex-1 bg-primary text-white py-2 rounded-lg font-medium" data-modal-open="registerModal">Daftar</button>
-=======
 
       <div id="saranSuccess" class="hidden mt-6 bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
         <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
->>>>>>> c1156a84b9a5c90545d726a175172cd2f8054c82
         </div>
         <h3 class="text-xl font-semibold text-green-800 mb-2">Terima Kasih!</h3>
         <p class="text-green-700">Saran dan kritik Anda telah berhasil dikirim. Kami akan menindaklanjuti masukan Anda untuk meningkatkan layanan SportField.</p>
@@ -221,131 +182,7 @@ require 'include_user/header.php';
             <p class="text-slate-600 mb-4">Kirim pertanyaan atau permintaan detail via email</p>
             <div class="text-sm text-slate-500">booking@sportfield.id</div>
           </div>
-<<<<<<< HEAD
-
-          <div class="grid md:grid-cols-2 gap-8">
-            <!-- WhatsApp dengan Ikon Pesawat Besar -->
-            <a href="https://wa.me/6285234063810" target="_blank" class="block contact-icon">
-              <div class="bg-white p-8 rounded-2xl shadow-soft hover:shadow-lift transition-all duration-300 text-center h-full">
-                <div class="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <!-- Ikon Pesawat Kertas Besar untuk WhatsApp -->
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="#25D366"/>
-                  </svg>
-                </div>
-                <h3 class="text-2xl font-semibold mb-4">WhatsApp</h3>
-                <p class="text-slate-600 mb-4">Klik untuk chat langsung dengan admin kami</p>
-                <div class="text-sm text-slate-500">Respon cepat untuk booking & informasi</div>
-              </div>
-            </a>
-
-            <!-- Email dengan Ikon Email Besar -->
-            <a href="mailto:booking@sportfield.id" class="block contact-icon">
-              <div class="bg-white p-8 rounded-2xl shadow-soft hover:shadow-lift transition-all duration-300 text-center h-full">
-                <div class="w-32 h-32 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <!-- Ikon Email Besar -->
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" fill="#4285F4"/>
-                    <path d="M22 6L12 13L2 6V6C2 4.9 2.9 4 4 4H20C21.1 4 22 4.9 22 6V6Z" fill="#34A853"/>
-                    <path d="M2 18L12 11L22 18V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V18Z" fill="#FBBC04"/>
-                    <path d="M22 6L12 13L2 6" fill="#EA4335"/>
-                  </svg>
-                </div>
-                <h3 class="text-2xl font-semibold mb-4">Email</h3>
-                <p class="text-slate-600 mb-4">Kirim pertanyaan atau permintaan detail via email</p>
-                <div class="text-sm text-slate-500">booking@sportfield.id</div>
-              </div>
-            </a>
-          </div>
-
-        
-
-      <!-- TESTIMONIAL SECTION (Apa Kata Mereka?) -->
-      <section id="testimoni" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4">
-          <div class="text-center mb-12">
-            <h2 class="text-4xl font-poppins font-bold mb-4">Apa Kata Mereka?</h2>
-            <p class="text-lg text-slate-600">Testimoni dari pelanggan setia SportField</p>
-          </div>
-
-          <div class="grid md:grid-cols-3 gap-8" id="testimoniContainer">
-            <!-- Testimoni akan dimuat di sini secara dinamis -->
-          </div>
-
-          <!-- Info bahwa testimoni berasal dari form saran -->
-          <div class="mt-12 text-center">
-            <p class="text-slate-600 text-sm">
-              <strong>Tips:</strong> Isi form saran & kritik di atas untuk testimoni Anda tampil di sini!
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <!-- FAQ SECTION -->
-      <section id="faq" class="py-20 bg-white">
-        <div class="max-w-3xl mx-auto px-4">
-          <h2 class="text-4xl font-poppins font-bold text-center mb-12">Pertanyaan Umum</h2>
-          
-          <div class="space-y-6">
-            <details class="p-6 bg-slate-50 rounded-2xl shadow-soft">
-              <summary class="font-semibold text-lg cursor-pointer">Bagaimana cara booking?</summary>
-              <p class="mt-4 text-slate-600">Pilih lapangan → pilih tanggal & jam → login → konfirmasi & DP via admin.</p>
-            </details>
-            
-            <details class="p-6 bg-slate-50 rounded-2xl shadow-soft">
-              <summary class="font-semibold text-lg cursor-pointer">Metode pembayaran?</summary>
-              <p class="mt-4 text-slate-600">Transfer bank, e-wallet, atau pembayaran di tempat sesuai ketentuan.</p>
-            </details>
-            
-            <details class="p-6 bg-slate-50 rounded-2xl shadow-soft">
-              <summary class="font-semibold text-lg cursor-pointer">Refund?</summary>
-              <p class="mt-4 text-slate-600">Refund sesuai syarat & ketentuan; hubungi admin untuk proses.</p>
-            </details>
-          </div>
-        </div>
-      </section>
-
-      <!-- CTA SECTION -->
-      <section class="py-20 bg-gradient-to-r from-primary to-primaryDark text-white">
-        <div class="max-w-3xl mx-auto px-4 text-center">
-          <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Siap booking?</h2>
-          <h3 class="text-2xl md:text-3xl font-poppins font-bold mb-6">Amankan jadwalmu sekarang juga</h3>
-          <p class="text-xl text-white/90 mb-8">Klik booking, login, lalu pilih slot yang tersedia.</p>
-          <div class="mt-6">
-            <a href="index.php#lapangan" class="bg-white text-primary px-8 py-4 rounded-lg font-semibold text-lg hover:bg-slate-100 transition-all duration-300 inline-block">Lihat Lapangan</a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- FOOTER -->
-    <footer class="bg-white border-t border-slate-100">
-      <div class="max-w-7xl mx-auto px-4 py-10">
-        <div class="grid md:grid-cols-3 gap-6">
-          <div>
-            <div class="font-poppins font-semibold text-lg">SportField</div>
-            <div class="text-sm text-slate-500 mt-2">Booking lapangan cepat & aman untuk semua olahraga.</div>
-          </div>
-          <div>
-            <div class="font-semibold mb-2">Navigasi</div>
-            <ul class="text-sm text-slate-600 space-y-1">
-              <li><a href="index.php#lapangan" class="hover:text-primary">Lapangan</a></li>
-              <li><a href="member.php" class="hover:text-primary">Member</a></li>
-              <li><a href="riwayat.php" class="hover:text-primary">Riwayat</a></li>
-              <li><a href="kontak.php" class="hover:text-primary">Kontak</a></li>
-            </ul>
-          </div>
-          <div>
-            <div class="font-semibold mb-2">Kontak</div>
-            <div class="text-sm text-slate-600">booking@sportfield.id • +62 852 340 638 10</div>
-            <div class="mt-3 text-sm text-slate-500">Alamat: Jl. Olahraga No.1</div>
-          </div>
-        </div>
-
-        <div class="mt-8 text-center text-xs text-slate-500">© 2025 SportField — Semua hak dilindungi</div>
-=======
         </a>
->>>>>>> c1156a84b9a5c90545d726a175172cd2f8054c82
       </div>
 
   <section id="testimoni" class="py-20 bg-white">

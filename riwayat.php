@@ -1,249 +1,332 @@
 <?php
-// Koneksi database dan ambil data
-$host = 'localhost';
-$dbname = 'booking_badmintoon'; 
-$username = 'root';
-$password = '';
-$port = 3306;
+// 1. Memanggil header (sudah termasuk session_start())
+require 'include_user/header.php';
 
-try {
-    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+// === INI PERBAIKANNYA ===
+// header.php tidak memuat koneksi DB, jadi kita panggil manual
+require 'config/database.php';
+// === AKHIR PERBAIKAN ===
+
+// 2. Keamanan & Ambil User ID
+if (!isset($_SESSION['id_user']) || $_SESSION['id_user'] == 1) { // 1 adalah user demo
+    // Jika belum login atau masih user demo, redirect ke login
+    header('Location: ' . $base_url . '/auth/login.php');
+    exit;
 }
+$user_id = $_SESSION['id_user'];
 
-// Ambil data booking
-session_start();
-$user_id = $_SESSION['user_id'] ?? 9; // Default user Budi untuk testing
-
+// 3. Kueri SQL Baru (sesuai struktur proses_pembayaran.php)
 $bookings = [];
+$error = '';
 try {
-    // Query yang fixed untuk menghindari group by error
-    $stmt = $pdo->prepare("
+    // Baris ini (sebelumnya line 17) tidak akan error lagi
+    $stmt = $conn->prepare("
         SELECT 
             b.id_booking,
             b.tanggal,
-            b.tipe_booking,
-            b.status,
-            b.total_amount as total,
-            b.alasan_penolakan as deskripsi,
+            b.status AS status_admin, -- 'menunggu', 'disetujui', 'dibatalkan', 'selesai'
+            b.payment_status,        -- 'menunggu_verifikasi', 'belum_lunas', 'lunas'
+            b.total_amount,
+            b.remaining_amount,
+            b.alasan_penolakan,
             l.nama_lapangan,
-            l.harga_per_jam,
-            l.harga_per_jam_member,
-            (SELECT GROUP_CONCAT(CONCAT(jw.jam_mulai, '-', jw.jam_selesai) SEPARATOR ', ') 
+            
+            -- Ambil tipe pembayaran awal (DP atau Pelunasan)
+            (SELECT p.tipe FROM pembayaran p 
+             WHERE p.booking_id = b.id_booking 
+             ORDER BY p.id_pembayaran ASC LIMIT 1) as tipe_pembayaran,
+             
+            -- Gabungkan semua jam jadi satu string
+            (SELECT GROUP_CONCAT(CONCAT(SUBSTR(jw.jam_mulai, 1, 5), '-', SUBSTR(jw.jam_selesai, 1, 5)) SEPARATOR ', ') 
              FROM detail_booking db 
              JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu 
-             WHERE db.id_booking = b.id_booking) as jam_booking,
-            m.durasi_bulan,
-            m.tanggal_mulai,
-            m.tanggal_berakhir
+             WHERE db.id_booking = b.id_booking
+             ORDER BY jw.jam_mulai) as jam_booking
+             
         FROM booking b
         JOIN lapangan l ON b.id_lapangan = l.id_lapangan
-        LEFT JOIN member m ON b.id_user = m.id_user AND b.tipe_booking = 'member'
         WHERE b.id_user = ?
         ORDER BY b.tanggal DESC, b.id_booking DESC
     ");
     
-    $stmt->execute([$user_id]);
-    $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
-} catch (PDOException $e) {
+    while ($row = $result->fetch_assoc()) {
+        $bookings[] = $row;
+    }
+    $stmt->close();
+    
+} catch (Exception $e) {
     $error = "Error mengambil data: " . $e->getMessage();
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Riwayat Booking</title>
-    <link rel="stylesheet" href="riwayat.css" /> <!-- Path CSS diperbaiki -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-</head>
-<body>
-    <header class="header">
-        <h1>Riwayat Booking</h1>
-        <p>Lihat status dan detail pemesanan lapangan Anda</p>
-    </header>
+<style>
+    /* Style untuk Modal Detail (agar riwayat.js tetap berfungsi) */
+    .modal {
+        display: none; 
+        position: fixed; 
+        z-index: 1000; 
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        overflow: auto; 
+        background-color: rgba(0,0,0,0.6); 
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 24px;
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 500px;
+        border-radius: 0.75rem; /* rounded-xl */
+        position: relative;
+        animation: modalPopIn 0.3s ease-out;
+    }
+    @keyframes modalPopIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    .modal .close {
+        color: #aaa;
+        position: absolute;
+        right: 15px;
+        top: 10px;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .modal .close:hover,
+    .modal .close:focus {
+        color: black;
+        text-decoration: none;
+    }
+    .modal h2 {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+    .modal p {
+        font-size: 0.875rem;
+        color: #334155; /* slate-700 */
+        margin-bottom: 0.5rem;
+        line-height: 1.5;
+    }
+    .modal p strong {
+        color: #1e293b; /* slate-800 */
+    }
+    .qrcode {
+        margin-top: 1.5rem;
+        text-align: center;
+    }
+    .qrcode img {
+        margin: auto;
+        border: 4px solid #fff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+</style>
 
-    <main class="container" id="bookingContainer">
-        <?php if (isset($error)): ?>
-            <div class="error-state">
-                <h3><?php echo $error; ?></h3>
-                <p>Silakan coba lagi atau hubungi administrator.</p>
+<main class="max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold font-poppins text-slate-800 mb-2">Riwayat Booking Anda</h1>
+    <p class="text-lg text-slate-500 mb-8">Lihat status dan detail pemesanan lapangan Anda.</p>
+
+    <div class="flex flex-col gap-5">
+        <?php if ($error): ?>
+            <div class="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg">
+                <strong>Error:</strong> <?= htmlspecialchars($error) ?>
             </div>
         <?php elseif (empty($bookings)): ?>
-            <div class="empty-state">
-                <h3>Belum ada riwayat booking</h3>
-                <p>Booking lapangan pertama Anda untuk melihat riwayat di sini</p>
+            <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-5 rounded-lg text-center">
+                <h3 class="font-semibold text-lg mb-2">Belum Ada Riwayat Booking</h3>
+                <p class="text-sm">Anda belum pernah melakukan booking. Mulai booking lapangan pertama Anda!</p>
+                <a href="<?= $base_url ?>/BookingPengguna/booking.php" 
+                   class="inline-block bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-primaryDark transition-all duration-300 mt-4">
+                    Booking Sekarang
+                </a>
             </div>
         <?php else: ?>
             <?php foreach ($bookings as $booking): ?>
                 <?php
-                $statusClass = '';
-                $status = $booking['status'];
-                if (stripos($status, 'menunggu') !== false) $statusClass = 'menunggu';
-                elseif (stripos($status, 'disetujui') !== false) $statusClass = 'disetujui';
-                elseif (stripos($status, 'ditolak') !== false) $statusClass = 'ditolak';
-                elseif (stripos($status, 'selesai') !== false) $statusClass = 'disetujui';
-                elseif (stripos($status, 'dibatalkan') !== false) $statusClass = 'ditolak';
-                
-                $userTypeClass = $booking['tipe_booking'] === 'member' ? 'member' : 'reguler';
-                
-                // Hitung bisa edit atau tidak (H-5 jam)
-                $canEdit = false;
-                if ($status === 'disetujui') {
-                    $now = new DateTime();
-                    $bookingDate = new DateTime($booking['tanggal']);
-                    $diff = $bookingDate->diff($now);
-                    $hoursDiff = ($diff->days * 24) + $diff->h;
-                    $canEdit = $hoursDiff > 5;
-                }
-                
-                $countdownText = 'Tidak dapat diubah';
-                if ($canEdit) {
-                    $now = new DateTime();
-                    $bookingDate = new DateTime($booking['tanggal']);
-                    $diff = $bookingDate->diff($now);
-                    $days = $diff->days;
-                    $hours = $diff->h;
-                    $countdownText = "Dapat diubah: {$days}h {$hours}j";
+                // --- Logika Penentuan Status ---
+                $statusText = 'Selesai';
+                $statusClass = 'bg-green-100 text-green-800'; // Selesai / Lunas
+                $isDP = false;
+
+                if ($booking['status_admin'] === 'dibatalkan' || $booking['status_admin'] === 'ditolak') {
+                    $statusText = 'Dibatalkan / Ditolak';
+                    $statusClass = 'bg-red-100 text-red-800';
+                } elseif ($booking['payment_status'] === 'menunggu_verifikasi') {
+                    $statusText = 'Menunggu Verifikasi';
+                    $statusClass = 'bg-yellow-100 text-yellow-800';
+                } elseif ($booking['payment_status'] === 'belum_lunas') {
+                    $statusText = 'DP Diterima';
+                    $statusClass = 'bg-blue-100 text-blue-800'; // DP
+                    $isDP = true;
+                } elseif ($booking['payment_status'] === 'lunas' && $booking['status_admin'] !== 'selesai') {
+                    $statusText = 'Lunas (Disetujui)';
+                    $statusClass = 'bg-green-100 text-green-800';
                 }
                 ?>
                 
-                <div class="card">
-                    <div class="card-header">
+                <div class="bg-white rounded-xl shadow-soft p-5 transition-all duration-300 hover:shadow-lift">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-4 border-b border-slate-100">
                         <div>
-                            <h3>
-                                <?php echo htmlspecialchars($booking['nama_lapangan']); ?>
-                                <span class="user-type <?php echo $userTypeClass; ?>">
-                                    <?php echo strtoupper($booking['tipe_booking']); ?>
-                                </span>
+                            <h3 class="font-poppins font-semibold text-xl text-slate-800">
+                                <?= htmlspecialchars($booking['nama_lapangan']) ?>
                             </h3>
-                        </div>
-                        <span class="status <?php echo $statusClass; ?>">
-                            <?php echo htmlspecialchars(ucfirst($booking['status'])); ?>
-                        </span>
-                    </div>
-                    <div class="card-body">
-                        <p><strong>ID Booking:</strong> #<?php echo htmlspecialchars($booking['id_booking']); ?></p>
-                        <p><strong>Tanggal Booking:</strong> 
-                            <?php 
-                            $date = new DateTime($booking['tanggal']);
-                            echo $date->format('l, j F Y');
-                            ?>
-                        </p>
-                        <p><strong>Jam:</strong> <?php echo htmlspecialchars($booking['jam_booking'] ?? '-'); ?></p>
-                        <p><strong>Total:</strong> Rp <?php echo number_format($booking['total'], 0, ',', '.'); ?></p>
-                        <?php if ($booking['tipe_booking'] === 'member' && $booking['durasi_bulan']): ?>
-                            <p><strong>Durasi Member:</strong> <?php echo htmlspecialchars($booking['durasi_bulan']); ?> bulan</p>
-                            <p><strong>Periode:</strong> 
-                                <?php 
-                                $start = new DateTime($booking['tanggal_mulai']);
-                                $end = new DateTime($booking['tanggal_berakhir']);
-                                echo $start->format('d M Y') . ' - ' . $end->format('d M Y');
-                                ?>
+                            <p class="text-sm text-slate-500 font-medium">
+                                ID Booking: <strong>#<?= htmlspecialchars($booking['id_booking']) ?></strong>
                             </p>
-                        <?php endif; ?>
+                        </div>
+                        <div class="flex-shrink-0 flex gap-2">
+                            <?php if ($isDP): ?>
+                                <span class="text-xs font-bold py-1 px-3 rounded-full bg-blue-100 text-blue-800 uppercase">
+                                    DP
+                                </span>
+                            <?php elseif ($booking['payment_status'] === 'lunas' || $booking['status_admin'] === 'selesai'): ?>
+                                <span class="text-xs font-bold py-1 px-3 rounded-full bg-green-100 text-green-800 uppercase">
+                                    LUNAS
+                                </span>
+                            <?php endif; ?>
+                            <span class="text-xs font-bold py-1 px-3 rounded-full <?= $statusClass ?> uppercase">
+                                <?= htmlspecialchars($statusText) ?>
+                            </span>
+                        </div>
                     </div>
-                    <div class="card-footer">
-                        <div class="countdown <?php echo !$canEdit ? 'expired' : ''; ?>">
-                            <?php echo $countdownText; ?>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
+                        <div>
+                            <label class="text-xs text-slate-500">Tanggal</label>
+                            <p class="font-medium text-sm text-slate-700">
+                                <?= date('d M Y', strtotime($booking['tanggal'])) ?>
+                            </p>
                         </div>
                         <div>
-                            <button class="btn-detail" onclick="showDetail(
-                                '<?php echo $booking['id_booking']; ?>',
-                                '<?php echo htmlspecialchars($booking['nama_lapangan']); ?>',
-                                '<?php echo $booking['tanggal']; ?>',
-                                '<?php echo htmlspecialchars($booking['jam_booking'] ?? ''); ?>',
-                                '<?php echo $booking['total']; ?>',
-                                '<?php echo htmlspecialchars($booking['tipe_booking']); ?>',
-                                '<?php echo htmlspecialchars($booking['durasi_bulan'] ?? ''); ?>',
-                                '<?php echo htmlspecialchars($booking['tanggal_mulai'] ?? ''); ?>',
-                                '<?php echo htmlspecialchars($booking['tanggal_berakhir'] ?? ''); ?>',
-                                '<?php echo htmlspecialchars($booking['status']); ?>',
-                                '<?php echo htmlspecialchars($booking['deskripsi'] ?? ''); ?>'
-                            )">Lihat Detail</button>
-                            
-                            <?php if ($status === 'disetujui'): ?>
-                                <button class="btn-ubah" 
-                                    onclick="showUbahJadwal('<?php echo $booking['id_booking']; ?>', '<?php echo $booking['tipe_booking']; ?>')" 
-                                    <?php echo !$canEdit ? 'disabled' : ''; ?>>
-                                    Ubah Jadwal
-                                </button>
-                            <?php endif; ?>
+                            <label class="text-xs text-slate-500">Jam Main</label>
+                            <p class="font-medium text-sm text-slate-700">
+                                <?= htmlspecialchars($booking['jam_booking'] ?? '-') ?>
+                            </p>
                         </div>
+                        <div>
+                            <label class="text-xs text-slate-500">Total Biaya</label>
+                            <p class="font-medium text-sm text-slate-700">
+                                Rp <?= number_format($booking['total_amount'], 0, ',', '.') ?>
+                            </p>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">Sisa Bayar</label>
+                            <p class="font-medium text-sm <?= $booking['remaining_amount'] > 0 ? 'text-red-600' : 'text-slate-700' ?>">
+                                Rp <?= number_format($booking['remaining_amount'], 0, ',', '.') ?>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end pt-4 border-t border-slate-100">
+                        <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primaryDark transition-all duration-300" 
+                                onclick="showDetail(
+                                    '<?= $booking['id_booking'] ?>',
+                                    '<?= htmlspecialchars($booking['nama_lapangan'], ENT_QUOTES) ?>',
+                                    '<?= $booking['tanggal'] ?>',
+                                    '<?= htmlspecialchars($booking['jam_booking'] ?? '-', ENT_QUOTES) ?>',
+                                    '<?= $booking['total_amount'] ?>',
+                                    '<?= htmlspecialchars($booking['tipe_pembayaran'] ?? 'Reguler', ENT_QUOTES) ?>',
+                                    '', '', '', '<?= htmlspecialchars($statusText, ENT_QUOTES) ?>',
+                                    '<?= htmlspecialchars($booking['alasan_penolakan'] ?? '-', ENT_QUOTES) ?>'
+                                )">
+                            Lihat Detail
+                        </button>
                     </div>
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
-    </main>
-
-    <!-- Modal Detail -->
-    <div class="modal" id="detailModal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Detail Booking</h2>
-            <div id="detailContent"></div>
-            <div id="qrcode" class="qrcode"></div>
-        </div>
     </div>
+</main>
 
-    <!-- Modal Ubah Jadwal -->
-    <div class="modal" id="ubahJadwalModal">
-        <div class="modal-content">
-            <span class="close" onclick="closeUbahJadwalModal()">&times;</span>
-            <h2>Ubah Jadwal</h2>
-            <div id="ubahJadwalContent">
-                <form id="ubahJadwalForm" action="proses_ubah_jadwal.php" method="POST">
-                    <input type="hidden" name="booking_id" id="formBookingId">
-                    <input type="hidden" name="tipe_booking" id="formTipeBooking">
-                    <div class="form-group">
-                        <label>Pilih sesi:</label>
-                        <div id="sessionList" class="session-list"></div>
-                    </div>
-                    <div class="form-group">
-                        <label>Pindah ke:</label>
-                        <div class="time-selector">
-                            <select name="new_day" id="newDay" class="select-input" required>
-                                <option value="Senin">Senin</option>
-                                <option value="Selasa">Selasa</option>
-                                <option value="Rabu">Rabu</option>
-                                <option value="Kamis">Kamis</option>
-                                <option value="Jumat">Jumat</option>
-                                <option value="Sabtu">Sabtu</option>
-                                <option value="Minggu">Minggu</option>
-                            </select>
-                            <select name="new_time" id="newTime" class="select-input" required>
-                                <option value="08:00-09:00">08:00-09:00</option>
-                                <option value="09:00-10:00">09:00-10:00</option>
-                                <option value="10:00-11:00">10:00-11:00</option>
-                                <option value="11:00-12:00">11:00-12:00</option>
-                                <option value="12:00-13:00">12:00-13:00</option>
-                                <option value="13:00-14:00">13:00-14:00</option>
-                                <option value="14:00-15:00">14:00-15:00</option>
-                                <option value="15:00-16:00">15:00-16:00</option>
-                                <option value="16:00-17:00">16:00-17:00</option>
-                                <option value="17:00-18:00">17:00-18:00</option>
-                                <option value="18:00-19:00">18:00-19:00</option>
-                                <option value="19:00-20:00">19:00-20:00</option>
-                                <option value="20:00-21:00">20:00-21:00</option>
-                                <option value="21:00-22:00">21:00-22:00</option>
-                                <option value="22:00-23:00">22:00-23:00</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeUbahJadwalModal()">Batal</button>
-                        <button type="submit" class="btn-primary" id="submitUbahJadwal">Simpan Perubahan</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div class="modal" id="detailModal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Detail Booking</h2>
+        <div id="detailContent"></div>
+        <div id="qrcode" class="qrcode"></div>
     </div>
+</div>
 
-    <script src="riwayat.js"></script> <!-- Path JS diperbaiki -->
-</body>
-</html>
+<script src="<?= $base_url ?>/assets/js/qrcode.min.js"></script> <script>
+    // Kode dari riwayat.js Anda (disederhanakan karena modal ubah jadwal dihapus)
+    
+    // Modal Detail
+    function showDetail(id, lapangan, tanggal, jam, total, tipeUser, durasiMember, tanggalMulai, tanggalBerakhir, status, deskripsi) {
+      const modal = document.getElementById("detailModal");
+      const content = document.getElementById("detailContent");
+      const qrContainer = document.getElementById("qrcode");
+
+      qrContainer.innerHTML = "";
+
+      // Format tanggal
+      const date = new Date(tanggal);
+      const formattedDate = date.toLocaleDateString("id-ID", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      let detailHTML = `
+            <p><strong>ID Booking:</strong> #${id}</p>
+            <p><strong>Lapangan:</strong> ${lapangan}</p>
+            <p><strong>Tanggal Booking:</strong> ${formattedDate}</p>
+            <p><strong>Jam:</strong> ${jam || "-"}</p>
+            <p><strong>Total:</strong> Rp ${parseInt(total).toLocaleString("id-ID")}</p>
+            <p><strong>Tipe Pembayaran:</strong> ${tipeUser.toUpperCase()}</p>
+            <p><strong>Status:</strong> ${status}</p>
+            <p><strong>Keterangan:</strong> ${deskripsi || "-"}</p>
+        `;
+
+      content.innerHTML = detailHTML;
+
+      if (status.includes("Lunas") || status.includes("DP Diterima")) {
+        new QRCode(qrContainer, {
+          text: `VERIFIKASI_BOOKING_ID_${id}`, // Ganti dengan data QR yang valid
+          width: 150,
+          height: 150,
+          colorDark: "#094ea8", // primaryDark
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H,
+        });
+      }
+
+      modal.style.display = "flex";
+    }
+
+    function closeModal() {
+      document.getElementById("detailModal").style.display = "none";
+    }
+
+    // Close modal ketika klik di luar content
+    window.onclick = function (event) {
+      const detailModal = document.getElementById("detailModal");
+      if (event.target === detailModal) {
+        closeModal();
+      }
+    };
+
+    // Handle escape key
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeModal();
+      }
+    });
+</script>
+
+<?php 
+// 5. Memanggil footer
+require 'include_user/footer.php'; 
+?>
