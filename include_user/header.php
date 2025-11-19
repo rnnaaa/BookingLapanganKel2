@@ -85,7 +85,7 @@ $base_url = '/BookingLapanganKel2';
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <link rel="stylesheet" href="<?= $base_url ?>/assets/css/dashboard.css" />
+    <link rel="stylesheet" href="<?= $base_url ?>../assets/css/dashboard.css" />
 
     <style type="text/tailwindcss">
         body { font-family: 'Inter', sans-serif; background-color: #f6f8fb; }
