@@ -18,13 +18,11 @@ if (isset($_SESSION['id_user'])) { // Hanya cek jika user sudah login
             session_unset();
             session_destroy();
             
-            // Arahkan ke halaman login dengan pesan timeout
-            // (Kita gunakan JavaScript redirect agar tidak konflik dengan header PHP lain)
-            echo "<script>
-                    alert('Anda telah logout otomatis karena tidak aktif selama 20 menit.');
-                    window.location.href = '/BookingLapanganKel2/index.php';
-                  </script>";
-            exit; // Hentikan sisa script
+            // === PERUBAHAN DI SINI ===
+            // Menggunakan header PHP untuk redirect senyap (tanpa notifikasi)
+            // Pastikan path '/BookingLapanganKel2/index.php' sesuai folder project Anda
+            header("Location: /BookingLapanganKel2/index.php");
+            exit; // Penting: Hentikan script agar halaman tidak lanjut dimuat
             
         } else {
             // Jika belum timeout, perbarui waktu aktivitas terakhir
@@ -195,7 +193,7 @@ $base_url = '/BookingLapanganKel2';
                         <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm">Lapangan</a></li>
                         <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm">Kontak</a></li>
                         <li><a href="<?= $base_url ?>/member.php" class="nav-link px-2 py-1 text-sm">Member</a></li>
-                        <li><a href="<?= $base_url ?>/riwayat.php" class="nav-link px-2 py-1 text-sm">Riwayat</a></li>
+                        <li><a href="<?= $base_url ?>/riwayat/riwayat.php" class="nav-link px-2 py-1 text-sm">Riwayat</a></li>
                         <li>
                             <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer" title="Lihat Keranjang">
                                 <i class="fa-solid fa-cart-shopping text-lg"></i>
