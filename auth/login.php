@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identifier = trim($_POST['identifier']); // email atau username
     $password = $_POST['password'];
 
+    // Query database (MySQL defaultnya case-insensitive saat mencari username)
     $sql = "SELECT * FROM users WHERE (email=? OR username=?) LIMIT 1";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('ss', $identifier, $identifier);
@@ -21,27 +22,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $res = $stmt->get_result();
     
     if ($row = $res->fetch_assoc()) {
-        if (!password_verify($password, $row['password'])) {
+        
+        // === 1. CEK CASE SENSITIVE (KHUSUS USERNAME) ===
+        // Jika input TIDAK mengandung '@', berarti itu username.
+        // Kita cek apakah input user sama persis (identik) dengan data di DB.
+        if (strpos($identifier, '@') === false && $row['username'] !== $identifier) {
+            $err = "Username atau Password salah (Perhatikan huruf besar/kecil).";
+        }
+        // === 2. CEK PASSWORD ===
+        elseif (!password_verify($password, $row['password'])) {
             $err = "Password salah.";
         } 
+        // === 3. CEK VERIFIKASI EMAIL ===
         elseif ($row['is_verified'] == 0) {
             $err = "Akun belum diverifikasi. Cek email untuk kode verifikasi.";
         } 
+        // === 4. CEK STATUS AKUN ===
         elseif ($row['status'] !== 'aktif') {
             $err = "Akun tidak aktif. Hubungi admin.";
         } 
+        // === 5. LOGIN SUKSES ===
         else {
+            // Set Session
             $_SESSION['id_user'] = $row['id_user'];
             $_SESSION['nama'] = $row['nama'];
             $_SESSION['role'] = $row['role'];
             $_SESSION['foto_profil'] = $row['foto_profil'];
             $_SESSION['last_activity'] = time(); 
             
+            // Update waktu login terakhir
             $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id_user = ?");
             $update_stmt->bind_param('i', $row['id_user']);
             $update_stmt->execute();
             $update_stmt->close();
 
+            // Redirect sesuai role
             if ($row['role'] === 'admin') {
                 header('Location: ../Admin/dashboard.php');
                 exit;
@@ -93,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               <svg class="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.25rem; height:1.25rem; display: none;">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A.75.75 0 003 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 003.98 8.223zM3.98 15.75A.75.75 0 003 16.5v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM6.02 5.03A.75.75 0 004.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 006.02 5.03zM6.02 18.97A.75.75 0 004.5 19.75v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM9.02 2.03A.75.75 0 007.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 009.02 2.03zM9.02 21.97A.75.75 0 007.5 22.75v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM12.02 0A.75.75 0 0010.5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 0zM12.02 24A.75.75 0 0010.5 24.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 24zM15.02 2.03A.75.75 0 0013.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0015.02 2.03zM15.02 21.97A.75.75 0 0013.5 22.75v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM18.02 5.03A.75.75 0 0016.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0018.02 5.03zM18.02 18.97A.75.75 0 0016.5 19.75v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM21.02 8.223A.75.75 0 0019.5 9v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM21.02 15.75A.75.75 0 0019.5 16.5v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A.75.75 0 003 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 003.98 8.223zM3.98 15.75A.75.75 0 003 16.5v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM6.02 5.03A.75.75 0 004.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 006.02 5.03zM6.02 18.97A.75.75 0 004.5 19.75v.75a.75.75 0 001.5 0v-.75a.75.75 0 00-.52-.727zM9.02 2.03A.75.75 0 007.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 009.02 2.03zM9.02 21.97A.75.75 0 007.5 22.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM12.02 0A.75.75 0 0010.5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 0zM12.02 24A.75.75 0 0010.5 24.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 24zM15.02 2.03A.75.75 0 0013.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0015.02 2.03zM15.02 21.97A.75.75 0 0013.5 22.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM18.02 5.03A.75.75 0 0016.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0018.02 5.03zM18.02 18.97A.75.75 0 0016.5 19.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM21.02 8.223A.75.75 0 0019.5 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM21.02 15.75A.75.75 0 0019.5 16.5v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727z" />
               </svg>
             </button>
           </div>

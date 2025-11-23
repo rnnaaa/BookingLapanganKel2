@@ -151,6 +151,15 @@ if ($is_logged_in) {
         <p>Lihat status dan detail pemesanan Anda</p>
     </header>
 
+    <?php if (isset($_SESSION['booking_success'])): ?>
+        <div style="background-color: #d1fae5; color: #065f46; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #a7f3d0; display:flex; align-items:center; gap:10px;">
+            <i class="fa-solid fa-circle-check" style="font-size: 1.2rem;"></i> 
+            <div>
+                <strong>Berhasil!</strong> <?= htmlspecialchars($_SESSION['booking_success']); ?>
+            </div>
+        </div>
+        <?php unset($_SESSION['booking_success']); ?>
+    <?php endif; ?>
     <?php if (!$is_logged_in): ?>
         <div class="not-login-container">
             <i class="fa-solid fa-lock not-login-icon"></i>
@@ -432,174 +441,193 @@ if ($is_logged_in) {
             </div>
         </div>
         <script src="<?= $base_url ?>/assets/js/qrcode.min.js"></script>
-  <script>
-    // === 1. LOGIKA TAB (JALAN OTOMATIS SAAT LOAD) ===
-    document.addEventListener("DOMContentLoaded", function () {
-        const tabButtons = document.querySelectorAll(".tab-button");
-        const tabContents = document.querySelectorAll(".tab-content");
+        
+        <script>
+            // === 1. LOGIKA TAB (JALAN OTOMATIS SAAT LOAD) ===
+            document.addEventListener("DOMContentLoaded", function () {
+                const tabButtons = document.querySelectorAll(".tab-button");
+                const tabContents = document.querySelectorAll(".tab-content");
 
-        if(tabButtons.length > 0) {
-            tabButtons.forEach((button) => {
-                button.addEventListener("click", () => {
-                    const tabId = button.getAttribute("data-tab");
-                    
-                    // Reset Active Class
-                    tabButtons.forEach((btn) => btn.classList.remove("active"));
-                    tabContents.forEach((content) => content.classList.remove("active"));
+                if(tabButtons.length > 0) {
+                    tabButtons.forEach((button) => {
+                        button.addEventListener("click", () => {
+                            const tabId = button.getAttribute("data-tab");
+                            
+                            // Reset Active Class
+                            tabButtons.forEach((btn) => btn.classList.remove("active"));
+                            tabContents.forEach((content) => content.classList.remove("active"));
 
-                    // Set Active Class
-                    button.classList.add("active");
-                    const target = document.getElementById(tabId + "-tab");
-                    if(target) target.classList.add("active");
-                });
+                            // Set Active Class
+                            button.classList.add("active");
+                            const target = document.getElementById(tabId + "-tab");
+                            if(target) target.classList.add("active");
+                        });
+                    });
+                }
             });
-        }
-    });
 
-    // === 2. FUNGSI MODAL GLOBAL (Agar bisa dipanggil onclick) ===
+            // === 2. FUNGSI MODAL GLOBAL (Agar bisa dipanggil onclick) ===
 
-    // -- Modal Detail (Umum) --
-    function showDetail(id, lapangan, tanggal, jam, total, tipeUser, durasi, mulai, berakhir, status, deskripsi) {
-        // ... (Kode showDetail Anda yang lama, atau biarkan kosong jika sudah ada) ...
-        // Untuk mempersingkat, pastikan modal detail tetap jalan seperti sebelumnya
-        const modal = document.getElementById("detailModal");
-        const content = document.getElementById("detailContent");
-        
-        let html = `<p><strong>ID:</strong> #${id}</p><p><strong>Status:</strong> ${status}</p>`;
-        // (Isi detail sesuai kebutuhan Anda)
-        content.innerHTML = html;
-        modal.style.display = "flex";
-    }
+            // -- Modal Detail (Umum) --
+            function showDetail(id, lapangan, tanggal, jam, total, tipeUser, durasi, mulai, berakhir, status, deskripsi) {
+                const modal = document.getElementById("detailModal");
+                const content = document.getElementById("detailContent");
+                const qrContainer = document.getElementById("qrcode");
+                
+                qrContainer.innerHTML = ""; // Clear QR lama
 
-    // -- FUNGSI KHUSUS MEMBER: UBAH JADWAL --
-    function showUbahJadwalMember(memberId) {
-        console.log("Membuka modal untuk Member ID:", memberId); // Cek Console browser jika macet
+                let html = `
+                    <p><strong>ID:</strong> #${id}</p>
+                    <p><strong>Lapangan:</strong> ${lapangan}</p>
+                    <p><strong>Total:</strong> Rp ${parseInt(total).toLocaleString('id-ID')}</p>
+                    <p><strong>Status:</strong> <span style="font-weight:bold; color:${status === 'disetujui' || status === 'aktif' ? 'green' : 'orange'}">${status.toUpperCase()}</span></p>
+                `;
+                
+                if(status === 'disetujui' || status === 'aktif') {
+                    html += `<p style="margin-top:10px; color:green;">Tunjukkan QR Code ini kepada petugas.</p>`;
+                    // Generate QR
+                    new QRCode(qrContainer, {
+                        text: "BOOKING-" + id,
+                        width: 128,
+                        height: 128
+                    });
+                } else {
+                    html += `<p style="margin-top:10px; color:gray;">QR Code akan muncul setelah status Disetujui/Aktif.</p>`;
+                }
 
-        // 1. Set ID ke Form
-        const inputId = document.getElementById("formMemberId");
-        if(inputId) inputId.value = memberId;
-
-        // 2. Isi Info Header Modal
-        const detailInfo = document.getElementById("detailPesananMember");
-        if(detailInfo) {
-            detailInfo.innerHTML = `
-                <h4 style="font-weight:bold; margin-bottom:5px;">Ubah Jadwal Member #${memberId}</h4>
-                <p style="font-size:0.9rem; color:#64748b;">Pilih sesi di bawah ini yang ingin Anda pindahkan jadwalnya.</p>
-            `;
-        }
-
-        // 3. Load Data Sesi (Menggunakan Dummy Data Dulu agar UI muncul)
-        loadMemberSessions(memberId);
-
-        // 4. Tampilkan Modal
-        const modal = document.getElementById("ubahJadwalMemberModal");
-        if(modal) {
-            modal.style.display = "flex";
-        } else {
-            alert("Error: Modal ID 'ubahJadwalMemberModal' tidak ditemukan!");
-        }
-    }
-
-    // Fungsi Load Data Sesi Member
-    function loadMemberSessions(memberId) {
-        const sessionList = document.getElementById("memberSessionList");
-        sessionList.innerHTML = '<div class="loading">Memuat daftar sesi...</div>';
-
-        // SIMULASI DATA (Nanti diganti dengan fetch ke database)
-        setTimeout(() => {
-            // Contoh data sesi yang dimiliki member ini
-            const dummySessions = [
-                { id: 101, tanggal: "2025-11-25", jam_mulai: "08:00", jam_selesai: "09:00" },
-                { id: 102, tanggal: "2025-11-26", jam_mulai: "08:00", jam_selesai: "09:00" },
-                { id: 103, tanggal: "2025-12-02", jam_mulai: "08:00", jam_selesai: "09:00" }
-            ];
+                content.innerHTML = html;
+                modal.style.display = "flex";
+            }
             
-            displayMemberSessionList(dummySessions);
-        }, 500); // Delay 0.5 detik biar terlihat loading
-    }
+            function showMemberDetail(id, lapangan, durasi, mulai, berakhir, total, status, jadwal, ubahCount, maxUbah) {
+                 // Bisa menggunakan logic yang sama atau dimodifikasi
+                 showDetail(id, lapangan, mulai, jadwal, total, 'member', durasi, mulai, berakhir, status, '');
+            }
 
-    // Fungsi Render List Checkbox
-    function displayMemberSessionList(sessions) {
-        const sessionList = document.getElementById("memberSessionList");
-        sessionList.innerHTML = ""; // Bersihkan loading
+            // -- FUNGSI KHUSUS MEMBER: UBAH JADWAL --
+            function showUbahJadwalMember(memberId) {
+                // 1. Set ID ke Form
+                const inputId = document.getElementById("formMemberId");
+                if(inputId) inputId.value = memberId;
 
-        if (sessions.length === 0) {
-            sessionList.innerHTML = '<div class="empty-state">Tidak ada sesi yang tersedia.</div>';
-            return;
-        }
+                // 2. Isi Info Header Modal
+                const detailInfo = document.getElementById("detailPesananMember");
+                if(detailInfo) {
+                    detailInfo.innerHTML = `
+                        <h4 style="font-weight:bold; margin-bottom:5px;">Ubah Jadwal Member #${memberId}</h4>
+                        <p style="font-size:0.9rem; color:#64748b;">Pilih sesi di bawah ini yang ingin Anda pindahkan jadwalnya.</p>
+                    `;
+                }
 
-        // Buat HTML untuk setiap sesi
-        sessions.forEach((session) => {
-            const dateObj = new Date(session.tanggal);
-            const dateStr = dateObj.toLocaleDateString("id-ID", { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+                // 3. Load Data Sesi (Dummy Data sementara)
+                loadMemberSessions(memberId);
 
-            const itemDiv = document.createElement("div");
-            itemDiv.className = "session-item";
-            itemDiv.style.cssText = "display:flex; align-items:center; padding:10px; border-bottom:1px solid #eee;";
+                // 4. Tampilkan Modal
+                const modal = document.getElementById("ubahJadwalMemberModal");
+                if(modal) modal.style.display = "flex";
+            }
             
-            itemDiv.innerHTML = `
-                <input type="checkbox" name="member_session_ids[]" value="${session.id}" 
-                       id="sess-${session.id}" style="margin-right:15px; transform:scale(1.2);">
-                <label for="sess-${session.id}" style="cursor:pointer; flex:1;">
-                    <div class="session-date" style="font-weight:bold; color:#334155;">${dateStr}</div>
-                    <div class="session-time" style="font-size:0.9rem; color:#64748b;">
-                        Pukul ${session.jam_mulai} - ${session.jam_selesai}
-                    </div>
-                </label>
-            `;
-            sessionList.appendChild(itemDiv);
-        });
+            // Fungsi Reguler: Ubah Jadwal
+            function showUbahJadwal(bookingId, tipe) {
+                 // Implementasi serupa jika diperlukan
+                 alert("Fitur ubah jadwal reguler akan segera hadir.");
+            }
 
-        // Tambahkan Event Listener ke Checkbox baru (untuk update tombol simpan)
-        const checkboxes = sessionList.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', updateMemberSubmitButton);
-        });
-        
-        // Reset tombol submit
-        updateMemberSubmitButton();
-    }
+            // Fungsi Load Data Sesi Member
+            function loadMemberSessions(memberId) {
+                const sessionList = document.getElementById("memberSessionList");
+                sessionList.innerHTML = '<div class="loading">Memuat daftar sesi...</div>';
 
-    // Fungsi Update Status Tombol Simpan
-    function updateMemberSubmitButton() {
-        const submitBtn = document.getElementById("submitUbahJadwalMember");
-        const checkboxes = document.querySelectorAll('#memberSessionList input[type="checkbox"]:checked');
-        
-        if (checkboxes.length > 0) {
-            submitBtn.disabled = false;
-            submitBtn.innerText = `Simpan Perubahan (${checkboxes.length} Sesi)`;
-            submitBtn.style.backgroundColor = "#0b63d6";
-            submitBtn.style.cursor = "pointer";
-        } else {
-            submitBtn.disabled = true;
-            submitBtn.innerText = "Pilih Sesi Dulu";
-            submitBtn.style.backgroundColor = "#94a3b8";
-            submitBtn.style.cursor = "not-allowed";
-        }
-    }
+                setTimeout(() => {
+                    // Contoh data sesi
+                    const dummySessions = [
+                        { id: 101, tanggal: "2025-11-25", jam_mulai: "08:00", jam_selesai: "09:00" },
+                        { id: 102, tanggal: "2025-11-26", jam_mulai: "08:00", jam_selesai: "09:00" },
+                        { id: 103, tanggal: "2025-12-02", jam_mulai: "08:00", jam_selesai: "09:00" }
+                    ];
+                    
+                    displayMemberSessionList(dummySessions);
+                }, 500);
+            }
 
-    // -- FUNGSI TUTUP MODAL --
-    function closeModal() {
-        document.getElementById("detailModal").style.display = "none";
-    }
-    function closeUbahJadwalModal() {
-        document.getElementById("ubahJadwalModal").style.display = "none";
-    }
-    function closeUbahJadwalMemberModal() {
-        document.getElementById("ubahJadwalMemberModal").style.display = "none";
-    }
+            // Fungsi Render List Checkbox
+            function displayMemberSessionList(sessions) {
+                const sessionList = document.getElementById("memberSessionList");
+                sessionList.innerHTML = ""; 
 
-    // Tutup jika klik di luar (backdrop)
-    window.onclick = function (event) {
-        if (event.target.classList.contains("modal")) {
-            event.target.style.display = "none";
-        }
-    };
-</script>
-    
-    <script src="<?= $base_url ?>/assets/js/riwayat.js"></script>
+                if (sessions.length === 0) {
+                    sessionList.innerHTML = '<div class="empty-state">Tidak ada sesi yang tersedia.</div>';
+                    return;
+                }
 
-    <?php endif; ?> </div>
+                sessions.forEach((session) => {
+                    const dateObj = new Date(session.tanggal);
+                    const dateStr = dateObj.toLocaleDateString("id-ID", { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+
+                    const itemDiv = document.createElement("div");
+                    itemDiv.className = "session-item";
+                    itemDiv.style.cssText = "display:flex; align-items:center; padding:10px; border-bottom:1px solid #eee;";
+                    
+                    itemDiv.innerHTML = `
+                        <input type="checkbox" name="member_session_ids[]" value="${session.id}" 
+                               id="sess-${session.id}" style="margin-right:15px; transform:scale(1.2);">
+                        <label for="sess-${session.id}" style="cursor:pointer; flex:1;">
+                            <div class="session-date" style="font-weight:bold; color:#334155;">${dateStr}</div>
+                            <div class="session-time" style="font-size:0.9rem; color:#64748b;">
+                                Pukul ${session.jam_mulai} - ${session.jam_selesai}
+                            </div>
+                        </label>
+                    `;
+                    sessionList.appendChild(itemDiv);
+                });
+
+                const checkboxes = sessionList.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', updateMemberSubmitButton);
+                });
+                updateMemberSubmitButton();
+            }
+
+            // Fungsi Update Status Tombol Simpan
+            function updateMemberSubmitButton() {
+                const submitBtn = document.getElementById("submitUbahJadwalMember");
+                const checkboxes = document.querySelectorAll('#memberSessionList input[type="checkbox"]:checked');
+                
+                if (checkboxes.length > 0) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = `Simpan Perubahan (${checkboxes.length} Sesi)`;
+                    submitBtn.style.backgroundColor = "#0b63d6";
+                    submitBtn.style.cursor = "pointer";
+                } else {
+                    submitBtn.disabled = true;
+                    submitBtn.innerText = "Pilih Sesi Dulu";
+                    submitBtn.style.backgroundColor = "#94a3b8";
+                    submitBtn.style.cursor = "not-allowed";
+                }
+            }
+
+            // -- FUNGSI TUTUP MODAL --
+            function closeModal() {
+                document.getElementById("detailModal").style.display = "none";
+            }
+            function closeUbahJadwalModal() {
+                document.getElementById("ubahJadwalModal").style.display = "none";
+            }
+            function closeUbahJadwalMemberModal() {
+                document.getElementById("ubahJadwalMemberModal").style.display = "none";
+            }
+
+            // Tutup jika klik di luar (backdrop)
+            window.onclick = function (event) {
+                if (event.target.classList.contains("modal")) {
+                    event.target.style.display = "none";
+                }
+            };
+        </script>
+
+    <?php endif; ?>
+
+</div>
 
 <?php 
 require '../include_user/footer.php'; 
