@@ -47,6 +47,7 @@ $stmt_booking->close();
 // Variabel Tampilan
 $nama_lengkap = htmlspecialchars($user['nama']);
 $nama_depan = explode(' ', $nama_lengkap)[0];
+$tampil_username = htmlspecialchars($user['username']);
 // Menggunakan logika default avatar jika tidak ada foto
 $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_profil'] : null;
 ?>
@@ -63,7 +64,7 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
             theme: {
                 extend: {
                     colors: {
-                        primary: "#0056b3", /* Menggunakan biru yang lebih gelap sesuai logo biasanya */
+                        primary: "#0056b3",
                         primaryDark: "#004494",
                         softGray: "#f6f8fb",
                         'primary-light': '#e7f0ff',
@@ -81,60 +82,56 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <link rel="stylesheet" href="assets/css/dashboard.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
 </head>
-<body class="bg-softGray text-slate-800 font-sans antialiased">
-
-    <nav class="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-            <a href="<?= $base_url ?>/index.php" class="flex items-center gap-4 group">
-                <img src="assets/images/LogoRush.png" alt="Logo Rush" class="w-12 h-auto object-contain transition-transform group-hover:scale-105">
+<body class="bg-softGray text-slate-800 font-sans antialiased pb-10"> <nav class="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+            <a href="<?= $base_url ?>/index.php" class="flex items-center gap-3 group">
+                <img src="assets/images/LogoRush.png" alt="Logo Rush" class="w-10 h-10 sm:w-12 sm:h-auto object-contain transition-transform group-hover:scale-105">
                 <div class="flex flex-col">
-                    <h1 class="font-poppins font-bold text-lg leading-tight text-slate-900 tracking-tight">Rush Badminton Academy</h1>
-                    <span class="text-xs text-slate-500 font-medium">Booking Lapangan Online</span>
+                    <h1 class="font-poppins font-bold text-sm sm:text-lg leading-tight text-slate-900 tracking-tight">Rush Badminton</h1>
+                    <span class="text-[10px] sm:text-xs text-slate-500 font-medium hidden sm:block">Booking Lapangan Online</span>
                 </div>
             </a>
 
             <div class="relative">
-                <button id="profileMenuBtn" class="flex items-center gap-3 hover:bg-slate-50 py-2 px-3 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <button id="profileMenuBtn" class="flex items-center gap-2 sm:gap-3 hover:bg-slate-50 py-1.5 px-2 sm:py-2 sm:px-3 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/20">
                     <div class="text-right hidden md:block">
-                    <div class="text-sm font-bold text-slate-800 leading-none mb-1"><?= $nama_depan ?></div>
-                      <div class="text-xs text-slate-400">
-                        <?php
-                              // ARRAY HARI & BULAN INDONESIA (Manual agar akurat)
-                              $hari_indo = [
-                                  'Sunday' => 'Minggu', 'Monday' => 'Senin', 'Tuesday' => 'Selasa',
-                                  'Wednesday' => 'Rabu', 'Thursday' => 'Kamis', 'Friday' => 'Jumat', 'Saturday' => 'Sabtu'
-                              ];
-                              $bulan_indo = [
-                                  1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-                                  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-                              ];
-                              
-                              $hari_inggris = date('l');
-                              $tgl = date('d');
-                              $bulan_angka = date('n'); // 1-12
-                              $tahun = date('Y');
-                              
-                              echo $hari_indo[$hari_inggris] . ', ' . $tgl . ' ' . $bulan_indo[$bulan_angka] . ' ' . $tahun;
-                        ?>
-                      </div>
-                  </div>
+                        <div class="text-sm font-bold text-slate-800 leading-none mb-1"><?= $tampil_username ?></div>
+                        <div class="text-xs text-slate-400">
+                            <?php
+                                $hari_indo = ['Sunday' => 'Minggu', 'Monday' => 'Senin', 'Tuesday' => 'Selasa', 'Wednesday' => 'Rabu', 'Thursday' => 'Kamis', 'Friday' => 'Jumat', 'Saturday' => 'Sabtu'];
+                                $bulan_indo = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                                echo $hari_indo[date('l')] . ', ' . date('d') . ' ' . $bulan_indo[date('n')] . ' ' . date('Y');
+                            ?>
+                        </div>
+                    </div>
                     
                     <?php if($foto_profil): ?>
-                        <img src="<?= $foto_profil ?>" alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-slate-100 shadow-sm">
+                        <img src="<?= $foto_profil ?>" alt="Profile" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-slate-100 shadow-sm">
                     <?php else: ?>
-                        <div class="w-10 h-10 rounded-full bg-[#009ef7] flex items-center justify-center text-white shadow-md">
-                            <i class="fa-regular fa-user text-lg"></i>
+                        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#009ef7] flex items-center justify-center text-white shadow-md">
+                            <i class="fa-regular fa-user text-sm sm:text-lg"></i>
                         </div>
                     <?php endif; ?>
                     
-                    <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
+                    <i class="fa-solid fa-chevron-down text-[10px] sm:text-xs text-slate-400 ml-1"></i>
                 </button>
 
-                <div id="profileDropdown" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden hidden transform origin-top-right transition-all duration-200 scale-95 opacity-0">
+                <div id="profileDropdown" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden hidden transform origin-top-right transition-all duration-200 scale-95 opacity-0 z-50">
                     <div class="p-4 border-b border-slate-100 bg-slate-50/50">
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Akun Saya</p>
                         <p class="text-sm font-semibold text-slate-800 truncate"><?= htmlspecialchars($user['email']) ?></p>
@@ -152,66 +149,70 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 py-8">
-        <div class="bg-gradient-to-r from-primary to-primaryDark rounded-2xl p-8 shadow-lg shadow-primary/20 text-white mb-8 relative overflow-hidden animate-fade-in-up">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        
+        <div class="bg-gradient-to-r from-primary to-primaryDark rounded-2xl p-6 sm:p-8 shadow-lg shadow-primary/20 text-white mb-8 relative overflow-hidden animate-fade-in-up">
             <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
             <div class="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full -ml-10 -mb-10 blur-2xl"></div>
+            
             <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div>
-                    <h2 class="text-3xl font-poppins font-bold mb-2">Selamat Datang, <?= $nama_depan ?>! 👋</h2>
-                    <p class="text-white/80 text-lg">Siap untuk bermain badminton hari ini?</p>
+                <div class="max-w-lg">
+                    <h2 class="text-2xl sm:text-3xl font-poppins font-bold mb-2 leading-tight">Selamat Datang, <?= $nama_depan ?>!</h2>
+                    <p class="text-white/80 text-sm sm:text-lg">Siap untuk bermain badminton hari ini?</p>
                 </div>
-                <a href="BookingPengguna/booking.php" class="bg-white text-primary hover:bg-slate-100 px-6 py-3 rounded-xl font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2">
+                <a href="BookingPengguna/booking.php" class="w-full sm:w-auto bg-white text-primary hover:bg-slate-100 px-6 py-3 rounded-xl font-bold shadow-md transition-all transform hover:scale-105 flex items-center justify-center gap-2 text-sm sm:text-base">
                     <i class="fa-regular fa-calendar-plus"></i> Booking Sekarang
                 </a>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.1s;">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-receipt"></i></div>
-                    <span class="text-xs font-bold text-slate-400 uppercase">Total Booking</span>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+            <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.1s;">
+                <div class="flex items-center justify-between mb-3 sm:mb-4">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg sm:text-xl"><i class="fa-solid fa-receipt"></i></div>
+                    <span class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Total</span>
                 </div>
-                <h3 class="text-3xl font-bold text-slate-800" id="statTotal">0</h3>
+                <h3 class="text-2xl sm:text-3xl font-bold text-slate-800" id="statTotal">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.2s;">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-regular fa-clock"></i></div>
-                    <span class="text-xs font-bold text-slate-400 uppercase">Booking Aktif</span>
+            <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.2s;">
+                <div class="flex items-center justify-between mb-3 sm:mb-4">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-lg sm:text-xl"><i class="fa-regular fa-clock"></i></div>
+                    <span class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Aktif</span>
                 </div>
-                <h3 class="text-3xl font-bold text-slate-800" id="statActive">0</h3>
+                <h3 class="text-2xl sm:text-3xl font-bold text-slate-800" id="statActive">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.3s;">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-fire"></i></div>
-                    <span class="text-xs font-bold text-slate-400 uppercase">Total Jam Main</span>
+            <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.3s;">
+                <div class="flex items-center justify-between mb-3 sm:mb-4">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-lg sm:text-xl"><i class="fa-solid fa-fire"></i></div>
+                    <span class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Jam Main</span>
                 </div>
-                <h3 class="text-3xl font-bold text-slate-800" id="statHours">0</h3>
+                <h3 class="text-2xl sm:text-3xl font-bold text-slate-800" id="statHours">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.4s;">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-wallet"></i></div>
-                    <span class="text-xs font-bold text-slate-400 uppercase">Terakhir Bayar</span>
+            <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow animate-fade-in-up" style="animation-delay: 0.4s;">
+                <div class="flex items-center justify-between mb-3 sm:mb-4">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center text-lg sm:text-xl"><i class="fa-solid fa-wallet"></i></div>
+                    <span class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Bayar</span>
                 </div>
-                <h3 class="text-xl font-bold text-slate-800 truncate" id="statLastPayment">-</h3>
+                <h3 class="text-lg sm:text-xl font-bold text-slate-800 truncate" id="statLastPayment">-</h3>
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 animate-fade-in-up" style="animation-delay: 0.5s;">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="font-poppins font-bold text-lg text-slate-800">Aktivitas Bermain</h3>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div class="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 animate-fade-in-up" style="animation-delay: 0.5s;">
+                <div class="flex items-center justify-between mb-4 sm:mb-6">
+                    <h3 class="font-poppins font-bold text-base sm:text-lg text-slate-800">Aktivitas Bermain</h3>
                 </div>
-                <div class="relative w-full h-72"><canvas id="hourChart"></canvas></div>
+                <div class="relative w-full h-60 sm:h-72"><canvas id="hourChart"></canvas></div>
             </div>
+            
             <div class="flex flex-col gap-6 animate-fade-in-up" style="animation-delay: 0.6s;">
-                <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-5 sm:p-6 rounded-2xl shadow-lg relative overflow-hidden">
                     <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10"></div>
                     <h4 class="font-bold text-white/60 text-xs uppercase tracking-wider mb-4">Jadwal Berikutnya</h4>
                     <div id="nextBookingBox"><p class="text-slate-400 text-sm italic">Belum ada jadwal aktif.</p></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                
+                <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100">
                     <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-heart text-red-500"></i> Lapangan Favorit</h4>
                     <div id="favFields" class="space-y-3"><p class="text-slate-400 text-sm italic">Data belum cukup.</p></div>
                 </div>
@@ -219,62 +220,68 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
         </div>
     </main>
 
-    <footer class="py-8 text-center text-sm text-slate-500">&copy; 2025 Rush Badminton Academy. Dibuat dengan ❤️.</footer>
+    <footer class="py-6 sm:py-8 text-center text-xs sm:text-sm text-slate-500 px-4">
+        &copy; 2025 SportField — Semua hak dilindungi.
+    </footer>
 
-    <div id="modalOverlay" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden transition-opacity duration-300 opacity-0 flex items-center justify-center p-4">
-        <div id="modalContent" class="bg-white w-full max-w-lg rounded-2xl shadow-2xl transform scale-95 transition-all duration-300 opacity-0">
+    <div id="modalOverlay" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden transition-opacity duration-300 opacity-0 flex items-center justify-center p-4 sm:p-6">
+        <div id="modalContent" class="bg-white w-full max-w-lg rounded-2xl shadow-2xl transform scale-95 transition-all duration-300 opacity-0 m-4 max-h-[90vh] flex flex-col">
             
-            <div class="flex items-center justify-between p-6 border-b border-slate-100">
-                <h3 class="text-xl font-bold font-poppins text-slate-800">Edit Profil</h3>
+            <div class="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100">
+                <h3 class="text-lg sm:text-xl font-bold font-poppins text-slate-800">Edit Profil</h3>
                 <button id="closeModalBtn" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
-                <form id="editProfileForm" class="space-y-4">
-                    <div class="flex flex-col items-center mb-6">
-                        <div class="relative group cursor-pointer">
-                             <?php if($foto_profil): ?>
-                                <img src="<?= $foto_profil ?>" class="w-24 h-24 rounded-full object-cover border-4 border-slate-50 shadow-md" id="previewAvatar">
-                            <?php else: ?>
-                                <div class="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center text-slate-400 border-4 border-slate-50 shadow-md" id="previewAvatarDiv">
-                                    <i class="fa-solid fa-user text-3xl"></i>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+            <div class="p-5 sm:p-6 overflow-y-auto custom-scrollbar">
+              <form id="editProfileForm" class="space-y-4" enctype="multipart/form-data"> 
+                  <div class="flex flex-col items-center mb-6">
+                      <label for="inputFoto" class="relative group cursor-pointer">
+                          <?php if($foto_profil): ?>
+                              <img src="<?= $foto_profil ?>" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-slate-50 shadow-md transition-opacity group-hover:opacity-75" id="previewAvatar">
+                          <?php else: ?>
+                              <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-200 flex items-center justify-center text-slate-400 border-4 border-slate-50 shadow-md transition-opacity group-hover:opacity-75" id="previewAvatarDiv">
+                                  <img src="" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover hidden" id="previewAvatarNew"> 
+                                  <i class="fa-solid fa-user text-3xl" id="defaultIcon"></i>
+                              </div>
+                          <?php endif; ?>
 
-                    <div class="grid grid-cols-1 gap-4">
+                          <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <i class="fa-solid fa-camera text-slate-700 text-xl sm:text-2xl bg-white/50 p-2 rounded-full backdrop-blur-sm"></i>
+                          </div>
+                      </label>
+                      
+                      <input type="file" id="inputFoto" name="foto_profil" class="hidden" accept="image/png, image/jpeg, image/jpg">
+                      <span class="text-xs text-slate-400 mt-2 text-center">Klik foto untuk mengubah (Max 2MB)</span>
+                  </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:gap-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
-                            <input type="text" id="inputNama" name="nama" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['nama']) ?>" required>
+                            <input type="text" id="inputNama" name="nama" class="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['nama']) ?>" required>
                         </div>
 
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Username</label>
-                            <input type="text" id="inputUsername" name="username" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['username']) ?>" required>
-                            <p id="usernameError" class="text-red-500 text-xs mt-1 font-medium hidden">
-                                Username sudah terpakai.
-                            </p>
-                            <p id="usernameSuccess" class="text-green-500 text-xs mt-1 font-medium hidden">
-                                Username tersedia.
-                            </p>
+                            <input type="text" id="inputUsername" name="username" class="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['username']) ?>" required>
+                            <p id="usernameError" class="text-red-500 text-xs mt-1 font-medium hidden">Username sudah terpakai.</p>
+                            <p id="usernameSuccess" class="text-green-500 text-xs mt-1 font-medium hidden">Username tersedia.</p>
                         </div>
 
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email (Tidak dapat diubah)</label>
-                            <input type="email" id="inputEmail" name="email" class="w-full px-4 py-3 bg-gray-100 border border-slate-200 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed" value="<?= htmlspecialchars($user['email']) ?>" readonly>
+                            <input type="email" id="inputEmail" name="email" class="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-100 border border-slate-200 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed" value="<?= htmlspecialchars($user['email']) ?>" readonly>
                         </div>
 
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">No. WhatsApp</label>
-                            <input type="number" id="inputHP" name="no_hp" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['no_hp'] ?? '') ?>" required>
+                            <input type="number" id="inputHP" name="no_hp" class="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['no_hp'] ?? '') ?>" required>
                         </div>
 
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pekerjaan</label>
-                            <select id="inputPekerjaan" name="pekerjaan" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700">
+                            <select id="inputPekerjaan" name="pekerjaan" class="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700">
                                 <?php
                                 $jobs = ['Pelajar', 'Mahasiswa', 'Wirausaha', 'Pegawai Swasta', 'PNS', 'Freelancer', 'Lainnya'];
                                 $currentJob = $user['pekerjaan'] ?? '';
@@ -288,16 +295,15 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
 
                         <div id="customJobDiv" class="hidden">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sebutkan Pekerjaan</label>
-                            <input type="text" id="inputPekerjaanLain" name="pekerjaan_lain" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['pekerjaan_lain'] ?? '') ?>">
+                            <input type="text" id="inputPekerjaanLain" name="pekerjaan_lain" class="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm font-medium text-slate-700" value="<?= htmlspecialchars($user['pekerjaan_lain'] ?? '') ?>">
                         </div>
                     </div>
-
                 </form>
             </div>
 
-            <div class="p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl flex justify-end gap-3">
-                <button type="button" id="btnCancelEdit" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all">Batal</button>
-                <button type="button" id="btnSaveProfile" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-primary hover:bg-primaryDark shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all">Simpan Perubahan</button>
+            <div class="p-5 sm:p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl flex flex-col sm:flex-row justify-end gap-3">
+                <button type="button" id="btnCancelEdit" class="w-full sm:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all order-2 sm:order-1">Batal</button>
+                <button type="button" id="btnSaveProfile" class="w-full sm:w-auto px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-primary hover:bg-primaryDark shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all order-1 sm:order-2">Simpan Perubahan</button>
             </div>
         </div>
     </div>

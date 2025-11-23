@@ -197,7 +197,7 @@ $form_action = "proses_pembayaran.php";
                         <?php if ($metode_pembayaran === 'qris'): ?>
                         <div id="qris-view" class="text-center">
                             <h5 class="text-sm font-semibold mb-2">Scan QRIS</h5>
-                            <img src="../assets/images/qris_rush.jpg" alt="QRIS Rush Badminton" class="w-full max-w-[200px] mx-auto rounded-lg border p-1">
+                            <img src="../assets/images/qris_rush.jpg" alt="QRIS Rush Badminton" class="w-full max-w-[285px] mx-auto rounded-lg border p-1">
                             <p class="text-xs text-slate-500 text-center mt-2">NMID: ID1025384582157 - RUSH BADMINTON JEMBER</p>
                         </div>
 
