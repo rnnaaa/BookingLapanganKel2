@@ -3,9 +3,6 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 
-// if (!isset($_SESSION['id_user'])) {
-//     die("Unauthorized access.");
-// }
 
 // Ambil data pengeluaran
 $qData = mysqli_query($conn, "
