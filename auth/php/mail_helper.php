@@ -21,7 +21,7 @@ function send_email($to, $subject, $html_body) {
         $mail->SMTPSecure = 'tls';
         $mail->Port = 587;
 
-        $mail->setFrom($MAIL_USER, 'BookingLapangan');
+        $mail->setFrom($MAIL_USER, 'Rush Badminton');
         $mail->addAddress($to);
         $mail->isHTML(true);
         $mail->Subject = $subject;

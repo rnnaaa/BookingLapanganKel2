@@ -211,7 +211,7 @@ try {
     unset($_SESSION['booking_expired_at']);
 
     $_SESSION['booking_success'] = "Pembayaran berhasil dikirim! Booking ID #$temp_booking_id sedang menunggu verifikasi Admin.";
-    header('Location: ../DashPengguna.php');
+    header("Location: ../riwayat/riwayat.php");
     exit;
 
 } catch (Exception $e) {
