@@ -212,17 +212,21 @@ $base_url = '/BookingLapanganKel2';
                         if (isset($_SESSION['foto_profil']) && !empty($_SESSION['foto_profil'])) {
                             $foto_profil = $base_url . '/uploads/profiles/' . htmlspecialchars($_SESSION['foto_profil']);
                         }
-                        $nama_depan = explode(' ', htmlspecialchars($_SESSION['nama']))[0];
+                        
+                        // --- PERUBAHAN: Gunakan Username ---
+                        // Pastikan di login.php Anda sudah menyimpan $_SESSION['username']
+                        $tampil_username = isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : 'Member';
                         ?>
 
                         <a href="<?= $base_url ?>/DashPengguna.php" 
                         class="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary transition-colors duration-300"
                         title="Lihat Dashboard">
                             <img src="<?= $foto_profil ?>" alt="Foto Profil" class="w-9 h-9 rounded-full object-cover border-2 border-primary-light">
-                            <span>Halo, <?= $nama_depan ?></span>
+                            <span>Halo, <?= $tampil_username ?></span>
                         </a>
+                        
                         <a href="<?= $base_url ?>/auth/php/logout.php" id="btnLogout" class="text-sm text-gray-500 hover:text-red-600" title="Keluar">
-                           <i class="fa-solid fa-right-from-bracket"></i>
+                        <i class="fa-solid fa-right-from-bracket"></i>
                         </a>
 
                     <?php else: ?>

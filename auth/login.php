@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['role'] = $row['role'];
             $_SESSION['foto_profil'] = $row['foto_profil'];
             $_SESSION['last_activity'] = time(); 
+            $_SESSION['username'] = $row['username']; 
             
             // Update waktu login terakhir
             $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id_user = ?");

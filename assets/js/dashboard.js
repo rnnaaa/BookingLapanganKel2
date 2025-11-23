@@ -212,36 +212,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     // --- 4. SIMPAN PROFIL DENGAN SWEETALERT ---
+    // --- 4. SIMPAN PROFIL (FIXED: MENDUKUNG UPLOAD FOTO) ---
     if(btnSaveProfile) {
         btnSaveProfile.addEventListener('click', () => {
+            // 1. Validasi Input Sederhana
             const nama = document.getElementById('inputNama').value.trim();
             const username = document.getElementById('inputUsername').value.trim();
             const hp = document.getElementById('inputHP').value.trim();
             
-            if(!nama || !username || !hp) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Oops...',
-                    text: 'Nama, Username, dan No HP harus diisi!',
-                    confirmButtonColor: '#0b63d6'
-                });
+            // Cek username error (jika ada class merah)
+            const inputUsername = document.getElementById('inputUsername');
+            if(inputUsername.classList.contains('border-red-500')) {
+                Swal.fire({ icon: 'error', title: 'Username Tidak Valid', text: 'Harap ganti username lain.', confirmButtonColor: '#0b63d6' });
                 return;
             }
 
+            if(!nama || !username || !hp) {
+                Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Nama, Username, dan No HP harus diisi!', confirmButtonColor: '#0b63d6' });
+                return;
+            }
+
+            // 2. UI Loading State
             const originalText = btnSaveProfile.innerText;
             btnSaveProfile.innerText = "Menyimpan...";
             btnSaveProfile.disabled = true;
 
-            const formData = new FormData();
-            formData.append('nama', nama);
-            formData.append('username', username);
-            formData.append('no_hp', hp);
-            formData.append('pekerjaan', jobSelect.value);
-            formData.append('pekerjaan_lain', customJobInput.value);
+            // 3. CONSTRUCT FORM DATA (PERBAIKAN UTAMA DI SINI)
+            // Menggunakan 'new FormData(formElement)' otomatis mengambil SEMUA input termasuk FILE gambar
+            const formElement = document.getElementById('editProfileForm'); 
+            const formData = new FormData(formElement);
 
+            // 4. Kirim ke Backend
             fetch('update_profile.php', {
                 method: 'POST',
-                body: formData
+                body: formData // Jangan set Content-Type header, biarkan browser mengaturnya untuk Multipart
             })
             .then(res => res.json())
             .then(data => {
@@ -249,34 +253,65 @@ document.addEventListener("DOMContentLoaded", () => {
                     Swal.fire({
                         icon: 'success',
                         title: 'Berhasil!',
-                        text: 'Profil Anda telah diperbarui.',
+                        text: 'Profil dan foto berhasil diperbarui.',
                         showConfirmButton: false,
                         timer: 1500
                     }).then(() => {
-                        location.reload();
+                        location.reload(); // Reload agar foto header berubah
                     });
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal',
-                        text: data.message,
-                        confirmButtonColor: '#0b63d6'
-                    });
-                    btnSaveProfile.innerText = originalText;
-                    btnSaveProfile.disabled = false;
+                    throw new Error(data.message || 'Terjadi kesalahan server');
                 }
             })
             .catch(err => {
                 console.error(err);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Kesalahan Server',
-                    text: 'Tidak dapat terhubung ke server.',
+                    title: 'Gagal Menyimpan',
+                    text: err.message,
                     confirmButtonColor: '#0b63d6'
                 });
                 btnSaveProfile.innerText = originalText;
                 btnSaveProfile.disabled = false;
             });
+        });
+    }
+    
+    // --- 5. LOGIC PREVIEW FOTO (PASTIKAN INI ADA) ---
+    const inputFoto = document.getElementById('inputFoto');
+    const previewAvatar = document.getElementById('previewAvatar');
+    const previewAvatarDiv = document.getElementById('previewAvatarDiv');
+    const previewAvatarNew = document.getElementById('previewAvatarNew');
+    const defaultIcon = document.getElementById('defaultIcon');
+
+    if(inputFoto) {
+        inputFoto.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                // Validasi ukuran di Client (Max 2MB)
+                if(file.size > 2 * 1024 * 1024) {
+                    Swal.fire('File Terlalu Besar', 'Maksimal ukuran foto adalah 2MB', 'warning');
+                    this.value = ''; 
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Jika user sudah punya foto sebelumnya
+                    if (previewAvatar) {
+                        previewAvatar.src = e.target.result;
+                    } 
+                    // Jika user belum punya foto (tampilan default)
+                    else if (previewAvatarDiv) {
+                        if(defaultIcon) defaultIcon.classList.add('hidden');
+                        if(previewAvatarNew) {
+                            previewAvatarNew.classList.remove('hidden');
+                            previewAvatarNew.src = e.target.result;
+                        }
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
         });
     }
 
@@ -295,4 +330,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return `${hari}, ${tgl} ${bulan} ${tahun}`;
     }
+    
 });
