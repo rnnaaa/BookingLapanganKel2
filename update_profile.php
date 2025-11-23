@@ -2,71 +2,65 @@
 session_start();
 require 'config/database.php';
 
-// Atur header untuk merespon sebagai JSON
+ob_clean(); 
 header('Content-Type: application/json');
 
-// 1. Keamanan: Pastikan pengguna login
+// 1. Cek Login
 if (!isset($_SESSION['id_user'])) {
-    echo json_encode(['status' => 'error', 'message' => 'Anda harus login untuk melakukan aksi ini.']);
+    echo json_encode(['status' => 'error', 'message' => 'Sesi habis. Silakan login ulang.']);
     exit;
 }
 
-// 2. Pastikan ini adalah request POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Metode request tidak valid.']);
+    echo json_encode(['status' => 'error', 'message' => 'Request tidak valid.']);
     exit;
 }
 
 $user_id = $_SESSION['id_user'];
 
-// 3. Ambil dan bersihkan data dari POST
+// 2. Ambil Data (Username baru ditambahkan, Email tidak diambil untuk update)
 $nama = trim($_POST['nama'] ?? '');
-$email = trim($_POST['email'] ?? '');
+$username = trim($_POST['username'] ?? ''); // Username baru
 $no_hp = trim($_POST['no_hp'] ?? '');
 $pekerjaan = trim($_POST['pekerjaan'] ?? '');
 $pekerjaan_lain = trim($_POST['pekerjaan_lain'] ?? '');
 
-// 4. Validasi Server-Side
-if (empty($nama) || empty($email) || empty($no_hp)) {
-    echo json_encode(['status' => 'error', 'message' => 'Nama, email, dan No. HP tidak boleh kosong.']);
-    exit;
-}
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    echo json_encode(['status' => 'error', 'message' => 'Format email tidak valid.']);
+// 3. Validasi
+if (empty($nama) || empty($username) || empty($no_hp)) {
+    echo json_encode(['status' => 'error', 'message' => 'Nama, Username, dan No HP wajib diisi.']);
     exit;
 }
 
-// 5. Cek apakah email sudah digunakan oleh PENGGUNA LAIN
-$stmt_check = $conn->prepare("SELECT id_user FROM users WHERE email = ? AND id_user != ?");
-$stmt_check->bind_param('si', $email, $user_id);
+// 4. Cek DUPLIKAT USERNAME (Kecuali punya sendiri)
+$stmt_check = $conn->prepare("SELECT id_user FROM users WHERE username = ? AND id_user != ?");
+$stmt_check->bind_param('si', $username, $user_id);
 $stmt_check->execute();
 $result_check = $stmt_check->get_result();
 
 if ($result_check->num_rows > 0) {
-    echo json_encode(['status' => 'error', 'message' => 'Email ini sudah digunakan oleh akun lain.']);
+    echo json_encode(['status' => 'error', 'message' => 'Username ini sudah dipakai. Silakan pilih yang lain.']);
     exit;
 }
 $stmt_check->close();
 
-// 6. Tentukan nilai pekerjaan_lain
+// 5. Rapikan Data Pekerjaan
 if ($pekerjaan !== 'Lainnya') {
-    $pekerjaan_lain = ''; // Kosongkan
+    $pekerjaan_lain = ''; 
 }
 
-// 7. Update Database
-$stmt_update = $conn->prepare("UPDATE users SET nama = ?, email = ?, no_hp = ?, pekerjaan = ?, pekerjaan_lain = ? WHERE id_user = ?");
-$stmt_update->bind_param('sssssi', $nama, $email, $no_hp, $pekerjaan, $pekerjaan_lain, $user_id);
+// 6. Update Database (EMAIL DIHAPUS DARI QUERY)
+// Hanya update: nama, username, no_hp, pekerjaan
+$stmt = $conn->prepare("UPDATE users SET nama = ?, username = ?, no_hp = ?, pekerjaan = ?, pekerjaan_lain = ? WHERE id_user = ?");
+$stmt->bind_param('sssssi', $nama, $username, $no_hp, $pekerjaan, $pekerjaan_lain, $user_id);
 
-if ($stmt_update->execute()) {
-    // 8. Perbarui juga data di Session
+if ($stmt->execute()) {
+    // Update Session
     $_SESSION['nama'] = $nama;
     
-    echo json_encode(['status' => 'success', 'message' => 'Profil berhasil diperbarui.']);
+    echo json_encode(['status' => 'success', 'message' => 'Profil berhasil diperbarui!']);
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'Terjadi kesalahan. Gagal menyimpan ke database.']);
+    echo json_encode(['status' => 'error', 'message' => 'Gagal menyimpan ke database.']);
 }
 
-$stmt_update->close();
+$stmt->close();
 $conn->close();
-
-// <-- Tag penutup ?> sengaja dihapus di sini
