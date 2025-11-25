@@ -2,17 +2,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const USER = window.USER_DATA || {};
     const BOOKINGS = window.BOOKING_DATA || [];
 
-    // --- 1. STATS & WIDGETS (Sama) ---
+    // --- 1. STATS & WIDGETS (REVISI: LEBIH INFORMATIF & TOTAL PENGELUARAN) ---
     const totalBooking = BOOKINGS.length;
+    
+    // Menghitung booking yang statusnya 'menunggu' (belum lunas/verif) atau 'disetujui' (siap main)
     const activeBooking = BOOKINGS.filter(b => ['menunggu', 'disetujui'].includes(b.status)).length;
+    
+    // Asumsi 1 booking = 1 jam, bisa disesuaikan dengan data real jika ada kolom durasi
     const totalHours = totalBooking * 1; 
-    const lastPayment = BOOKINGS.find(b => parseFloat(b.total_amount) > 0);
 
+    // === LOGIKA BARU: MENGHITUNG TOTAL PENGELUARAN SELAMA INI ===
+    // Kita ambil semua booking yang statusnya TIDAK 'dibatalkan' atau 'ditolak'
+    // Lalu kita jumlahkan total_amount-nya
+    const totalSpend = BOOKINGS
+        .filter(b => b.status !== 'dibatalkan' && b.status !== 'ditolak')
+        .reduce((acc, curr) => acc + parseFloat(curr.total_amount || 0), 0);
+
+    // Update UI Stats
     setText("statTotal", totalBooking);
     setText("statActive", activeBooking);
-    setText("statHours", totalHours + "+");
-    setText("statLastPayment", lastPayment ? formatRupiah(lastPayment.total_amount) : "-");
+    setText("statHours", totalHours + " Jam"); // Menambahkan label 'Jam'
+    setText("statTotalSpend", formatRupiah(totalSpend)); // Format Rupiah
 
+    // Widget Jadwal Berikutnya
     const nextBooking = BOOKINGS.find(b => b.status === 'disetujui' && new Date(b.tanggal) >= new Date());
     const nextBox = document.getElementById("nextBookingBox");
     if(nextBox) {
@@ -30,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Widget Lapangan Favorit
     const counts = {};
     BOOKINGS.forEach(b => { counts[b.nama_lapangan] = (counts[b.nama_lapangan] || 0) + 1; });
     const favs = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 3);
@@ -46,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- 2. CHART (Sama) ---
+    // --- 2. CHART ---
     const ctx = document.getElementById('hourChart');
     if(ctx) {
         const hoursMap = Array(24).fill(0);
@@ -99,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
         closeDropdown();
         modalOverlay.classList.remove('hidden');
         handleJobSelect();
-        // Reset Username State saat buka modal
+        
         const inputUsername = document.getElementById('inputUsername');
         const errorText = document.getElementById('usernameError');
         if(inputUsername) {
@@ -137,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(modalOverlay) modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) closeModal(); });
     if(jobSelect) jobSelect.addEventListener('change', handleJobSelect);
 
-    // --- TAMBAHAN: LOGOUT DENGAN SWEETALERT ---
+    // --- LOGOUT ---
     if(btnLogout) {
         btnLogout.addEventListener('click', (e) => {
             e.preventDefault();
@@ -145,13 +158,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 title: 'Konfirmasi Keluar',
                 text: "Apakah Anda yakin ingin keluar dari akun Anda?",
                 icon: 'warning',
-                iconColor: '#ef4444', // Merah sesuai gambar warning
+                iconColor: '#ef4444', 
                 showCancelButton: true,
                 confirmButtonText: 'Ya, Keluar',
                 cancelButtonText: 'Batal',
-                reverseButtons: true, // Agar tombol Batal di kiri, Keluar di kanan (opsional, sesuaikan selera)
-                
-                // Kustomisasi Tombol agar mirip Gambar (Putih & Merah)
+                reverseButtons: true, 
                 customClass: {
                     popup: 'rounded-2xl font-sans', 
                     title: 'text-xl font-bold text-slate-800',
@@ -159,7 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     confirmButton: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1',
                     cancelButton: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1'
                 },
-                buttonsStyling: false // Mematikan style bawaan SweetAlert agar class Tailwind di atas bekerja
+                buttonsStyling: false 
             }).then((result) => {
                 if (result.isConfirmed) {
                     window.location.href = 'auth/php/logout.php';
@@ -168,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- TAMBAHAN: CEK USERNAME REAL-TIME ---
+    // --- CHECK USERNAME ---
     const inputUsername = document.getElementById('inputUsername');
     const usernameError = document.getElementById('usernameError');
     const usernameSuccess = document.getElementById('usernameSuccess');
@@ -179,50 +190,42 @@ document.addEventListener("DOMContentLoaded", () => {
             clearTimeout(usernameTimeout);
             const val = this.value.trim();
 
-            // Reset visual
             this.classList.remove('border-red-500', 'focus:ring-red-200', 'border-green-500');
             usernameError.classList.add('hidden');
             usernameSuccess.classList.add('hidden');
             btnSaveProfile.disabled = false;
 
-            if(val === USER.username) return; // Jika sama dengan username sendiri, abaikan
-            if(val.length < 3) return; // Jangan cek jika terlalu pendek
+            if(val === USER.username) return; 
+            if(val.length < 3) return; 
 
             usernameTimeout = setTimeout(() => {
                 fetch(`check_username.php?username=${val}`)
                 .then(res => res.json())
                 .then(data => {
                     if(data.status === 'taken') {
-                        // USERNAME SUDAH DIPAKAI (MERAH SEPERTI GAMBAR)
                         inputUsername.classList.add('border-red-500', 'focus:ring-red-200');
                         inputUsername.classList.remove('focus:border-primary', 'focus:ring-primary/20');
                         usernameError.classList.remove('hidden');
                         btnSaveProfile.disabled = true;
                     } else {
-                        // TERSEDIA (HIJAU/NORMAL)
                         inputUsername.classList.add('border-green-500');
-                        // usernameSuccess.classList.remove('hidden'); // Opsional jika mau menampilkan teks tersedia
                         btnSaveProfile.disabled = false;
                     }
                 })
                 .catch(err => console.error("Error check username:", err));
-            }, 500); // Delay 500ms agar tidak spam request
+            }, 500); 
         });
     }
 
-
-    // --- 4. SIMPAN PROFIL DENGAN SWEETALERT ---
-    // --- 4. SIMPAN PROFIL (FIXED: MENDUKUNG UPLOAD FOTO) ---
+    // --- SIMPAN PROFIL & FOTO ---
     if(btnSaveProfile) {
         btnSaveProfile.addEventListener('click', () => {
-            // 1. Validasi Input Sederhana
             const nama = document.getElementById('inputNama').value.trim();
             const username = document.getElementById('inputUsername').value.trim();
             const hp = document.getElementById('inputHP').value.trim();
             
-            // Cek username error (jika ada class merah)
-            const inputUsername = document.getElementById('inputUsername');
-            if(inputUsername.classList.contains('border-red-500')) {
+            const inputUsernameCheck = document.getElementById('inputUsername');
+            if(inputUsernameCheck.classList.contains('border-red-500')) {
                 Swal.fire({ icon: 'error', title: 'Username Tidak Valid', text: 'Harap ganti username lain.', confirmButtonColor: '#0b63d6' });
                 return;
             }
@@ -232,20 +235,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 2. UI Loading State
             const originalText = btnSaveProfile.innerText;
             btnSaveProfile.innerText = "Menyimpan...";
             btnSaveProfile.disabled = true;
 
-            // 3. CONSTRUCT FORM DATA (PERBAIKAN UTAMA DI SINI)
-            // Menggunakan 'new FormData(formElement)' otomatis mengambil SEMUA input termasuk FILE gambar
             const formElement = document.getElementById('editProfileForm'); 
             const formData = new FormData(formElement);
 
-            // 4. Kirim ke Backend
             fetch('update_profile.php', {
                 method: 'POST',
-                body: formData // Jangan set Content-Type header, biarkan browser mengaturnya untuk Multipart
+                body: formData 
             })
             .then(res => res.json())
             .then(data => {
@@ -257,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         showConfirmButton: false,
                         timer: 1500
                     }).then(() => {
-                        location.reload(); // Reload agar foto header berubah
+                        location.reload(); 
                     });
                 } else {
                     throw new Error(data.message || 'Terjadi kesalahan server');
@@ -277,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
     
-    // --- 5. LOGIC PREVIEW FOTO (PASTIKAN INI ADA) ---
+    // --- PREVIEW FOTO ---
     const inputFoto = document.getElementById('inputFoto');
     const previewAvatar = document.getElementById('previewAvatar');
     const previewAvatarDiv = document.getElementById('previewAvatarDiv');
@@ -288,7 +287,6 @@ document.addEventListener("DOMContentLoaded", () => {
         inputFoto.addEventListener('change', function() {
             const file = this.files[0];
             if (file) {
-                // Validasi ukuran di Client (Max 2MB)
                 if(file.size > 2 * 1024 * 1024) {
                     Swal.fire('File Terlalu Besar', 'Maksimal ukuran foto adalah 2MB', 'warning');
                     this.value = ''; 
@@ -297,11 +295,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    // Jika user sudah punya foto sebelumnya
                     if (previewAvatar) {
                         previewAvatar.src = e.target.result;
                     } 
-                    // Jika user belum punya foto (tampilan default)
                     else if (previewAvatarDiv) {
                         if(defaultIcon) defaultIcon.classList.add('hidden');
                         if(previewAvatarNew) {

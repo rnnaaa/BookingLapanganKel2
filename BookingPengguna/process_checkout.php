@@ -20,11 +20,17 @@ $user_id = $_SESSION['id_user'];
 $keranjang = $_SESSION['keranjang'];
 $expired_at = date('Y-m-d H:i:s', strtotime('+7 minutes')); // Waktu hold 7 menit
 
+// === PERBAIKAN: HITUNG TOTAL HARGA DI AWAL ===
+$total_booking_awal = 0;
+foreach ($keranjang as $item) {
+    $total_booking_awal += (float)$item['harga'];
+}
+// =============================================
+
 mysqli_begin_transaction($conn);
 
 try {
     // 2. Validasi Ketersediaan Slot (Double Check)
-    // Cek apakah slot sudah 'dibooking' atau sedang di-'hold' oleh orang lain
     $check_sql = "SELECT 1 FROM jadwal_detail jd
                   JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian
                   LEFT JOIN booking b ON jd.id_booking = b.id_booking
@@ -47,12 +53,14 @@ try {
     }
 
     // 3. Buat Booking Utama (Status 'hold')
+    // UPDATE: Masukkan $total_booking_awal ke database
     $first_item = $keranjang[0];
     $insert_booking = "INSERT INTO booking (id_user, id_lapangan, tanggal, tipe_booking, status, expired_at, total_amount) 
-                       VALUES (?, ?, ?, 'reguler', 'hold', ?, 0)";
+                       VALUES (?, ?, ?, 'reguler', 'hold', ?, ?)";
     
     $stmt_b = $conn->prepare($insert_booking);
-    $stmt_b->bind_param("iiss", $user_id, $first_item['id_lapangan'], $first_item['tanggal'], $expired_at);
+    // Perhatikan parameter terakhir ('d' untuk decimal/double)
+    $stmt_b->bind_param("iissd", $user_id, $first_item['id_lapangan'], $first_item['tanggal'], $expired_at, $total_booking_awal);
     $stmt_b->execute();
     $booking_id = $conn->insert_id;
 
@@ -82,8 +90,7 @@ try {
 
     mysqli_commit($conn);
 
-    // === PERBAIKAN DI SINI ===
-    // Tambahkan ?cart=1 agar produk_tambahan.php mau menerima datanya
+    // Redirect ke halaman produk tambahan
     echo json_encode(['status' => 'ok', 'redirect' => 'produk_tambahan.php?cart=1']); 
 
 } catch (Exception $e) {

@@ -68,7 +68,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // --- 1. LOGIKA KLIK JAM ---
+// --- 1. LOGIKA KLIK JAM (HAPUS TOAST SUKSES, PERTAHANKAN ALERT ERROR) ---
   document.querySelectorAll(".jam-main").forEach((btn) => {
     btn.addEventListener("click", function () {
       const slotData = {
@@ -97,17 +97,35 @@ document.addEventListener("DOMContentLoaded", function () {
         .then((r) => r.json())
         .then((res) => {
           if (res.status === "ok") {
+            // === SUKSES: HANYA UPDATE UI DAN BUKA SIDEBAR ===
             addItemToSidebar(slotData);
             if (cartCount) cartCount.textContent = res.count ?? parseInt(cartCount.textContent || "0") + 1;
             if (checkoutBtn) checkoutBtn.disabled = false;
+            
+            // Otomatis buka sidebar keranjang sebagai penanda sukses
             if (sidebar) sidebar.classList.add("active");
+
+            // (Bagian Toast notifikasi hijau sudah dihapus)
+
           } else {
-            alert(res.message || "Gagal menambahkan ke keranjang");
+            // === GAGAL / DUPLIKAT: TAMPILKAN POPUP PERINGATAN ===
+            Swal.fire({
+                icon: 'warning',
+                title: 'Oops...',
+                text: res.message || "Gagal menambahkan ke keranjang",
+                confirmButtonColor: '#0b63d6',
+                confirmButtonText: 'Oke, Mengerti'
+            });
           }
         })
         .catch((err) => {
           console.error(err);
-          alert("Terjadi kesalahan jaringan.");
+          Swal.fire({
+              icon: 'error',
+              title: 'Error Jaringan',
+              text: 'Terjadi kesalahan saat menghubungi server.',
+              confirmButtonColor: '#0b63d6'
+          });
         });
     });
   });
@@ -126,11 +144,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // --- 3. HAPUS ITEM ---
-  if (keranjangList) {
+if (keranjangList) {
     keranjangList.addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("remove-item-btn")) {
         const idx = e.target.dataset.index;
-        if (!confirm("Hapus item dari keranjang?")) return;
+        
+        // KODE LAMA YANG DIHAPUS:
+        // if (!confirm("Hapus item dari keranjang?")) return;
 
         const data = new URLSearchParams();
         data.append("action", "remove_from_cart");
@@ -144,9 +164,12 @@ document.addEventListener("DOMContentLoaded", function () {
           .then((r) => r.json())
           .then((res) => {
             if (res.status === "ok") {
+              // Hapus elemen HTML dari sidebar secara langsung untuk efek instan
               const el = e.target.closest(".keranjang-item");
               if (el) el.remove();
+              
               if (cartCount) cartCount.textContent = res.count ?? 0;
+              
               if ((res.count ?? 0) <= 0) {
                 keranjangList.innerHTML = '<p class="text-slate-400">Belum ada jadwal di keranjang.</p>';
                 if (checkoutBtn) checkoutBtn.disabled = true;
@@ -154,6 +177,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 reindexRemoveButtons();
               }
             } else {
+              // Tetap tampilkan alert jika terjadi error dari server
               alert(res.message || "Gagal menghapus item");
             }
           })
@@ -165,14 +189,12 @@ document.addEventListener("DOMContentLoaded", function () {
   // --- 4. TOMBOL CHECKOUT (MODIFIED) ---
   if (checkoutBtn) {
     checkoutBtn.addEventListener("click", () => {
-      
-      // === PERUBAHAN UTAMA DI SINI ===
+
       // Jika belum login, tampilkan MODAL, bukan alert
       if (!isLoggedIn()) {
-        showLoginModal(); // Panggil fungsi modal custom
+        showLoginModal(); 
         return;
       }
-      // ===============================
 
       const originalText = checkoutBtn.innerText;
       checkoutBtn.innerText = "Memproses...";
@@ -184,15 +206,32 @@ document.addEventListener("DOMContentLoaded", function () {
           if (res.status === 'ok') {
               window.location.href = res.redirect;
           } else {
-              alert(res.message);
+              // === UPDATE: SWEETALERT UNTUK SLOT DIAMBIL ORANG LAIN ===
+              Swal.fire({
+                  icon: 'error',
+                  title: 'Gagal Checkout',
+                  text: res.message, // Pesan dari PHP: "Maaf, slot jam ... baru saja diambil orang lain."
+                  confirmButtonColor: '#d33',
+                  confirmButtonText: 'Muat Ulang Jadwal',
+                  allowOutsideClick: false
+              }).then(() => {
+                  // Penting: Reload halaman agar slot yang tadinya hijau berubah jadi merah (booked)
+                  location.reload(); 
+              });
+
               checkoutBtn.innerText = originalText;
               checkoutBtn.disabled = false;
-              location.reload(); 
           }
       })
       .catch(err => {
           console.error(err);
-          alert("Gagal memproses checkout.");
+          // Error Jaringan / Server Error
+          Swal.fire({
+              icon: 'error',
+              title: 'Terjadi Kesalahan',
+              text: 'Gagal memproses checkout. Silakan coba lagi.',
+              confirmButtonColor: '#0b63d6'
+          });
           checkoutBtn.innerText = originalText;
           checkoutBtn.disabled = false;
       });

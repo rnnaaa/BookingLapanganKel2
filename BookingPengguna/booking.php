@@ -224,6 +224,16 @@ $message = '';
 require '../include_user/header.php';
 ?>
 
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rush Badminton Academy</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    </head>
   <main class="max-w-7xl mx-auto px-4 py-8">
     <div class="grid lg:grid-cols-2 gap-8">
 
