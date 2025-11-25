@@ -1,7 +1,8 @@
 <?php
-ob_start(); // aktifkan output buffering
+ob_start(); // aktifkan output buffering agar header() bisa dipanggil setelah output
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
 include('../includes/topbar.php');
@@ -11,76 +12,118 @@ date_default_timezone_set('Asia/Jakarta');
 $successMsg = '';
 $errorMsg = '';
 
+// Helper: sanitize input
+function input_trim($s) {
+  return trim((string)$s);
+}
+
 // === PROSES SIMPAN ADMIN BARU ===
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $nama       = trim($_POST['nama']);
-  $email      = trim($_POST['email']);
-  $username   = trim($_POST['username']);
-  $password   = $_POST['password'];
-  $confirmPwd = $_POST['confirm_password'];
-  $no_hp      = trim($_POST['no_hp']);
-  $role       = 'admin';
-  $status     = 'aktif';
-  $fotoProfil = null;
+  try {
+    $nama       = input_trim($_POST['nama'] ?? '');
+    $email      = input_trim($_POST['email'] ?? '');
+    $username   = input_trim($_POST['username'] ?? '');
+    $password   = $_POST['password'] ?? '';
+    $confirmPwd = $_POST['confirm_password'] ?? '';
+    $no_hp      = input_trim($_POST['no_hp'] ?? '');
+    $role       = 'admin';
+    $status     = 'aktif';
+    $fotoProfil = null;
 
-  // Validasi dasar
-  if (empty($nama) || empty($email) || empty($username) || empty($password)) {
-    $errorMsg = "Semua field wajib diisi!";
-  } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $errorMsg = "Format email tidak valid!";
-  } elseif ($password !== $confirmPwd) {
-    $errorMsg = "Konfirmasi password tidak sesuai!";
-  } else {
+    // Validasi dasar
+    if (empty($nama) || empty($email) || empty($username) || empty($password)) {
+      throw new Exception("Semua field wajib diisi!");
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      throw new Exception("Format email tidak valid!");
+    }
+    if ($password !== $confirmPwd) {
+      throw new Exception("Konfirmasi password tidak sesuai!");
+    }
+
     // Cek email unik
     $check = $conn->prepare("SELECT id_user FROM users WHERE email = ?");
+    if (!$check) throw new Exception("Prepare failed: " . $conn->error);
     $check->bind_param('s', $email);
-    $check->execute();
+    if (!$check->execute()) throw new Exception("Execute check failed: " . $check->error);
     $check->store_result();
-
     if ($check->num_rows > 0) {
-      $errorMsg = "Email sudah digunakan oleh pengguna lain!";
-    } else {
-      // === Upload Foto Profil ===
-      if (!empty($_FILES['foto_profil']['name'])) {
-        $uploadDir = "../uploads/users/";
-        if (!file_exists($uploadDir)) {
-          mkdir($uploadDir, 0777, true);
-        }
-
-        $fileName = time() . '_' . basename($_FILES["foto_profil"]["name"]);
-        $targetFile = $uploadDir . $fileName;
-        $fileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
-
-        $allowed = ['jpg', 'jpeg', 'png', 'gif'];
-        if (!in_array($fileType, $allowed)) {
-          $errorMsg = "Format foto harus JPG, JPEG, PNG, atau GIF!";
-        } elseif ($_FILES['foto_profil']['size'] > 2 * 1024 * 1024) {
-          $errorMsg = "Ukuran foto maksimal 2MB!";
-        } elseif (move_uploaded_file($_FILES["foto_profil"]["tmp_name"], $targetFile)) {
-          $fotoProfil = $fileName;
-        } else {
-          $errorMsg = "Gagal mengunggah foto profil!";
-        }
-      }
-
-      // Jika tidak ada error upload
-      if (!$errorMsg) {
-        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-
-        $stmt = $conn->prepare("
-          INSERT INTO users (nama, username, email, password, no_hp, role, status, foto_profil, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        ");
-        $stmt->bind_param('ssssssss', $nama, $username, $email, $hashedPassword, $no_hp, $role, $status, $fotoProfil);
-
-        if ($stmt->execute()) {
-          $successMsg = "Admin baru berhasil ditambahkan!";
-        } else {
-          $errorMsg = "Gagal menambahkan admin: " . $conn->error;
-        }
-      }
+      $check->close();
+      throw new Exception("Email sudah digunakan oleh pengguna lain!");
     }
     $check->close();
+
+    // === Upload Foto Profil (optional) ===
+    if (!empty($_FILES['foto_profil']['name'])) {
+      $uploadDir = __DIR__ . "/../uploads/users/";
+      if (!file_exists($uploadDir)) {
+        if (!mkdir($uploadDir, 0777, true)) {
+          throw new Exception("Gagal membuat direktori upload.");
+        }
+      }
+
+      $originalName = basename($_FILES["foto_profil"]["name"]);
+      $fileExt = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+      $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+      if (!in_array($fileExt, $allowed)) {
+        throw new Exception("Format foto harus JPG, JPEG, PNG, atau GIF!");
+      }
+      if ($_FILES['foto_profil']['size'] > 2 * 1024 * 1024) {
+        throw new Exception("Ukuran foto maksimal 2MB!");
+      }
+
+      // gunakan unique filename
+      $fileName = time() . '_' . bin2hex(random_bytes(6)) . '.' . $fileExt;
+      $targetFile = $uploadDir . $fileName;
+
+      if (!move_uploaded_file($_FILES["foto_profil"]["tmp_name"], $targetFile)) {
+        throw new Exception("Gagal mengunggah foto profil!");
+      }
+
+      // simpan nama file relatif (agar bisa dipakai di web)
+      $fotoProfil = $fileName;
+    }
+
+    // Hash password
+    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+    // === INSERT ===
+    $stmt = $conn->prepare("
+  INSERT INTO users 
+  (nama, username, email, password, no_hp, role, status, foto_profil, is_verified, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+");
+if (!$stmt) throw new Exception("Prepare failed: " . $conn->error);
+
+$fotoBind = $fotoProfil ?? null;
+
+$stmt->bind_param('ssssssss', 
+    $nama, 
+    $username, 
+    $email, 
+    $hashedPassword, 
+    $no_hp, 
+    $role, 
+    $status, 
+    $fotoBind
+);
+    if (!$stmt->execute()) {
+      // cek apakah error karena constraint (mis. last_login not null)
+      $err = $stmt->error;
+      $stmt->close();
+      throw new Exception("Gagal menambahkan admin: " . $err);
+    }
+
+    $stmt->close();
+
+    // sukses -> redirect ke admin.php supaya spinner tidak macet
+    // gunakan header redirect (pastikan ob_start aktif)
+    header('Location: admin.php?added=1');
+    exit;
+
+  } catch (Exception $e) {
+    $errorMsg = $e->getMessage();
+    // Pastikan overlay loading tidak macet: overlay default adalah d-none, jadi halaman error akan render normal.
   }
 }
 ?>
@@ -111,41 +154,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           </div>
 
-          <?php if ($successMsg): ?>
-            <div class="alert alert-success alert-dismissible fade show">
-              <i class="fas fa-check-circle me-2"></i> <?= $successMsg ?>
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            <script>
-              setTimeout(() => { window.location.href = 'admin.php'; }, 1500);
-            </script>
-          <?php elseif ($errorMsg): ?>
+          <?php if (!empty($errorMsg)): ?>
             <div class="alert alert-danger alert-dismissible fade show">
-              <i class="fas fa-exclamation-circle me-2"></i> <?= $errorMsg ?>
+              <i class="fas fa-exclamation-circle me-2"></i> <?= htmlspecialchars($errorMsg) ?>
               <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
           <?php endif; ?>
 
-          <form method="POST" enctype="multipart/form-data" id="formAdmin">
+          <form method="POST" enctype="multipart/form-data" id="formAdmin" novalidate>
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label">Nama Lengkap</label>
-                <input type="text" name="nama" class="form-control" required>
+                <input type="text" name="nama" class="form-control" required value="<?= isset($_POST['nama']) ? htmlspecialchars($_POST['nama']) : '' ?>">
               </div>
 
               <div class="col-md-6 mb-3">
                 <label class="form-label">Username</label>
-                <input type="text" name="username" class="form-control" required>
+                <input type="text" name="username" class="form-control" required value="<?= isset($_POST['username']) ? htmlspecialchars($_POST['username']) : '' ?>">
               </div>
 
               <div class="col-md-6 mb-3">
                 <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" required>
+                <input type="email" name="email" class="form-control" required value="<?= isset($_POST['email']) ? htmlspecialchars($_POST['email']) : '' ?>">
               </div>
 
               <div class="col-md-6 mb-3">
                 <label class="form-label">No. HP</label>
-                <input type="text" name="no_hp" class="form-control" maxlength="25" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Hanya angka">
+                <input type="text" name="no_hp" class="form-control" maxlength="25" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Hanya angka" value="<?= isset($_POST['no_hp']) ? htmlspecialchars($_POST['no_hp']) : '' ?>">
               </div>
 
               <div class="col-md-6 mb-3 position-relative">
@@ -177,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="mt-4 text-end">
-              <button type="submit" class="btn btn-success px-4">
+              <button type="submit" id="btnSubmit" class="btn btn-success px-4">
                 <i class="fas fa-save me-2"></i> Simpan
               </button>
               <button type="reset" class="btn btn-outline-secondary px-4">Reset</button>
@@ -218,26 +253,19 @@ $(document).ready(function(){
     }
   });
 
-  // === Tampilkan overlay loading saat submit ===
-  $('#formAdmin').on('submit', function(){
+  // === Tampilkan overlay loading saat submit, dan disable tombol ===
+  $('#formAdmin').on('submit', function(e){
+    // simple client-side validation: pastikan password cocok sebelum showing overlay
+    const pwd = $('#password').val();
+    const conf = $('#confirm_password').val();
+    if (pwd !== conf) {
+      e.preventDefault();
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Password dan konfirmasi tidak cocok!' });
+      return;
+    }
+
+    $('#btnSubmit').prop('disabled', true);
     $('#loadingOverlay').removeClass('d-none').addClass('d-flex');
   });
-
-  // === Jika PHP kirim pesan sukses, tampilkan loading lalu redirect ===
-  <?php if (!empty($successMsg)): ?>
-    $('#loadingOverlay').removeClass('d-none').addClass('d-flex');
-    setTimeout(() => {
-      $('#loadingOverlay').html(`
-        <div class="text-center">
-          <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
-          <p class="fw-bold text-dark mt-3">Berhasil disimpan!</p>
-        </div>
-      `);
-      setTimeout(() => {
-        window.location.href = 'admin.php';
-      }, 1000);
-    }, 800);
-  <?php endif; ?>
 });
 </script>
-

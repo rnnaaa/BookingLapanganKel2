@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
-session_start();
+require_once __DIR__ . '/auth_check.php';
 
 // Pastikan ada ID yang dikirim
 if (!isset($_GET['id'])) {

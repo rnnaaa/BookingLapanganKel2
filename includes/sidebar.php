@@ -1,36 +1,58 @@
 <?php
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Fungsi menandai menu aktif & membuka submenu otomatis
+function isActive($pages)
+{
+  global $current_page;
+  return in_array($current_page, $pages) ? 'menu-open' : '';
+}
+function activeLink($page)
+{
+  global $current_page;
+  return $current_page == $page ? 'active' : '';
+}
 ?>
 
-<!-- Main Sidebar Container -->
+<!-- Main Sidebar -->
 <aside class="main-sidebar sidebar-light-primary elevation-4" style="background-color: #1874ad;">
 
-  <!-- Brand Logo -->
-  <a href="dashboard.php" class="brand-link d-flex align-items-center justify-content-center" style="gap: 10px; padding: 15px 0;">
-    <img src="../public/asseth/tampilan_admin/dist/img/AdminLTELogo.png" 
-         alt="Logo" 
-         class="brand-image img-circle elevation-3" 
-         style="width: 40px; height: 40px; opacity: .9;">
-    <span class="brand-text font-weight-bold text-white" style="font-size: 20px;">Badmintoon</span>
+  <!-- LOGO -->
+  <a href="dashboard.php"
+    class="brand-link d-flex align-items-center"
+    style="gap: 12px; padding: 12px 16px; background: #166a9c;">
+
+    <img src="../public/asseth/tampilan_admin/dist/img/AdminLTELogo.png"
+      alt="Logo"
+      class="brand-image img-circle elevation-3"
+      style="width: 40px; height: 40px; object-fit: cover; opacity: .95;">
+
+    <span class="brand-text font-weight-bold text-white"
+      style="font-size: 20px; margin-top: 2px;">
+      Badmintoon
+    </span>
   </a>
 
-  <!-- Sidebar -->
+
   <div class="sidebar">
 
-    <!-- User Panel -->
+    <!-- USER PANEL -->
     <div class="user-panel mt-3 pb-3 mb-3 d-flex align-items-center">
-      <div class="image">
-        <img src="../public/asseth/tampilan_admin/dist/img/user2-160x160.jpg" 
-             class="img-circle elevation-2" 
-             alt="User Image" 
-             style="width: 40px; height: 40px;">
-      </div>
-      <div class="info">
-        <a href="#" class="d-block text-white" style="font-weight: 500;">Administrator</a>
+      <div class="info text-truncate">
+        <a href="#" class="d-block text-white" style="font-weight: 500;">
+          <?php
+          // Ambil nama dari session yang sudah diverifikasi
+          if (isset($_SESSION['nama'])) {
+            echo htmlspecialchars($_SESSION['nama']);
+          } else {
+            echo 'Administrator'; // Fallback jika session tidak terdeteksi
+          }
+          ?>
+        </a>
       </div>
     </div>
 
-    <!-- Search (aktif) -->
+    <!-- PENCARIAN -->
     <div class="form-inline mb-2">
       <div class="input-group" id="sidebar-search-container">
         <input id="sidebar-search" class="form-control form-control-sidebar" type="search" placeholder="Cari menu..." aria-label="Search">
@@ -42,88 +64,307 @@ $current_page = basename($_SERVER['PHP_SELF']);
       </div>
     </div>
 
-    <!-- Sidebar Menu -->
+    <!-- MENU -->
     <nav class="mt-2">
-      <ul id="sidebar-menu" class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+      <ul id="sidebar-menu" class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
 
         <!-- DASHBOARD -->
         <li class="nav-item">
-          <a href="dashboard.php" class="nav-link <?= $current_page=='dashboard.php'?'active':'' ?>">
+          <a href="dashboard.php" class="nav-link <?= activeLink('dashboard.php') ?>">
             <i class="nav-icon fas fa-tachometer-alt"></i>
             <p>Dashboard</p>
           </a>
         </li>
 
         <!-- LAPANGAN & JADWAL -->
-        <li class="nav-header text-light mt-2">LAPANGAN & JADWAL</li>
-        <li class="nav-item"><a href="lapangan.php" class="nav-link <?= $current_page=='lapangan.php'?'active':'' ?>"><i class="nav-icon fas fa-futbol"></i><p>Data Lapangan</p></a></li>
-        <li class="nav-item"><a href="jadwal_waktu.php" class="nav-link <?= $current_page=='jadwal_waktu.php'?'active':'' ?>"><i class="nav-icon fas fa-clock"></i><p>Jadwal Waktu</p></a></li>
-        <li class="nav-item"><a href="jadwal_harian.php" class="nav-link <?= $current_page=='jadwal_harian.php'?'active':'' ?>"><i class="nav-icon fas fa-calendar-day"></i><p>Jadwal Harian</p></a></li>
-        <li class="nav-item"><a href="jadwal_view.php" class="nav-link <?= $current_page=='jadwal_view.php'?'active':'' ?>"><i class="fas fa-calendar-alt nav-icon"></i><p>Jadwal View</p></a></li>
-        <li class="nav-item"><a href="jadwal_singkronisasi.php" class="nav-link <?= $current_page=='jadwal_singkronisasi.php'?'active':'' ?>"><i class="fas fa-sync-alt nav-icon"></i><p>Singkronisasi</p></a></li>
-        <li class="nav-item"><a href="jam_operasional.php" class="nav-link <?= $current_page=='jam_operasional.php'?'active':'' ?>"><i class="nav-icon fas fa-clock"></i><p>Jam Operasional</p></a></li>
+        <li class="nav-item has-treeview <?= isActive(['lapangan.php', 'jadwal_waktu.php', 'jadwal_harian.php', 'jadwal_view.php', 'jadwal_singkronisasi.php', 'jam_operasional.php']) ?>">
+          <a href="#" class="nav-link">
+            <i class="nav-icon fas fa-futbol"></i>
+            <p>Lapangan & Jadwal <i class="right fas fa-angle-left rotate-icon"></i></p>
+          </a>
+          <ul class="nav nav-treeview ml-3">
+            <li class="nav-item"><a href="lapangan.php" class="nav-link <?= activeLink('lapangan.php') ?>">
+                <p>Data Lapangan</p>
+              </a></li>
+            <li class="nav-item"><a href="jadwal_waktu.php" class="nav-link <?= activeLink('jadwal_waktu.php') ?>">
+                <p>Jadwal Waktu</p>
+              </a></li>
+            <li class="nav-item"><a href="jadwal_harian.php" class="nav-link <?= activeLink('jadwal_harian.php') ?>">
+                <p>Jadwal Harian</p>
+              </a></li>
+            <li class="nav-item"><a href="jadwal_view.php" class="nav-link <?= activeLink('jadwal_view.php') ?>">
+                <p>Jadwal View</p>
+              </a></li>
+            <li class="nav-item"><a href="jadwal_singkronisasi.php" class="nav-link <?= activeLink('jadwal_singkronisasi.php') ?>">
+                <p>Sinkronisasi</p>
+              </a></li>
+            <li class="nav-item"><a href="jam_operasional.php" class="nav-link <?= activeLink('jam_operasional.php') ?>">
+                <p>Jam Operasional</p>
+              </a></li>
+          </ul>
+        </li>
 
-        <!-- BOOKING & PEMBAYARAN -->
-        <li class="nav-header text-light mt-2">BOOKING & PEMBAYARAN</li>
-        <li class="nav-item"><a href="booking.php" class="nav-link <?= $current_page=='booking.php'?'active':'' ?>"><i class="nav-icon fas fa-calendar-check"></i><p>Data Booking</p></a></li>
-        <li class="nav-item"><a href="pembayaran.php" class="nav-link <?= $current_page=='pembayaran.php'?'active':'' ?>"><i class="nav-icon fas fa-credit-card"></i><p>Pembayaran</p></a></li>
+        <!-- BOOKING -->
+        <li class="nav-item has-treeview <?= isActive(['booking.php', 'pembayaran.php']) ?>">
+          <a href="#" class="nav-link">
+            <i class="nav-icon fas fa-calendar-check"></i>
+            <p>Booking & Pembayaran <i class="right fas fa-angle-left rotate-icon"></i></p>
+          </a>
+          <ul class="nav nav-treeview ml-3">
+            <li class="nav-item"><a href="booking.php" class="nav-link <?= activeLink('booking.php') ?>">
+                <p>Data Booking</p>
+              </a></li>
+            <li class="nav-item"><a href="pembayaran.php" class="nav-link <?= activeLink('pembayaran.php') ?>">
+                <p>Pembayaran</p>
+              </a></li>
+          </ul>
+        </li>
 
         <!-- MEMBER -->
-        <li class="nav-header text-light mt-2">MEMBER & JADWAL</li>
-        <li class="nav-item"><a href="member.php" class="nav-link <?= $current_page=='member.php'?'active':'' ?>"><i class="nav-icon fas fa-id-card"></i><p>Data Member</p></a></li>
-        <li class="nav-item"><a href="member_jadwal.php" class="nav-link <?= $current_page=='member_jadwal.php'?'active':'' ?>"><i class="nav-icon fas fa-calendar-week"></i><p>Jadwal Member</p></a></li>
+        <li class="nav-item has-treeview <?= isActive(['member.php', 'member_jadwal.php']) ?>">
+          <a href="#" class="nav-link">
+            <i class="nav-icon fas fa-id-card"></i>
+            <p>Member <i class="right fas fa-angle-left rotate-icon"></i></p>
+          </a>
+          <ul class="nav nav-treeview ml-3">
+            <li class="nav-item"><a href="member.php" class="nav-link <?= activeLink('member.php') ?>">
+                <p>Data Member</p>
+              </a></li>
+            <li class="nav-item"><a href="member_jadwal.php" class="nav-link <?= activeLink('member_jadwal.php') ?>">
+                <p>Jadwal Member</p>
+              </a></li>
+          </ul>
+        </li>
 
         <!-- KEUANGAN -->
-        <li class="nav-header text-light mt-2">KEUANGAN</li>
-        <li class="nav-item"><a href="keuangan.php" class="nav-link <?= $current_page=='keuangan.php'?'active':'' ?>"><i class="nav-icon fas fa-coins"></i><p>Rekap Keuangan</p></a></li>
-        <li class="nav-item"><a href="pengeluaran.php" class="nav-link <?= $current_page=='pengeluaran.php'?'active':'' ?>"><i class="nav-icon fas fa-receipt"></i><p>Data Pengeluaran</p></a></li>
+        <li class="nav-item has-treeview <?= isActive(['keuangan.php', 'pengeluaran.php']) ?>">
+          <a href="#" class="nav-link">
+            <i class="nav-icon fas fa-coins"></i>
+            <p>Keuangan <i class="right fas fa-angle-left rotate-icon"></i></p>
+          </a>
+          <ul class="nav nav-treeview ml-3">
+            <li class="nav-item"><a href="keuangan.php" class="nav-link <?= activeLink('keuangan.php') ?>">
+                <p>Rekap Keuangan</p>
+              </a></li>
+            <li class="nav-item"><a href="pengeluaran.php" class="nav-link <?= activeLink('pengeluaran.php') ?>">
+                <p>Data Pengeluaran</p>
+              </a></li>
+          </ul>
+        </li>
 
-        <!-- USERS -->
-        <li class="nav-header text-light mt-2">PENGGUNA SISTEM</li>
-        <li class="nav-item"><a href="users.php" class="nav-link <?= $current_page=='users.php'?'active':'' ?>"><i class="nav-icon fas fa-users"></i><p>Data Pengguna</p></a></li>
-        <li class="nav-item"><a href="admin.php" class="nav-link <?= $current_page=='admin.php'?'active':'' ?>"><i class="nav-icon fas fa-users"></i><p>Data Pengguna Admin</p></a></li>
+        <!-- USER -->
+        <li class="nav-item has-treeview <?= isActive(['users.php', 'admin.php']) ?>">
+          <a href="#" class="nav-link">
+            <i class="nav-icon fas fa-users"></i>
+            <p>Pengguna Sistem <i class="right fas fa-angle-left rotate-icon"></i></p>
+          </a>
+          <ul class="nav nav-treeview ml-3">
+            <li class="nav-item"><a href="users.php" class="nav-link <?= activeLink('users.php') ?>">
+                <p>Data Pengguna</p>
+              </a></li>
+            <li class="nav-item"><a href="admin.php" class="nav-link <?= activeLink('admin.php') ?>">
+                <p>Data Admin</p>
+              </a></li>
+          </ul>
+        </li>
 
         <!-- LAPORAN -->
-        <li class="nav-header text-light mt-2">LAPORAN</li>
-        <li class="nav-item"><a href="laporan_booking.php" class="nav-link <?= $current_page=='laporan_booking.php'?'active':'' ?>"><i class="nav-icon fas fa-file-alt"></i><p>Laporan Booking</p></a></li>
-        <li class="nav-item"><a href="laporan_keuangan.php" class="nav-link <?= $current_page=='laporan_keuangan.php'?'active':'' ?>"><i class="nav-icon fas fa-chart-line"></i><p>Laporan Keuangan</p></a></li>
+        <li class="nav-item has-treeview <?= isActive(['laporan_booking.php', 'laporan_keuangan.php']) ?>">
+          <a href="#" class="nav-link">
+            <i class="nav-icon fas fa-file-alt"></i>
+            <p>Laporan <i class="right fas fa-angle-left rotate-icon"></i></p>
+          </a>
+          <ul class="nav nav-treeview ml-3">
+            <li class="nav-item"><a href="laporan_booking.php" class="nav-link <?= activeLink('laporan_booking.php') ?>">
+                <p>Laporan Booking</p>
+              </a></li>
+            <li class="nav-item"><a href="laporan_keuangan.php" class="nav-link <?= activeLink('laporan_keuangan.php') ?>">
+                <p>Laporan Keuangan</p>
+              </a></li>
+          </ul>
+        </li>
 
         <!-- PENGATURAN -->
-        <li class="nav-header text-light mt-2">PENGATURAN</li>
-        <li class="nav-item"><a href="settings.php" class="nav-link <?= $current_page=='settings.php'?'active':'' ?>"><i class="nav-icon fas fa-cog"></i><p>Pengaturan Sistem</p></a></li>
+        <li class="nav-item">
+          <a href="settings.php" class="nav-link <?= activeLink('settings.php') ?>">
+            <i class="nav-icon fas fa-cog"></i>
+            <p>Pengaturan Sistem</p>
+          </a>
+        </li>
 
         <!-- LOGOUT -->
-        <li class="nav-item mt-2">
+        <li class="nav-item mt-3">
           <a href="logout.php" class="nav-link text-danger">
             <i class="nav-icon fas fa-sign-out-alt"></i>
             <p>Logout</p>
           </a>
         </li>
+
       </ul>
     </nav>
   </div>
 </aside>
 
-<!-- === Script untuk aktifkan pencarian menu === -->
+<!-- ============================================================== -->
+<!-- ===============     STYLE FINAL LENGKAP    ==================== -->
+<!-- ============================================================== -->
+<style>
+  /* Rotasi panah */
+  .nav-item>a .rotate-icon {
+    transition: transform 0.3s ease;
+  }
+
+  .nav-item.menu-open>a .rotate-icon {
+    transform: rotate(-90deg);
+  }
+
+  /* Garis vertikal utama */
+  .nav-treeview {
+    margin-left: 15px;
+    padding-left: 15px;
+    position: relative;
+  }
+
+  .nav-treeview::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 2px;
+    width: 2px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.25);
+    opacity: 0;
+    transform: scaleY(0);
+    transition: all 0.35s ease;
+  }
+
+  .nav-item.menu-open>.nav-treeview::before {
+    opacity: 1;
+    transform: scaleY(1);
+    animation: glowingLine 1.5s infinite;
+  }
+
+  @keyframes glowingLine {
+    0% {
+      box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+    }
+
+    50% {
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+    }
+
+    100% {
+      box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+    }
+  }
+
+  /* Garis cabang submenu */
+  .nav-treeview .nav-item {
+    position: relative;
+    padding-left: 20px;
+  }
+
+  .nav-treeview .nav-item::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -15px;
+    width: 15px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  .nav-treeview .nav-item::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -15px;
+    width: 2px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .nav-treeview .nav-item:last-child::after {
+    height: 50%;
+  }
+
+  .nav-item.menu-open>.nav-treeview .nav-item::before,
+  .nav-item.menu-open>.nav-treeview .nav-item::after {
+    animation: glowingBranch 1.6s infinite;
+  }
+
+  @keyframes glowingBranch {
+    0% {
+      opacity: 0.2;
+    }
+
+    50% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0.2;
+    }
+  }
+
+  /* Teks submenu */
+  .nav-treeview .nav-link p {
+    color: #dcdcdc;
+    font-size: 14px;
+  }
+
+  .nav-treeview .nav-link:hover p {
+    color: #ffffff;
+    text-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  }
+
+  /* Aktif */
+  .nav-treeview .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+  }
+</style>
+
+<!-- ============================================================== -->
+<!-- ===============     SCRIPT FINAL LENGKAP    =================== -->
+<!-- ============================================================== -->
 <script>
-  document.getElementById('btn-sidebar-search').addEventListener('click', function() {
-    const query = document.getElementById('sidebar-search').value.toLowerCase();
-    const menuItems = document.querySelectorAll('#sidebar-menu li.nav-item');
+  document.addEventListener('DOMContentLoaded', function() {
 
-    menuItems.forEach(item => {
-      const text = item.textContent.toLowerCase();
-      item.style.display = text.includes(query) ? '' : 'none';
+    /* Pencarian menu */
+    const searchInput = document.getElementById('sidebar-search');
+    const searchButton = document.getElementById('btn-sidebar-search');
+    const menuItems = document.querySelectorAll('#sidebar-menu > li.nav-item');
+
+    function filterMenu(query) {
+      query = query.toLowerCase();
+      menuItems.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(query) ? '' : 'none';
+      });
+    }
+
+    searchInput.addEventListener('keyup', () => filterMenu(searchInput.value));
+    searchButton.addEventListener('click', () => filterMenu(searchInput.value));
+
+    /* Rotasi panah otomatis */
+    const allMenus = document.querySelectorAll('.nav-item.has-treeview');
+    allMenus.forEach(menu => {
+      const link = menu.querySelector('a');
+      const arrow = link.querySelector('.rotate-icon');
+      if (!arrow) return;
+
+      if (menu.classList.contains('menu-open')) {
+        arrow.style.transform = 'rotate(-90deg)';
+      }
+
+      link.addEventListener('click', function() {
+        setTimeout(() => {
+          arrow.style.transform =
+            menu.classList.contains('menu-open') ? 'rotate(-90deg)' : 'rotate(0deg)';
+        }, 150);
+      });
     });
-  });
 
-  // Bisa langsung cari sambil mengetik
-  document.getElementById('sidebar-search').addEventListener('keyup', function() {
-    const query = this.value.toLowerCase();
-    const menuItems = document.querySelectorAll('#sidebar-menu li.nav-item');
-
-    menuItems.forEach(item => {
-      const text = item.textContent.toLowerCase();
-      item.style.display = text.includes(query) ? '' : 'none';
-    });
   });
 </script>

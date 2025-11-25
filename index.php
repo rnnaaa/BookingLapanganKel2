@@ -1,4 +1,24 @@
 <?php include __DIR__ . '/include_user/header.php'; ?>
+<style>
+/* Tambahkan font-family */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6,
+.font-poppins {
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Style tambahan untuk konsistensi */
+.btn-primary, .btn-outline, .btn-accent {
+    font-family: 'Inter', sans-serif;
+}
+
+.card-lapangan, .modal-panel {
+    font-family: 'Inter', sans-serif;
+}
+</style>
 
 <main>
     <section class="relative overflow-hidden bg-gradient-to-r from-primary to-primaryDark text-white">

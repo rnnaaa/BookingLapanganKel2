@@ -1,5 +1,4 @@
 <?php
-ob_start();
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
 include('../includes/topbar.php');
@@ -43,7 +42,6 @@ date_default_timezone_set('Asia/Jakarta');
               <?php
               $no = 1;
 
-              // Query hanya untuk role admin
               $sql = "
                 SELECT 
                   id_user,
@@ -60,12 +58,12 @@ date_default_timezone_set('Asia/Jakarta');
               $result = mysqli_query($conn, $sql);
 
               if (!$result) {
-                echo "<tr><td colspan='7' class='text-center text-danger'>Query Error: " . mysqli_error($conn) . "</td></tr>";
+                echo "<tr><td colspan='7' class='text-center text-danger'>Query Error: " . htmlspecialchars(mysqli_error($conn)) . "</td></tr>";
               } else {
                 while ($row = mysqli_fetch_assoc($result)):
                   $roleBadge = '<span class="badge bg-danger">Admin</span>';
               ?>
-              <tr id="user-<?= $row['id_user'] ?>">
+              <tr id="user-<?= (int)$row['id_user'] ?>">
                 <td class="text-center"><?= $no++ ?></td>
                 <td><?= htmlspecialchars($row['nama']) ?></td>
                 <td><?= htmlspecialchars($row['email']) ?></td>
@@ -73,8 +71,8 @@ date_default_timezone_set('Asia/Jakarta');
                 <td class="text-center"><?= $roleBadge ?></td>
                 <td class="text-center"><?= date('d-m-Y', strtotime($row['created_at'])) ?></td>
                 <td class="text-center">
-                  <a href="users_edit.php?id=<?= $row['id_user'] ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
-                  <button class="btn btn-sm btn-danger btn-delete" data-id="<?= $row['id_user'] ?>" title="Hapus"><i class="fas fa-trash"></i></button>
+                  <a href="admin_edit.php?id=<?= (int)$row['id_user'] ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
+                  <button class="btn btn-sm btn-danger btn-delete" data-id="<?= (int)$row['id_user'] ?>" title="Hapus"><i class="fas fa-trash"></i></button>
                 </td>
               </tr>
               <?php endwhile; } ?>
@@ -102,6 +100,7 @@ $(function(){
       cancelButtonText: 'Batal'
     }).then((result) => {
       if(result.isConfirmed){
+        // menuju file penghapus
         window.location.href = 'users_hapus.php?id=' + id;
       }
     });

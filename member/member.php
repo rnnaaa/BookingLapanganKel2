@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+session_start();
 
 /*
  member.php (final revised)
@@ -11,7 +12,7 @@ declare(strict_types=1);
 
 // ---------------- DB CONFIG - EDIT INI SESUAI SERVERMU ----------------
 $DB_HOST = '127.0.0.1';
-$DB_NAME = 'bookinglapanganb2'; // ganti sesuai db mu
+$DB_NAME = 'bookinglapanganb2';
 $DB_USER = 'root';
 $DB_PASS = '';
 $DB_CHAR = 'utf8mb4';
@@ -290,6 +291,196 @@ $service = new MemberService($pdo, __DIR__ . '/uploads');
 /* ---------- Simple router for AJAX endpoints ---------- */
 $action = $_REQUEST['action'] ?? null;
 
+// Endpoint untuk ambil data user dari session
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_user_data') {
+    header('Content-Type: application/json');
+    
+    $userData = [
+        'name' => '',
+        'email' => '',
+        'id' => null,
+    ];
+    
+    // Cek apakah user sudah login
+    if (!isset($_SESSION['id_user'])) {
+        echo json_encode(['success' => true, 'data' => $userData]); // User belum login
+        exit;
+    }
+    
+    $userData['id'] = $_SESSION['id_user'];
+    
+    // Ambil nama dari session (sudah disimpan saat login)
+    if (isset($_SESSION['nama'])) {
+        $userData['name'] = $_SESSION['nama'];
+    }
+    
+    // Ambil email dari database (tidak disimpan di session saat login)
+    try {
+        $stmt = $pdo->prepare("SELECT email FROM users WHERE id_user = :id LIMIT 1");
+        $stmt->execute([':id' => $_SESSION['id_user']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($user && isset($user['email'])) {
+            $userData['email'] = $user['email'];
+        }
+    } catch (Exception $e) {
+        error_log("Error fetching email: " . $e->getMessage());
+    }
+    
+    echo json_encode(['success' => true, 'data' => $userData]);
+    exit;
+}
+
+// Endpoint untuk initialize booking timer (set start time di session)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'init_booking_timer') {
+    header('Content-Type: application/json');
+    
+    if (!isset($_SESSION['id_user'])) {
+        echo json_encode(['success' => false, 'errors' => ['User belum login']]);
+        exit;
+    }
+    
+    // Set booking start time di session jika belum ada
+    if (!isset($_SESSION['booking_start_time'])) {
+        $_SESSION['booking_start_time'] = time();
+    }
+    
+    $startTime = $_SESSION['booking_start_time'];
+    $currentTime = time();
+    $secondsElapsed = $currentTime - $startTime;
+    $secondsRemaining = max(0, 1800 - $secondsElapsed); // 1800 detik = 30 menit
+    
+    echo json_encode([
+        'success' => true,
+        'start_time' => $startTime,
+        'current_time' => $currentTime,
+        'seconds_elapsed' => $secondsElapsed,
+        'seconds_remaining' => $secondsRemaining,
+        'is_expired' => $secondsRemaining <= 0
+    ]);
+    exit;
+}
+
+// Endpoint untuk check booking timer status
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'check_booking_timer') {
+    header('Content-Type: application/json');
+    
+    if (!isset($_SESSION['id_user'])) {
+        echo json_encode(['success' => false, 'errors' => ['User belum login']]);
+        exit;
+    }
+    
+    // Check booking start time
+    if (!isset($_SESSION['booking_start_time'])) {
+        echo json_encode(['success' => true, 'expired' => false, 'seconds_remaining' => 600]);
+        exit;
+    }
+    
+    $startTime = $_SESSION['booking_start_time'];
+    $currentTime = time();
+    $secondsElapsed = $currentTime - $startTime;
+    $secondsRemaining = max(0, 1800 - $secondsElapsed); // 1800 detik = 30 menit
+    $isExpired = $secondsRemaining <= 0;
+    
+    if ($isExpired) {
+        // Clear session booking timer
+        unset($_SESSION['booking_start_time']);
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'expired' => $isExpired,
+        'seconds_remaining' => $secondsRemaining,
+        'seconds_elapsed' => $secondsElapsed
+    ]);
+    exit;
+}
+
+// Endpoint untuk clear/reset booking timer
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'clear_booking_timer') {
+    header('Content-Type: application/json');
+    
+    if (!isset($_SESSION['id_user'])) {
+        echo json_encode(['success' => false, 'errors' => ['User belum login']]);
+        exit;
+    }
+    
+    // Clear booking timer
+    unset($_SESSION['booking_start_time']);
+    
+    echo json_encode(['success' => true, 'message' => 'Booking timer cleared']);
+    exit;
+}
+
+// Endpoint untuk check booking expiry status
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'check_booking_expiry') {
+    header('Content-Type: application/json');
+    
+    // Ambil member_id dari parameter (atau dari session jika tersedia)
+    $memberId = isset($_GET['member_id']) ? (int)$_GET['member_id'] : null;
+    
+    if (!$memberId) {
+        echo json_encode(['success' => false, 'errors' => ['Member ID diperlukan']]);
+        exit;
+    }
+    
+    // Timeout dalam menit
+    $TIMEOUT_MINUTES = 10;
+    $expiredTime = date('Y-m-d H:i:s', strtotime("-$TIMEOUT_MINUTES minutes"));
+    
+    try {
+        // Query member_jadwal yang masih pending dan belum expired
+        $stmt = $pdo->prepare("SELECT id_member_jadwal, tanggal_booking, jam_mulai, created_at,
+                                  TIMESTAMPDIFF(SECOND, created_at, NOW()) as seconds_elapsed,
+                                  TIMESTAMPDIFF(SECOND, created_at, DATE_ADD(created_at, INTERVAL 10 MINUTE)) as seconds_remaining
+                               FROM member_jadwal
+                               WHERE id_member = :member_id
+                               AND status = 'pending'
+                               LIMIT 1");
+        $stmt->execute([':member_id' => $memberId]);
+        $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$booking) {
+            echo json_encode(['success' => true, 'expired' => false, 'message' => 'Tidak ada booking pending']);
+            exit;
+        }
+        
+        // Check apakah sudah expired
+        $isExpired = $booking['seconds_elapsed'] >= 1800; // 1800 detik = 30 menit
+        
+        if ($isExpired) {
+            // Hapus booking yang expired
+            $deleteStmt = $pdo->prepare("DELETE FROM member_jadwal WHERE id_member_jadwal = :id LIMIT 1");
+            $deleteStmt->execute([':id' => $booking['id_member_jadwal']]);
+            
+            echo json_encode([
+                'success' => true,
+                'expired' => true,
+                'message' => 'Waktu Anda telah habis. Slot booking dirilis kembali.'
+            ]);
+        } else {
+            // Belum expired, return info sisa waktu
+            $secondsRemaining = max(0, 600 - $booking['seconds_elapsed']);
+            $minutesRemaining = intdiv($secondsRemaining, 60);
+            $secsRemaining = $secondsRemaining % 60;
+            
+            echo json_encode([
+                'success' => true,
+                'expired' => false,
+                'seconds_remaining' => $secondsRemaining,
+                'minutes_remaining' => $minutesRemaining,
+                'booking_id' => $booking['id_member_jadwal'],
+                'date' => $booking['tanggal_booking'],
+                'time' => $booking['jam_mulai'],
+                'message' => "Waktu tersisa: $minutesRemaining menit $secsRemaining detik"
+            ]);
+        }
+    } catch (Exception $e) {
+        error_log("Error checking booking expiry: " . $e->getMessage());
+        echo json_encode(['success' => false, 'errors' => ['Gagal mengecek status booking']]);
+    }
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'availability') {
     // GET params: lapangan, ym=YYYY-MM
     $lap = isset($_GET['lapangan']) ? (int)$_GET['lapangan'] : 0;
@@ -335,18 +526,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
         <div class="hero-left">
           <h1 class="title">Member Badminton Premium</h1>
           <p class="subtitle">Prioritas booking, harga spesial, dan jadwal mingguan otomatis.</p>
-
-          <div class="benefit-grid">
-            <div class="benefit-card">🎯 Harga tetap jelas</div>
-            <div class="benefit-card">⚡ Prioritas pemesanan</div>
-            <div class="benefit-card">🔁 1x ubah jadwal/bulan</div>
-            <div class="benefit-card">📅 Jadwal otomatis</div>
-            <div class="benefit-card">💰 Hemat hingga 30%</div>
-            <div class="benefit-card">🎁 Free minuman</div>
-          </div>
+<div class="benefit-grid">
+    <div class="benefit-card">Harga tetap jelas</div>
+    <div class="benefit-card">Prioritas pemesanan</div>
+    <div class="side-by-side-container">
+        <div class="benefit-card">Hemat hingga 30%</div>
+        <div class="benefit-card">1x ubah jadwal/bulan</div>
+    </div>
+</div>
 
           <div class="cta">
-            <button id="openFlowBtn" class="btn primary" type="button">🎯 Gabung Member Sekarang</button>
+            <button id="openFlowBtn" class="btn primary" type="button">Gabung Member Sekarang</button>
           </div>
         </div>
 
@@ -383,17 +573,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
         <div class="price-item">
           <strong>1 Bulan</strong>
           <span><?= rupiah(100000) ?></span>
-          <div style="font-size:0.9rem;color:#64748b;margin-top:8px">⭐ Cocok untuk pemula</div>
+          <div style="font-size:0.9rem;color:#64748b;margin-top:8px"></div>
         </div>
         <div class="price-item">
           <strong>2 Bulan</strong>
           <span><?= rupiah(200000) ?></span>
-          <div style="font-size:0.9rem;color:#64748b;margin-top:8px">💫 Hemat 15% per bulan</div>
+          <div style="font-size:0.9rem;color:#64748b;margin-top:8px"></div>
         </div>
         <div class="price-item">
           <strong>3 Bulan</strong>
           <span><?= rupiah(300000) ?></span>
-          <div style="font-size:0.9rem;color:#64748b;margin-top:8px">🚀 Hemat 30% per bulan</div>
+          <div style="font-size:0.9rem;color:#64748b;margin-top:8px"></div>
         </div>
       </div>
     </section>
@@ -423,28 +613,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
     <div class="popup-overlay"></div>
     <div class="popup-dialog">
       <button id="closeFlow" class="close" type="button">&times;</button>
-      <h2 class="flow-title">🎯 Gabung / Perpanjang Member</h2>
+      <h2 class="flow-title">Gabung / Perpanjang Member</h2>
 
       <form id="memberForm" method="post" enctype="multipart/form-data" action="member.php?action=submit_member">
         <input type="hidden" name="action" value="submit_member">
 
         <!-- SECTION A -->
         <div class="section" id="sectionA">
-          <h3>1. 📝 Data Diri & Paket</h3>
+          <h3>1. Data Diri & Paket</h3>
           <label class="label">Nama lengkap
             <input name="name" id="name" required placeholder="Masukkan nama lengkap Anda">
           </label>
           <label class="label">Email 
-            <div class="muted" style="font-size:13px;margin-bottom:8px;">Ketik bagian sebelum @, otomatis berakhiran @gmail.com</div>
-            <input name="email" id="email" type="text" required placeholder="nama.anda">
+            <div id="emailDisplay" style="padding: 12px; background: #f3f4f6; border-radius: 8px; color: #4b5563; font-size: 14px;">Memuat email...</div>
+            <input name="email" id="email" type="hidden" required>
           </label>
 
           <label class="label">Pilih Paket
             <select name="paket" id="paket" required>
               <option value="">-- Pilih Paket --</option>
-              <option value="1">1 Bulan — <?= rupiah(100000) ?> (⭐ Pemula)</option>
-              <option value="2">2 Bulan — <?= rupiah(200000) ?> (💫 Hemat 15%)</option>
-              <option value="3">3 Bulan — <?= rupiah(300000) ?> (🚀 Hemat 30%)</option>
+              <option value="1">1 Bulan — <?= rupiah(100000) ?></option>
+              <option value="2">2 Bulan — <?= rupiah(200000) ?></option>
+              <option value="3">3 Bulan — <?= rupiah(300000) ?></option>
             </select>
           </label>
 
@@ -465,13 +655,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
           </label>
 
           <div class="form-actions">
-            <button type="button" id="toScheduleBtn" class="btn primary">📅 Lanjut Pilih Jadwal</button>
+            <button type="button" id="toScheduleBtn" class="btn primary">Lanjut Pilih Jadwal</button>
           </div>
         </div>
 
         <!-- SECTION B (per-month) -->
         <div class="section" id="sectionB" style="display:none">
-          <h3>2. 📅 Pilih Jadwal Mingguan</h3>
+          <h3>2. Pilih Jadwal Mingguan</h3>
           <!-- REVISI: Update pesan untuk sistem fleksibel -->
           <div class="warning-text">
             <strong>📢 Sistem Fleksibel:</strong> Untuk setiap bulan, pilih <strong>minimal 2 tanggal</strong> (bebas minggu ke berapa). Minggu ke-5 bersifat opsional.
@@ -483,19 +673,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
 
           <div class="form-actions">
             <button type="button" id="backToA" class="btn outline">⬅️ Kembali</button>
-            <button type="button" id="toPaymentBtn" class="btn primary">💰 Lanjut ke Pembayaran</button>
+            <button type="button" id="toPaymentBtn" class="btn primary">Lanjut ke Pembayaran</button>
           </div>
         </div>
 
         <!-- SECTION C: payment -->
         <div class="section" id="sectionC" style="display:none">
-          <h3>3. 💰 Pembayaran</h3>
+          <h3>3. Pembayaran</h3>
           <label class="label">Metode Pembayaran
             <select name="payment_method" id="payment_method" required>
               <option value="">-- Pilih Metode --</option>
-              <option value="qris">📱 QRIS</option>
-              <option value="bca">🏦 Transfer BCA</option>
-              <option value="mandiri">🏦 Transfer Mandiri</option>
+              <option value="qris">QRIS</option>
+              <option value="bca">Transfer BCA</option>
+              <option value="mandiri">Transfer Mandiri</option>
             </select>
           </label>
 
@@ -525,7 +715,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
 
           <div class="form-actions">
             <button type="button" id="backToB" class="btn outline">⬅️ Kembali</button>
-            <button type="button" id="submitBtn" class="btn primary">✅ Kirim Pendaftaran</button>
+            <button type="button" id="submitBtn" class="btn primary">Kirim Pendaftaran</button>
           </div>
         </div>
 
@@ -538,17 +728,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
     <div class="popup-overlay"></div>
     <div class="popup-dialog">
       <button id="confirmClose" class="close" type="button">&times;</button>
-      <h3>✅ Konfirmasi Data Member</h3>
+      <h3>Konfirmasi Data Member</h3>
       <div id="confirmContent" style="max-height:400px;overflow:auto;margin:16px 0"></div>
       <div class="note muted" style="padding:12px;background:#f8fafc;border-radius:8px;margin:16px 0">
-        <strong>📋 Pastikan semua data sudah benar:</strong><br>
+        <strong>Pastikan semua data sudah benar:</strong><br>
         • Data tidak dapat diubah setelah dikirim<br>
         • Proses verifikasi membutuhkan waktu 1x24 jam<br>
         • Pilih 'Ubah Data' untuk kembali ke form
       </div>
       <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px">
-        <button id="editBtn" class="btn outline" type="button">✏️ Ubah Data</button>
-        <button id="confirmSendBtn" class="btn primary" type="button">🚀 Kirim & Tunggu Verifikasi</button>
+        <button id="editBtn" class="btn outline" type="button">Ubah Data</button>
+        <button id="confirmSendBtn" class="btn primary" type="button">Kirim & Tunggu Verifikasi</button>
       </div>
     </div>
   </div>

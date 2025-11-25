@@ -1,7 +1,7 @@
 <?php
 // Koneksi database dan ambil data
 $host = 'localhost';
-$dbname = 'booking_badmintoon'; 
+$dbname = 'bookinglapanganb2'; 
 $username = 'root';
 $password = '';
 $port = 3306;

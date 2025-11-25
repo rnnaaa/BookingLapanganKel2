@@ -459,26 +459,303 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Real-time email formatting
-  if (emailInput) {
-    emailInput.addEventListener("input", () => {
-      let value = emailInput.value;
-      if (value.includes("@")) return;
-      value = value.replace(/[^a-zA-Z0-9.]/g, "");
-      emailInput.value = value;
-    });
+  // ----- Booking Expiry Timer -----
+  let expiryCheckInterval = null;
+  let bookingMemberId = null;
 
-    emailInput.addEventListener("blur", () => {
-      formatEmail(emailInput);
-    });
-
-    emailInput.addEventListener("focus", () => {
-      let value = emailInput.value;
-      if (value.includes("@gmail.com")) {
-        emailInput.value = value.replace("@gmail.com", "");
+  function displayPaymentTimerInstructions() {
+    // Cari atau buat elemen instruksi timer
+    let timerInstructions = document.getElementById("paymentTimerInstructions");
+    
+    if (!timerInstructions) {
+      timerInstructions = document.createElement("div");
+      timerInstructions.id = "paymentTimerInstructions";
+      
+      // Insert sebelum form payment (cari parent section C atau inject di atas)
+      const sectionC = document.getElementById("sectionC");
+      if (sectionC && sectionC.firstChild) {
+        sectionC.insertBefore(timerInstructions, sectionC.firstChild);
       }
-    });
+    }
+    
+    // Update content dengan instruksi
+    timerInstructions.innerHTML = `
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                  color: white; 
+                  padding: 20px; 
+                  border-radius: 16px; 
+                  margin-bottom: 24px;
+                  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);">
+        
+        <div style="display: flex; align-items: flex-start; gap: 16px;">
+          <!-- Left: Timer Icon & Countdown -->
+          <div style="flex: 0 0 120px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 8px; animation: pulse 2s infinite;">⏱️</div>
+            <div id="paymentCountdownDisplay" style="font-size: 32px; font-weight: 800; font-family: 'Courier New', monospace;">
+              30:00
+            </div>
+            <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">Waktu Tersisa</div>
+          </div>
+          
+          <!-- Right: Instructions -->
+          <div style="flex: 1;">
+            <div style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">⚡ PENTING: Batas Waktu Pembayaran</div>
+            <div style="font-size: 14px; line-height: 1.6; opacity: 0.95;">
+              <div style="margin-bottom: 8px;">
+                ✅ Anda memiliki <strong>30 menit</strong> untuk menyelesaikan pembayaran.
+              </div>
+              <div style="margin-bottom: 8px;">
+                🔄 Slot jadwal yang Anda pilih akan tetap tersimpan selama countdown berjalan.
+              </div>
+              <div style="margin-bottom: 8px;">
+                ⚠️ Jika waktu habis dan Anda belum bayar, slot akan dibuka untuk pengguna lain.
+              </div>
+              <div>
+                💰 Pastikan transfer sudah dikirim dan bukti sudah diupload sebelum waktu habis.
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div style="margin-top: 16px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden;">
+          <div id="paymentProgressBar" style="height: 100%; background: linear-gradient(90deg, #4ade80 0%, #fbbf24 50%, #ef4444 100%); 
+                                            width: 100%; 
+                                            transition: width 1s linear;"></div>
+        </div>
+      </div>
+      
+      <style>
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.1); }
+        }
+      </style>
+    `;
   }
+
+  async function startBookingExpiryTimer(memberId) {
+    console.log("🔴 startBookingExpiryTimer called for member:", memberId);
+    bookingMemberId = memberId;
+    
+    // Initialize timer di server (set session timestamp)
+    try {
+      const initResp = await fetch("member.php?action=init_booking_timer");
+      const initData = await initResp.json();
+      console.log("✅ Timer initialized:", initData);
+    } catch (e) {
+      console.error("❌ Failed to init timer:", e);
+    }
+    
+    // Clear any existing interval
+    if (expiryCheckInterval) {
+      console.log("⚠️ Clearing existing interval");
+      clearInterval(expiryCheckInterval);
+    }
+
+    // Start countdown setiap 1 detik untuk smooth animation
+    expiryCheckInterval = setInterval(async () => {
+      try {
+        const resp = await fetch("member.php?action=check_booking_timer");
+        if (!resp.ok) {
+          console.error("❌ Response not OK:", resp.status);
+          return;
+        }
+
+        const json = await resp.json();
+        console.log("📊 Booking timer check:", json); // Debug log
+        
+        if (!json.success) {
+          console.error("❌ API returned error:", json.errors);
+          return;
+        }
+
+        if (json.expired) {
+          // Booking sudah expired
+          console.log("⏰ BOOKING EXPIRED!");
+          clearInterval(expiryCheckInterval);
+          
+          // Update display ke expired
+          const countdownDisplay = document.getElementById("paymentCountdownDisplay");
+          if (countdownDisplay) {
+            countdownDisplay.textContent = "00:00";
+            countdownDisplay.style.color = "#ff6b6b";
+          }
+          
+          // Wait 1 detik kemudian tampilkan warning
+          setTimeout(() => {
+            showSmallPopup("⏰ Waktu Anda telah habis! Slot booking dirilis kembali.", "warning");
+            
+            // Reset form ke section A
+            setTimeout(() => {
+              sectionA.style.display = "block";
+              sectionB.style.display = "none";
+              sectionC.style.display = "none";
+              monthFlowWrap.innerHTML = "";
+              selectedDates = {};
+              
+              // Remove timer displays
+              let timerDisplay = document.getElementById("bookingExpiryTimer");
+              if (timerDisplay) timerDisplay.remove();
+              let timerInstructions = document.getElementById("paymentTimerInstructions");
+              if (timerInstructions) timerInstructions.remove();
+            }, 2000);
+          }, 500);
+        } else if (json.seconds_remaining !== undefined) {
+          // Update countdown di UI
+          const totalSeconds = json.seconds_remaining;
+          const mins = Math.floor(totalSeconds / 60);
+          const secs = totalSeconds % 60;
+          
+          console.log(`⏱️ Time remaining: ${mins}:${String(secs).padStart(2, '0')}`);
+          
+          // Update countdown display
+          const countdownDisplay = document.getElementById("paymentCountdownDisplay");
+          if (countdownDisplay) {
+            countdownDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            
+            // Change color based on remaining time
+            if (totalSeconds <= 120) {
+              countdownDisplay.style.color = "#ff6b6b"; // Red
+            } else if (totalSeconds <= 300) {
+              countdownDisplay.style.color = "#fbbf24"; // Yellow
+            } else {
+              countdownDisplay.style.color = "#ffffff"; // White
+            }
+          }
+          
+          // Update progress bar
+          const progressBar = document.getElementById("paymentProgressBar");
+          if (progressBar) {
+            const progressPercent = (totalSeconds / 600) * 100;
+            progressBar.style.width = progressPercent + "%";
+          }
+          
+          // Cari dan update fixed timer display (pojok kanan atas)
+          let timerDisplay = document.getElementById("bookingExpiryTimer");
+          if (!timerDisplay) {
+            // Buat timer display jika belum ada
+            console.log("✨ Creating fixed timer display");
+            timerDisplay = document.createElement("div");
+            timerDisplay.id = "bookingExpiryTimer";
+            timerDisplay.style.cssText = `
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 16px 24px;
+              border-radius: 12px;
+              font-weight: 700;
+              z-index: 9999;
+              box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+              text-align: center;
+              min-width: 200px;
+            `;
+            document.body.appendChild(timerDisplay);
+          }
+          
+          // Update teks timer di pojok
+          const warningLevel = totalSeconds <= 120 ? "warning" : "normal";
+          if (warningLevel === "warning") {
+            timerDisplay.style.background = "linear-gradient(135deg, #f97316 0%, #dc2626 100%)";
+          } else if (totalSeconds <= 300) {
+            timerDisplay.style.background = "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)";
+          } else {
+            timerDisplay.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+          }
+          
+          timerDisplay.innerHTML = `
+            <div style="font-size: 12px; opacity: 0.9;">Waktu Pembayaran</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px; font-family: 'Courier New', monospace;">${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}</div>
+            <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">
+              ${warningLevel === "warning" ? "⚠️ SEGERA BAYAR!" : totalSeconds <= 300 ? "⏰ Jangan lupa bayar" : "Lanjutkan ke pembayaran"}
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error("❌ Error checking booking timer:", error);
+      }
+    }, 1000); // Update setiap 1 detik
+    
+    console.log("✅ Timer interval started");
+  }
+
+  // ----- Load User Data Function -----
+  async function loadUserData() {
+    try {
+      const resp = await fetch("member.php?action=get_user_data");
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      const json = await resp.json();
+      console.log("User data received:", json); // Debug log
+
+      if (json && json.success && json.data) {
+        const userData = json.data;
+        console.log("Name:", userData.name, "Email:", userData.email); // Debug log
+
+        // Auto-fill name if exists and field is empty
+        if (userData.name && nameInput && !nameInput.value.trim()) {
+          nameInput.value = userData.name;
+          console.log("Nama filled:", userData.name); // Debug log
+        }
+
+        // Set email ke hidden input dan tampilkan di div
+        if (userData.email && emailInput) {
+          emailInput.value = userData.email;
+          const emailDisplay = document.getElementById("emailDisplay");
+          if (emailDisplay) {
+            emailDisplay.textContent = userData.email;
+            emailDisplay.style.background = "#e0f2fe";
+            emailDisplay.style.color = "#0369a1";
+            emailDisplay.style.fontWeight = "600";
+          }
+          console.log("Email filled:", userData.email); // Debug log
+        } else {
+          // Jika tidak ada email
+          const emailDisplay = document.getElementById("emailDisplay");
+          if (emailDisplay) {
+            emailDisplay.textContent = "(Email tidak ditemukan - silakan hubungi admin)";
+            emailDisplay.style.background = "#fee2e2";
+            emailDisplay.style.color = "#b91c1c";
+          }
+        }
+
+        // Simpan user_id untuk keperluan submit
+        if (userData.id) {
+          bookingMemberId = userData.id; // Set global variable
+          
+          const form = document.getElementById("memberForm");
+          let hiddenUserId = document.querySelector('input[name="id_user"]');
+          if (!hiddenUserId && form) {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "id_user";
+            input.value = userData.id;
+            form.appendChild(input);
+            console.log("ID user saved:", userData.id); // Debug log
+          }
+          
+          // Mulai expiry timer untuk member ini (jika belum berjalan)
+          if (!expiryCheckInterval) {
+            console.log("Starting booking expiry timer for member:", userData.id);
+            startBookingExpiryTimer(userData.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      const emailDisplay = document.getElementById("emailDisplay");
+      if (emailDisplay) {
+        emailDisplay.textContent = "(Gagal memuat email - silakan refresh halaman)";
+        emailDisplay.style.background = "#fee2e2";
+        emailDisplay.style.color = "#b91c1c";
+      }
+    }
+  }
+
+  // Real-time email formatting - DIHAPUS karena email sekarang hidden input
+  // Email input hanya hidden field, tidak perlu formatting
 
   // ----- Bank Number Validation -----
   const bankNumberInput = document.getElementById("bank_from_number");
@@ -570,10 +847,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!paket.value) paket.value = "1";
 
       updatePrice();
+      
+      // Fetch dan auto-fill user data
+      loadUserData();
     });
 
     closeFlow.addEventListener("click", () => {
       flowPopup.setAttribute("aria-hidden", "true");
+      // Clear expiry timer ketika close flow
+      if (expiryCheckInterval) {
+        clearInterval(expiryCheckInterval);
+        expiryCheckInterval = null;
+      }
+      // Clear server-side timer
+      fetch("member.php?action=clear_booking_timer");
+      
+      let timerDisplay = document.getElementById("bookingExpiryTimer");
+      if (timerDisplay) timerDisplay.remove();
+      let timerInstructions = document.getElementById("paymentTimerInstructions");
+      if (timerInstructions) timerInstructions.remove();
     });
   }
 
@@ -612,22 +904,33 @@ document.addEventListener("DOMContentLoaded", () => {
     if (v === "qris") {
       paymentDetails.innerHTML = `
         <div style="text-align:center">
-          <div style="width:160px;height:160px;border-radius:12px;border:2px dashed #cfe3ff;display:inline-flex;align-items:center;justify-content:center;color:#2563eb;font-weight:700;font-size:18px;background:#f8fbff">
-            QRIS CODE
+          <div style="background:linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);padding:24px;border-radius:16px;display:inline-block;border:1px solid #e5e7eb;box-shadow:0 4px 12px rgba(0,0,0,0.08)">
+            <div style="font-size:14px;font-weight:600;color:#1f2937;margin-bottom:12px">📱 QRIS Code Standar Pembayaran Nasional</div>
+            
+            <div style="width:240px;height:240px;background:white;border:2px solid #e5e7eb;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;overflow:hidden">
+              <img src="../assets/images/qris_rush.jpg" alt="QRIS Code" style="width:100%;height:100%;object-fit:cover">
+            </div>
+            
+            <div style="text-align:left;background:white;padding:12px;border-radius:8px;margin-top:12px;border:1px solid #e5e7eb;font-size:13px">
+              <div style="margin-bottom:6px"><strong>RUSH BADMINTON JEMBER</strong></div>
+              <div style="color:#6b7280;margin-bottom:4px">NMID: IDI02538458157</div>
+              <div style="color:#6b7280">Tipe: A01</div>
+            </div>
+            
+            <div class="muted" style="margin-top:12px;font-size:12px">✓ Scan QRIS menggunakan aplikasi e-wallet Anda</div>
           </div>
-          <div class="muted" style="margin-top:12px">Scan QRIS untuk melakukan pembayaran</div>
         </div>`;
     } else if (v === "bca") {
       paymentDetails.innerHTML = `
         <div style="text-align:center">
-          <div style="font-size:18px;font-weight:700;color:#2563eb;margin-bottom:8px">BCA</div>
+          <div style="font-size:18px;font-weight:700;color:#2563eb;margin-bottom:8px">🏦 BCA Transfer</div>
           <div style="font-size:24px;font-weight:800;color:#1f2937;margin-bottom:8px">123 456 7890</div>
           <div class="muted">a.n. Lapangan Badminton</div>
         </div>`;
     } else if (v === "mandiri") {
       paymentDetails.innerHTML = `
         <div style="text-align:center">
-          <div style="font-size:18px;font-weight:700;color:#2563eb;margin-bottom:8px">Mandiri</div>
+          <div style="font-size:18px;font-weight:700;color:#2563eb;margin-bottom:8px">🏦 Mandiri Transfer</div>
           <div style="font-size:24px;font-weight:800;color:#1f2937;margin-bottom:8px">098 765 4321</div>
           <div class="muted">a.n. Lapangan Badminton</div>
         </div>`;
@@ -676,6 +979,14 @@ document.addEventListener("DOMContentLoaded", () => {
       sectionC.style.display = "block";
       updatePaymentDetails();
       updatePrice();
+      
+      // Display timer instructions
+      displayPaymentTimerInstructions();
+      
+      // Start timer jika belum berjalan
+      if (!expiryCheckInterval && bookingMemberId) {
+        startBookingExpiryTimer(bookingMemberId);
+      }
     });
   }
 
@@ -684,6 +995,12 @@ document.addEventListener("DOMContentLoaded", () => {
       sectionA.style.display = "none";
       sectionB.style.display = "block";
       sectionC.style.display = "none";
+      
+      // Remove timer displays when going back
+      let timerDisplay = document.getElementById("bookingExpiryTimer");
+      if (timerDisplay) timerDisplay.remove();
+      let timerInstructions = document.getElementById("paymentTimerInstructions");
+      if (timerInstructions) timerInstructions.remove();
     });
   }
 
@@ -700,9 +1017,12 @@ document.addEventListener("DOMContentLoaded", () => {
     confirmContent.innerHTML = "";
     const arr = gatherSelectedAsArray();
 
+    // Ambil email dari hidden input
+    const emailValue = emailInput.value || '(tidak ada email)';
+
     const rows = [
       { label: "Nama Lengkap", value: nameInput.value.trim() },
-      { label: "Email", value: emailInput.value.trim() },
+      { label: "Email", value: emailValue },
       { label: "Paket Member", value: `${paket.value} Bulan (${formatRupiah(prices[parseInt(paket.value) || 1])})` },
       { label: "Mulai Bulan", value: startMonth.value },
       { label: "Lapangan", value: court.options[court.selectedIndex]?.text || court.value },
@@ -781,7 +1101,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ----- Form Reset Function -----
   function resetForm() {
     if (nameInput) nameInput.value = "";
-    if (emailInput) emailInput.value = "";
+    if (emailInput) emailInput.value = ""; // Reset hidden email input
     if (paket) paket.value = "";
     if (startMonth) {
       const now = new Date();
@@ -1285,7 +1605,34 @@ document.addEventListener("DOMContentLoaded", () => {
         // UPDATE REAL-TIME SECTION B
         updateScheduleDisplayRealTime();
 
-        smallPopup.setAttribute("aria-hidden", "true");
+        // CHECK: Apakah sudah mencapai 2 pilihan?
+        const currentSelections = selectedDates[key] || {};
+        const selectedCount = Object.keys(currentSelections).length;
+        
+        console.log(`✅ Selection saved. Total: ${selectedCount} (Min: 2, Max: 5)`);
+        
+        // Jika sudah 2 pilihan, langsung tutup kalender
+        if (selectedCount >= 2) {
+          console.log("🎉 Sudah mencapai 2 pilihan minimum! Menutup kalender...");
+          
+          // Update display
+          const infoBox = document.getElementById("month-info-" + monthIndex);
+          if (infoBox) {
+            updateMonthInfoDisplay(mm, monthIndex, infoBox);
+          }
+
+          // Close popup
+          smallPopup.setAttribute("aria-hidden", "true");
+          
+          // Notify user
+          setTimeout(() => {
+            showSmallPopup("✅ Minimal 2 tanggal terpenuhi untuk bulan " + formatMonthYear(mm.year, mm.month) + "! Anda bisa melanjutkan atau menambah lagi.", "info");
+          }, 300);
+          
+          return; // Jangan buka calendar lagi
+        }
+        
+        // Jika belum 2 pilihan, kembali ke kalender
         setTimeout(() => openMonthPicker(monthIndex), 300);
       };
 
@@ -1316,18 +1663,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return false;
     }
 
+    // Email sudah terisi otomatis dari hidden input, validasi ketersediaan
     if (!emailInput.value.trim()) {
-      showSmallPopup("Email wajib diisi", "warning");
-      emailInput.focus();
-      return false;
-    }
-
-    formatEmail(emailInput);
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailInput.value)) {
-      showSmallPopup("Format email tidak valid", "warning");
-      emailInput.focus();
+      showSmallPopup("Email tidak ditemukan. Silakan refresh halaman dan login kembali.", "warning");
       return false;
     }
 
