@@ -1,382 +1,334 @@
-/** dashboard.js
- * VERSI DIPERBAIKI:
- * - Menghapus logika password (FIXING TYPEERROR)
- * - Memperbaiki logika dropdown profil (FIXING ARIA-HIDDEN)
- * - Memfungsikan 'fetch' (AJAX) pada 'saveProfile()' ke 'update_profile.php'
- */
-
-/* ---------- Mengambil data asli dari PHP ---------- */
-const USER = window.INJECTED_USER_DATA || { nama: "User Error", email: "error@mail.com", foto_profil: null, no_hp: '', pekerjaan: '', pekerjaan_lain: '' };
-const BOOKINGS = window.INJECTED_BOOKING_DATA || [];
-
-/* ---------- render helpers ---------- */
-function $(sel) {
-  return document.querySelector(sel);
-}
-function $all(sel) {
-  return Array.from(document.querySelectorAll(sel));
-}
-
-// Helper untuk path foto profil
-function getAvatarPath(foto_profil) {
-    if (foto_profil) {
-        // Path dari root, karena dashboard.js ada di assets/js/
-        return `uploads/profiles/${foto_profil}`; 
-    }
-    return 'assets/images/default-avatar.png'; 
-}
-
-/* populate header / profile */
 document.addEventListener("DOMContentLoaded", () => {
-  // header values
-  $("#userName").textContent = USER.nama.split(' ')[0]; 
-  $("#profileAvatar").src = getAvatarPath(USER.foto_profil);
-  $("#todayDate").textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const USER = window.USER_DATA || {};
+    const BOOKINGS = window.BOOKING_DATA || [];
 
-  // stats
-  const total = BOOKINGS.length;
-  const active = BOOKINGS.filter((b) => b.status === "menunggu" || b.status === "disetujui").length;
-  const hours = BOOKINGS.reduce((s, b) => s + (parseInt(b.total_jam) || 0), 0);
-  const lastPayment = BOOKINGS.slice()
-    .reverse()
-    .find((b) => b.total_amount > 0);
+    // --- 1. STATS & WIDGETS (Sama) ---
+    const totalBooking = BOOKINGS.length;
+    const activeBooking = BOOKINGS.filter(b => ['menunggu', 'disetujui'].includes(b.status)).length;
+    const totalHours = totalBooking * 1; 
+    const lastPayment = BOOKINGS.find(b => parseFloat(b.total_amount) > 0);
+
+    setText("statTotal", totalBooking);
+    setText("statActive", activeBooking);
+    setText("statHours", totalHours + "+");
+    setText("statLastPayment", lastPayment ? formatRupiah(lastPayment.total_amount) : "-");
+
+    const nextBooking = BOOKINGS.find(b => b.status === 'disetujui' && new Date(b.tanggal) >= new Date());
+    const nextBox = document.getElementById("nextBookingBox");
+    if(nextBox) {
+        if (nextBooking) {
+            nextBox.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center text-xl">📅</div>
+                    <div>
+                        <h5 class="font-bold text-lg">${nextBooking.nama_lapangan}</h5>
+                        <p class="text-white/70 text-sm">${formatDate(nextBooking.tanggal)} • ${nextBooking.jam_mulai.substring(0,5)}</p>
+                    </div>
+                </div>`;
+        } else {
+            nextBox.innerHTML = `<p class="text-white/50 text-sm italic">Tidak ada jadwal mendatang.</p>`;
+        }
+    }
+
+    const counts = {};
+    BOOKINGS.forEach(b => { counts[b.nama_lapangan] = (counts[b.nama_lapangan] || 0) + 1; });
+    const favs = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 3);
+    const favContainer = document.getElementById("favFields");
+    if(favContainer) {
+        if(favs.length > 0) {
+            favContainer.innerHTML = favs.map(name => `
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span class="font-medium text-slate-700 text-sm">${name}</span>
+                    <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">${counts[name]}x main</span>
+                </div>`).join('');
+        } else {
+            favContainer.innerHTML = `<p class="text-slate-400 text-xs text-center py-2">Belum ada riwayat bermain.</p>`;
+        }
+    }
+
+    // --- 2. CHART (Sama) ---
+    const ctx = document.getElementById('hourChart');
+    if(ctx) {
+        const hoursMap = Array(24).fill(0);
+        BOOKINGS.forEach(b => { if(b.jam_mulai) hoursMap[parseInt(b.jam_mulai.split(':')[0])]++; });
+        const labels = [], data = [];
+        for(let i=8; i<=22; i++) { labels.push(i < 10 ? `0${i}:00` : `${i}:00`); data.push(hoursMap[i]); }
+        new Chart(ctx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Frekuensi Main', data: data, backgroundColor: '#0b63d6', borderRadius: 4, barThickness: 12 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { display: true, drawBorder: false } }, x: { grid: { display: false } } } }
+        });
+    }
+
+    // --- 3. INTERAKSI MODAL & DROPDOWN ---
+    const profileBtn = document.getElementById('profileMenuBtn');
+    const profileDropdown = document.getElementById('profileDropdown');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalContent = document.getElementById('modalContent');
+    const btnEditProfile = document.getElementById('btnEditProfile');
+    const btnCancelEdit = document.getElementById('btnCancelEdit');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const btnSaveProfile = document.getElementById('btnSaveProfile');
+    const jobSelect = document.getElementById('inputPekerjaan');
+    const customJobDiv = document.getElementById('customJobDiv');
+    const customJobInput = document.getElementById('inputPekerjaanLain');
+    const btnLogout = document.getElementById('btnLogout');
+
+    if(profileBtn && profileDropdown) {
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = profileDropdown.classList.contains('hidden');
+            if(isHidden) {
+                profileDropdown.classList.remove('hidden');
+                setTimeout(() => { profileDropdown.classList.remove('scale-95', 'opacity-0'); profileDropdown.classList.add('scale-100', 'opacity-100'); }, 10);
+            } else {
+                closeDropdown();
+            }
+        });
+        document.addEventListener('click', (e) => { if(!profileDropdown.contains(e.target)) closeDropdown(); });
+    }
+
+    function closeDropdown() {
+        if(!profileDropdown) return;
+        profileDropdown.classList.remove('scale-100', 'opacity-100');
+        profileDropdown.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => profileDropdown.classList.add('hidden'), 200);
+    }
+
+    function openModal() {
+        closeDropdown();
+        modalOverlay.classList.remove('hidden');
+        handleJobSelect();
+        // Reset Username State saat buka modal
+        const inputUsername = document.getElementById('inputUsername');
+        const errorText = document.getElementById('usernameError');
+        if(inputUsername) {
+            inputUsername.classList.remove('border-red-500', 'ring-red-200');
+            errorText.classList.add('hidden');
+            btnSaveProfile.disabled = false;
+        }
+
+        setTimeout(() => {
+            modalOverlay.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95', 'opacity-0');
+            modalContent.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closeModal() {
+        modalOverlay.classList.add('opacity-0');
+        modalContent.classList.remove('scale-100', 'opacity-100');
+        modalContent.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => modalOverlay.classList.add('hidden'), 300);
+    }
+
+    function handleJobSelect() {
+        if(jobSelect.value === 'Lainnya') {
+            customJobDiv.classList.remove('hidden');
+            if(USER.pekerjaan === 'Lainnya') customJobInput.value = USER.pekerjaan_lain || '';
+        } else {
+            customJobDiv.classList.add('hidden');
+        }
+    }
+
+    if(btnEditProfile) btnEditProfile.addEventListener('click', openModal);
+    if(btnCancelEdit) btnCancelEdit.addEventListener('click', closeModal);
+    if(closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+    if(modalOverlay) modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) closeModal(); });
+    if(jobSelect) jobSelect.addEventListener('change', handleJobSelect);
+
+    // --- TAMBAHAN: LOGOUT DENGAN SWEETALERT ---
+    if(btnLogout) {
+        btnLogout.addEventListener('click', (e) => {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Konfirmasi Keluar',
+                text: "Apakah Anda yakin ingin keluar dari akun Anda?",
+                icon: 'warning',
+                iconColor: '#ef4444', // Merah sesuai gambar warning
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Keluar',
+                cancelButtonText: 'Batal',
+                reverseButtons: true, // Agar tombol Batal di kiri, Keluar di kanan (opsional, sesuaikan selera)
+                
+                // Kustomisasi Tombol agar mirip Gambar (Putih & Merah)
+                customClass: {
+                    popup: 'rounded-2xl font-sans', 
+                    title: 'text-xl font-bold text-slate-800',
+                    htmlContainer: 'text-slate-500',
+                    confirmButton: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1',
+                    cancelButton: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1'
+                },
+                buttonsStyling: false // Mematikan style bawaan SweetAlert agar class Tailwind di atas bekerja
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'auth/php/logout.php';
+                }
+            });
+        });
+    }
+
+    // --- TAMBAHAN: CEK USERNAME REAL-TIME ---
+    const inputUsername = document.getElementById('inputUsername');
+    const usernameError = document.getElementById('usernameError');
+    const usernameSuccess = document.getElementById('usernameSuccess');
+    let usernameTimeout = null;
+
+    if(inputUsername) {
+        inputUsername.addEventListener('input', function() {
+            clearTimeout(usernameTimeout);
+            const val = this.value.trim();
+
+            // Reset visual
+            this.classList.remove('border-red-500', 'focus:ring-red-200', 'border-green-500');
+            usernameError.classList.add('hidden');
+            usernameSuccess.classList.add('hidden');
+            btnSaveProfile.disabled = false;
+
+            if(val === USER.username) return; // Jika sama dengan username sendiri, abaikan
+            if(val.length < 3) return; // Jangan cek jika terlalu pendek
+
+            usernameTimeout = setTimeout(() => {
+                fetch(`check_username.php?username=${val}`)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'taken') {
+                        // USERNAME SUDAH DIPAKAI (MERAH SEPERTI GAMBAR)
+                        inputUsername.classList.add('border-red-500', 'focus:ring-red-200');
+                        inputUsername.classList.remove('focus:border-primary', 'focus:ring-primary/20');
+                        usernameError.classList.remove('hidden');
+                        btnSaveProfile.disabled = true;
+                    } else {
+                        // TERSEDIA (HIJAU/NORMAL)
+                        inputUsername.classList.add('border-green-500');
+                        // usernameSuccess.classList.remove('hidden'); // Opsional jika mau menampilkan teks tersedia
+                        btnSaveProfile.disabled = false;
+                    }
+                })
+                .catch(err => console.error("Error check username:", err));
+            }, 500); // Delay 500ms agar tidak spam request
+        });
+    }
+
+
+    // --- 4. SIMPAN PROFIL DENGAN SWEETALERT ---
+    // --- 4. SIMPAN PROFIL (FIXED: MENDUKUNG UPLOAD FOTO) ---
+    if(btnSaveProfile) {
+        btnSaveProfile.addEventListener('click', () => {
+            // 1. Validasi Input Sederhana
+            const nama = document.getElementById('inputNama').value.trim();
+            const username = document.getElementById('inputUsername').value.trim();
+            const hp = document.getElementById('inputHP').value.trim();
+            
+            // Cek username error (jika ada class merah)
+            const inputUsername = document.getElementById('inputUsername');
+            if(inputUsername.classList.contains('border-red-500')) {
+                Swal.fire({ icon: 'error', title: 'Username Tidak Valid', text: 'Harap ganti username lain.', confirmButtonColor: '#0b63d6' });
+                return;
+            }
+
+            if(!nama || !username || !hp) {
+                Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Nama, Username, dan No HP harus diisi!', confirmButtonColor: '#0b63d6' });
+                return;
+            }
+
+            // 2. UI Loading State
+            const originalText = btnSaveProfile.innerText;
+            btnSaveProfile.innerText = "Menyimpan...";
+            btnSaveProfile.disabled = true;
+
+            // 3. CONSTRUCT FORM DATA (PERBAIKAN UTAMA DI SINI)
+            // Menggunakan 'new FormData(formElement)' otomatis mengambil SEMUA input termasuk FILE gambar
+            const formElement = document.getElementById('editProfileForm'); 
+            const formData = new FormData(formElement);
+
+            // 4. Kirim ke Backend
+            fetch('update_profile.php', {
+                method: 'POST',
+                body: formData // Jangan set Content-Type header, biarkan browser mengaturnya untuk Multipart
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: 'Profil dan foto berhasil diperbarui.',
+                        showConfirmButton: false,
+                        timer: 1500
+                    }).then(() => {
+                        location.reload(); // Reload agar foto header berubah
+                    });
+                } else {
+                    throw new Error(data.message || 'Terjadi kesalahan server');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal Menyimpan',
+                    text: err.message,
+                    confirmButtonColor: '#0b63d6'
+                });
+                btnSaveProfile.innerText = originalText;
+                btnSaveProfile.disabled = false;
+            });
+        });
+    }
     
-  $("#statTotal").textContent = total;
-  $("#statActive").textContent = active;
-  $("#statHours").textContent = hours + " jam";
-  $("#statLastPayment").textContent = lastPayment ? "Rp " + parseFloat(lastPayment.total_amount).toLocaleString('id-ID') : "-";
+    // --- 5. LOGIC PREVIEW FOTO (PASTIKAN INI ADA) ---
+    const inputFoto = document.getElementById('inputFoto');
+    const previewAvatar = document.getElementById('previewAvatar');
+    const previewAvatarDiv = document.getElementById('previewAvatarDiv');
+    const previewAvatarNew = document.getElementById('previewAvatarNew');
+    const defaultIcon = document.getElementById('defaultIcon');
 
-  // next booking
-  const next = BOOKINGS.find((b) => b.status === "disetujui" && new Date(b.tanggal) >= new Date()) || null;
-  const nb = $("#nextBookingBox");
-  if (next) {
-    nb.innerHTML = `<strong>${next.nama_lapangan}</strong><div class="muted">${formatDate(next.tanggal)} • ${next.jam_mulai.substring(0,5)}</div>`;
-    nb.classList.remove("muted");
-  } else {
-    nb.textContent = "Tidak ada jadwal aktif";
-  }
+    if(inputFoto) {
+        inputFoto.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                // Validasi ukuran di Client (Max 2MB)
+                if(file.size > 2 * 1024 * 1024) {
+                    Swal.fire('File Terlalu Besar', 'Maksimal ukuran foto adalah 2MB', 'warning');
+                    this.value = ''; 
+                    return;
+                }
 
-  // favorites
-  const favMap = BOOKINGS.reduce((m, b) => {
-    if (b.status !== "dibatalkan") {
-      m[b.nama_lapangan] = (m[b.nama_lapangan] || 0) + 1;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Jika user sudah punya foto sebelumnya
+                    if (previewAvatar) {
+                        previewAvatar.src = e.target.result;
+                    } 
+                    // Jika user belum punya foto (tampilan default)
+                    else if (previewAvatarDiv) {
+                        if(defaultIcon) defaultIcon.classList.add('hidden');
+                        if(previewAvatarNew) {
+                            previewAvatarNew.classList.remove('hidden');
+                            previewAvatarNew.src = e.target.result;
+                        }
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        });
     }
-    return m;
-  }, {});
-  const favs = Object.entries(favMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2);
-  const favBox = $("#favFields");
-  
-  if (favs.length) {
-    favBox.innerHTML = favs
-      .map(
-        (f) => `
-      <div class="fav-item">
-        <div class="fav-thumb"></div>
-        <div class="fav-meta">
-          <div class="name">${f[0]}</div>
-          <div class="muted">${f[1]}x booking</div>
-        </div>
-      </div>
-    `
-      )
-      .join("");
-    favBox.classList.remove("muted");
-  } else {
-    favBox.textContent = "Belum ada data favorit";
-  }
 
-  // === PERBAIKAN: Logika dropdown (Fixing ARIA-HIDDEN) ===
-  const profileToggle = $("#profileToggle");
-  const dropdown = $("#profileDropdown");
-  if (profileToggle && dropdown) {
-      profileToggle.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isHidden = dropdown.classList.toggle("show");
-        dropdown.setAttribute("aria-hidden", !isHidden);
-      });
+    // Helpers
+    function setText(id, val) { const el = document.getElementById(id); if(el) el.textContent = val; }
+    function formatRupiah(num) { return "Rp " + parseInt(num).toLocaleString('id-ID'); }
+    function formatDate(dateString) { 
+        const date = new Date(dateString);
+        const hariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const bulanIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-      document.addEventListener("click", (e) => {
-        if (!profileToggle.contains(e.target) && !dropdown.contains(e.target)) {
-          dropdown.classList.remove("show");
-          dropdown.setAttribute("aria-hidden", "true");
-        }
-      });
-      
-      // Mengatur fokus saat dropdown ditutup
-      dropdown.addEventListener("transitionend", (e) => {
-          if (!dropdown.classList.contains("show")) {
-              profileToggle.focus();
-          }
-      });
-  }
-  // === AKHIR PERBAIKAN DROPDOWN ===
-  
-  // Tombol Logout
-  if ($("#btnLogout")) {
-      $("#btnLogout").addEventListener("click", () => {
-        const baseUrl = window.location.origin + "/BookingLapanganKel2";
-        if (confirm("Yakin ingin keluar?")) {
-          window.location.href = baseUrl + '/auth/php/logout.php';
-        }
-      });
-  }
-  
-  // Tombol Edit Profil
-  if ($("#btnEditProfile")) $("#btnEditProfile").addEventListener("click", openProfileModal);
+        const hari = hariIndo[date.getDay()];
+        const tgl = date.getDate();
+        const bulan = bulanIndo[date.getMonth()];
+        const tahun = date.getFullYear();
 
-  // Inisialisasi Modal Profil
-  initializeProfileModal();
-
-  // Quick booking button
-  if ($("#btnQuickBook")) {
-      $("#btnQuickBook").addEventListener("click", () => {
-        const baseUrl = window.location.origin + "/BookingLapanganKel2";
-        window.location.href = baseUrl + "/BookingPengguna/booking.php";
-      });
-  }
-
-  // build chart
-  buildHourChart();
+        return `${hari}, ${tgl} ${bulan} ${tahun}`;
+    }
+    
 });
-
-/* ---------- Profile Modal Functions ---------- */
-function initializeProfileModal() {
-  if (!$("#profileModal")) return;
-
-  // Set initial values
-  $("#inputName").value = USER.nama;
-  $("#inputEmail").value = USER.email;
-  $("#inputPhone").value = USER.no_hp || "";
-  $("#profileAvatarLarge").src = getAvatarPath(USER.foto_profil);
-  $("#profileNameDisplay").textContent = USER.nama;
-  $("#profileEmailDisplay").textContent = USER.email;
-
-  // Set job value
-  const jobSelect = $("#inputJob");
-  const jobCustom = $("#inputJobCustom");
-  
-  if (USER.pekerjaan) {
-      let jobFound = false;
-      jobSelect.querySelectorAll("option").forEach(opt => {
-          if (opt.value.toLowerCase() === USER.pekerjaan.toLowerCase()) {
-              opt.selected = true;
-              jobFound = true;
-          }
-      });
-
-      if (!jobFound && USER.pekerjaan) {
-          jobSelect.value = "Lainnya";
-          jobCustom.value = USER.pekerjaan_lain || USER.pekerjaan; 
-          jobCustom.style.display = "block";
-      } else if (jobSelect.value === 'Lainnya') {
-          jobCustom.value = USER.pekerjaan_lain || '';
-          jobCustom.style.display = "block";
-      }
-  }
-
-  // Job selection handler
-  jobSelect.addEventListener("change", function () {
-    if (this.value === "Lainnya") {
-      jobCustom.style.display = "block";
-      jobCustom.focus();
-    } else {
-      jobCustom.style.display = "none";
-      jobCustom.value = "";
-    }
-  });
-
-  // === PERBAIKAN: Logika password dihapus (FIXING TYPEERROR) ===
-  // $("#togglePassword").addEventListener("click", ...);
-  // $("#toggleConfirmPassword").addEventListener("click", ...);
-  // === AKHIR PERBAIKAN ===
-
-  // Avatar edit button
-  $(".avatar-edit").addEventListener("click", function () {
-    showNotification("Fitur upload foto profil akan datang!", "info");
-  });
-
-  // Save profile
-  $("#saveProfile").addEventListener("click", saveProfile);
-
-  // Tombol tutup modal
-  $("#cancelProfile").addEventListener("click", closeProfileModal);
-  $("#closeProfileModal").addEventListener("click", closeProfileModal);
-  
-  $("#profileModal").addEventListener("click", function(e) {
-      if (e.target === $("#profileModal")) {
-          closeProfileModal();
-      }
-  });
-}
-
-/**
- * ========================================================
- * FUNGSI SAVEPROFILE (Sudah Benar)
- * Menggunakan Fetch untuk mengirim data ke update_profile.php
- * ========================================================
- */
-function saveProfile() {
-  const name = $("#inputName").value.trim();
-  const email = $("#inputEmail").value.trim();
-  const phone = $("#inputPhone").value.trim();
-  const jobSelect = $("#inputJob").value;
-  const jobCustom = $("#inputJobCustom").value.trim();
-
-  // 1. Validasi Sisi Klien
-  if (!name || !email || !phone) {
-    showNotification("Nama, email, dan nomor HP harus diisi", "error");
-    return;
-  }
-  if (jobSelect === "Lainnya" && !jobCustom) {
-      showNotification("Silakan tulis pekerjaan Anda", "error");
-      return;
-  }
-
-  // 2. Siapkan FormData
-  const formData = new FormData();
-  formData.append('nama', name);
-  formData.append('email', email);
-  formData.append('no_hp', phone);
-  formData.append('pekerjaan', jobSelect);
-  formData.append('pekerjaan_lain', jobCustom);
-
-  // 3. Kirim ke Server (update_profile.php)
-  fetch('update_profile.php', {
-    method: 'POST',
-    body: formData
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.status === 'success') {
-      // 4. Jika Sukses
-      showNotification(data.message, "success");
-      
-      // 5. Perbarui UI & data global (USER) secara lokal
-      $("#userName").textContent = name.split(' ')[0];
-      $("#profileNameDisplay").textContent = name;
-      $("#profileEmailDisplay").textContent = email;
-      
-      // Update data global
-      USER.nama = name;
-      USER.email = email;
-      USER.no_hp = phone;
-      USER.pekerjaan = jobSelect;
-      USER.pekerjaan_lain = jobCustom;
-      
-      closeProfileModal();
-    } else {
-      // 6. Jika Gagal (misal: email duplikat)
-      showNotification(data.message, "error");
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    showNotification("Terjadi kesalahan. Gagal menghubungi server.", "error");
-  });
-}
-
-/* ---------- small helper functions ---------- */
-function formatDate(d) {
-  try {
-    const dt = new Date(d + 'T00:00:00'); 
-    return dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-  } catch {
-    return d;
-  }
-}
-
-function openProfileModal() {
-  const modal = $("#profileModal");
-  if (modal) {
-    modal.setAttribute("aria-hidden", "false");
-    modal.classList.add("show");
-  }
-}
-
-function closeProfileModal() {
-  const modal = $("#profileModal");
-  if (modal) {
-    modal.setAttribute("aria-hidden", "true");
-    modal.classList.remove("show");
-  }
-}
-
-function showNotification(message, type = "info") {
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  setTimeout(() => {
-    notification.style.animation = "slideInRight 0.3s ease-out reverse";
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
-      }
-    }, 300);
-  }, 3000);
-}
-
-/* ---------- CHART (Tidak berubah) ---------- */
-function buildHourChart() {
-  if (!$("#hourChart")) return;
-
-  const hours = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
-  const freq = Array(hours.length).fill(0);
-  
-  BOOKINGS.forEach((b) => {
-    if (b.status !== "dibatalkan" && b.jam_mulai) {
-      const hourStart = parseInt(b.jam_mulai.split(":")[0]);
-      const idx = hours.findIndex((h) => parseInt(h.split(":")[0]) === hourStart);
-      if (idx >= 0) freq[idx] += 1;
-    }
-  });
-
-  const ctx = document.getElementById("hourChart").getContext("2d");
-  new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: hours,
-      datasets: [
-        {
-          label: "Jumlah Booking",
-          data: freq,
-          backgroundColor: "#0057D8",
-          borderColor: "#0040A0",
-          borderWidth: 1,
-          borderRadius: 4,
-        },
-      ],
-    },
-    options: {
-      indexAxis: "x",
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { stepSize: 1 },
-          grid: { color: "rgba(0,0,0,0.05)" },
-        },
-        x: {
-          grid: { display: false },
-        },
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              return `Booking: ${context.parsed.y} kali`;
-            },
-          },
-        },
-      },
-      animation: {
-        duration: 1000,
-        easing: "easeOutQuart",
-      },
-    },
-  });
-}

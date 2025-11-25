@@ -3,6 +3,11 @@ date_default_timezone_set('Asia/Jakarta');
 session_start();
 require '../config/database.php';
 
+// === 1. PANGGIL FUNGSI AUTO-RELEASE (PENTING!) ===
+// Membersihkan slot 'hold' yang sudah lewat waktu 7 menit
+require '../include_user/release_slots.php';
+// ==================================================
+
 // --- BAGIAN USER ---
 if (!isset($_SESSION['id_user'])) {
     $_SESSION['id_user'] = 1;
@@ -44,11 +49,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        // Cek DB (Safety Check)
+        // Cek DB (Safety Check Update)
+        // Cek status 'dibooking' ATAU 'hold' yang belum expired
         $check_q = "SELECT 1 
                     FROM jadwal_detail jd
                     JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian
-                    WHERE jd.id_jadwal_waktu = ? AND jh.tanggal = ? AND jd.status = 'dibooking'";
+                    LEFT JOIN booking b ON jd.id_booking = b.id_booking
+                    WHERE jd.id_jadwal_waktu = ? 
+                    AND jh.tanggal = ? 
+                    AND (
+                        jd.status = 'dibooking' 
+                        OR (jd.status = 'hold' AND b.expired_at > NOW())
+                    )";
+                    
         $stmt_check = mysqli_prepare($conn, $check_q);
         if ($stmt_check) {
             mysqli_stmt_bind_param($stmt_check, "is", $id_jadwal_waktu, $tanggal);
@@ -165,11 +178,17 @@ if ($hari_status === 'tersedia') {
     }
 }
 
-// CEK BOOKED
+// CEK BOOKED (UPDATE LOGIKA HOLD)
 $booked_slots = [];
 if ($id_jadwal_harian_today > 0) { 
-    $check_query = "SELECT id_jadwal_waktu FROM jadwal_detail 
-                    WHERE id_jadwal_harian = ? AND status = 'dibooking'";
+    $check_query = "SELECT jd.id_jadwal_waktu, jd.status 
+                    FROM jadwal_detail jd
+                    LEFT JOIN booking b ON jd.id_booking = b.id_booking
+                    WHERE jd.id_jadwal_harian = ? 
+                    AND (
+                        jd.status = 'dibooking' 
+                        OR (jd.status = 'hold' AND b.expired_at > NOW())
+                    )";
     
     $stmt_booked = mysqli_prepare($conn, $check_query);
     if ($stmt_booked) {
@@ -202,7 +221,6 @@ foreach ($jadwal_list as $jadwal) {
 
 $message = ''; 
 
-// === MEMANGGIL HEADER (Ini sudah berisi <html>, <head>, <body>, Navbar, Sidebar) ===
 require '../include_user/header.php';
 ?>
 
@@ -235,6 +253,7 @@ require '../include_user/header.php';
           </div>
         </div>
       </div>
+
       <div class="bg-white rounded-xl shadow-soft p-6 animate-fade-in-delay" style="animation-delay: 0.1s;">
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
           <div class="flex-1">
@@ -341,10 +360,29 @@ require '../include_user/header.php';
           Menampilkan jadwal untuk: <strong><?= date('d/m/Y', strtotime($selected_date)) ?> (<?= ucfirst($hari) ?>)</strong>
         </p>
       </div>
-      </div>
+    </div>
   </main>
-  
+  <div id="loginRequiredModal" class="fixed inset-0 z-[9999] flex items-center justify-center hidden bg-black/60 backdrop-blur-sm transition-all duration-300 opacity-0 pointer-events-none">
+    <div class="bg-white rounded-2xl shadow-2xl w-[90%] max-w-[320px] p-6 text-center transform scale-95 transition-transform duration-300" id="loginModalContent">
+        
+        <h3 class="text-lg font-bold text-slate-800 mb-2">Login Diperlukan</h3>
+        
+        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
+            Anda harus login terlebih dahulu untuk melanjutkan checkout. Apakah Anda ingin login sekarang?
+        </p>
+        
+        <div class="flex flex-col gap-3">
+            <button id="btnLoginYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-200">
+                IYA, LOGIN
+            </button>
+            
+            <button id="btnLoginNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">
+                TIDAK
+            </button>
+        </div>
+    </div>
+  </div>
+
   <?php 
-// MEMANGGIL FOOTER
 require '../include_user/footer.php'; 
 ?>

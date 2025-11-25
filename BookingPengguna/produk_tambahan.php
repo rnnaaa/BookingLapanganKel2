@@ -3,39 +3,44 @@ date_default_timezone_set('Asia/Jakarta');
 session_start();
 require '../config/database.php';
 
-// Logika ini disalin dari payment.php untuk mengambil data booking
+// 1. Cek Login
 if (!isset($_SESSION['id_user'])) {
-    header("Location: login.php");
+    header("Location: ../auth/login.php");
     exit;
 }
 
-$items_to_pay = [];
-$total_biaya_sewa = 0;
-
-if (isset($_GET['cart']) && !empty($_SESSION['keranjang'])) {
-    $items_to_pay = $_SESSION['keranjang'];
-} elseif (isset($_GET['direct']) && isset($_GET['id_jadwal_waktu'])) {
-    // ... (Logika direct checkout disederhanakan, diasumsikan user selalu via keranjang)
-    // Jika Anda butuh direct checkout, logika lengkap dari payment.php bisa disalin ke sini
-    $items_to_pay = $_SESSION['keranjang'] ?? []; // Fallback ke keranjang
-}
-
-if (empty($items_to_pay)) {
-    // Jika tidak ada item, lempar ke booking
+// 2. Cek Session Hold & Timer
+if (!isset($_SESSION['temp_booking_id']) || !isset($_SESSION['booking_expired_at'])) {
     header("Location: booking.php");
     exit;
 }
 
-// Hitung total sewa SAJA
-foreach ($items_to_pay as $item) {
-    $total_biaya_sewa += $item['harga'];
+$expired_time = strtotime($_SESSION['booking_expired_at']);
+$remaining_seconds = $expired_time - time();
+
+if ($remaining_seconds <= 0) {
+    echo "<script>window.location.href='cancel_booking.php';</script>";
+    exit;
 }
 
-// Definisikan produk tambahan Anda
+// 3. Data Keranjang
+$items_to_pay = $_SESSION['keranjang'] ?? [];
+if (empty($items_to_pay)) {
+    header("Location: booking.php");
+    exit;
+}
+
+$total_biaya_sewa = 0;
+foreach ($items_to_pay as $item) {
+    $total_biaya_sewa += (float)$item['harga'];
+}
+
 $products = [
     ['id' => 'cock_12', 'nama' => 'Shuttlecock (12k)', 'harga' => 12000],
     ['id' => 'cock_15', 'nama' => 'Shuttlecock (15k)', 'harga' => 15000],
     ['id' => 'cock_20', 'nama' => 'Shuttlecock (20k)', 'harga' => 20000],
+    ['id' => 'air_mineral', 'nama' => 'Air Mineral (5k)', 'harga' => 5000],
+    ['id' => 'sewa_raket', 'nama' => 'Sewa Raket (10k)', 'harga' => 10000],
 ];
 ?>
 <!DOCTYPE html>
@@ -44,62 +49,62 @@ $products = [
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Produk Tambahan | Rush Academy</title>
-  
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
   
   <script>
-    // Konfigurasi Tailwind (Sama seperti payment.php)
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: { 'sans': ['Inter', 'sans-serif'], 'poppins': ['Poppins', 'sans-serif'] },
-          colors: { 
-            primary: "#0b63d6", 
-            primaryDark: "#094ea8", 
-            softGray: "#f9fafb",
-            'primary-light': '#e7f0ff',
-          },
-          boxShadow: { 
-            lift: "0 18px 40px rgba(11,26,54,0.10)", 
-            soft: "0 8px 24px rgba(11,26,54,0.06)",
-          }
+          colors: { primary: "#0b63d6", primaryDark: "#094ea8", softGray: "#f9fafb", 'primary-light': '#e7f0ff' },
+          boxShadow: { lift: "0 18px 40px rgba(11,26,54,0.10)", soft: "0 8px 24px rgba(11,26,54,0.06)" }
         },
       },
     };
   </script>
-  
   <style type="text/tailwindcss">
     body { font-family: 'Inter', sans-serif; }
-    .card {
-      @apply bg-white rounded-xl shadow-soft p-5;
-    }
+    .card { @apply bg-white rounded-xl shadow-soft p-5; }
   </style>
 </head>
 
 <body class="bg-softGray text-slate-900 antialiased">
 
- <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-md">
+ <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
       <div class="max-w-5xl mx-auto px-4">
-        <nav class="flex items-center justify-start h-20">
-          <a href="/BookingLapanganKel2/index.php" class="flex items-center gap-3">
+        <nav class="flex items-center justify-between h-20">
+          
+          <a href="#" class="flex items-center gap-4 pointer-events-none">
             <div class="w-14 h-14 flex items-center justify-center">
-              <img src="../assets/images/LogoRush.png" alt="Rush Academy Logo" class="w-14 h-14 object-contain rounded-xl shadow-md">
+              <img src="../assets/images/LogoRush.png" alt="Logo" class="w-full h-full object-contain">
             </div>
-            <div>
-              <div class="font-poppins font-semibold text-lg leading-tight">Rush Badminton Academy</div>
-              <div class="text-xs text-slate-500 -mt-0.5">Booking Lapangan Online</div>
+            
+            <div class="hidden sm:block">
+              <h1 class="font-poppins font-bold text-xl text-slate-900 leading-tight">Rush Badminton Academy</h1>
+              <p class="text-sm font-medium text-slate-500 mt-0.5">Booking Lapangan Online</p>
             </div>
           </a>
-          </nav>
+
+          <div class="flex items-center gap-4">
+              <div id="timer-container" class="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-md transition-colors duration-300">
+                  <i class="fa-regular fa-clock text-xs opacity-80"></i>
+                  <span id="countdown-timer" class="font-mono font-bold text-sm tracking-wider">00:00</span>
+              </div>
+
+              <button onclick="triggerManualCancel()" class="text-sm font-medium text-slate-500 hover:text-red-600 flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-red-50 transition-all" title="Batalkan Pesanan">
+                  <i class="fa-solid fa-right-from-bracket text-lg"></i>
+                  <span class="hidden sm:inline">Batalkan Booking</span>
+              </button>
+          </div>
+        </nav>
       </div>
     </header>
-
-  <form action="payment.php?<?= htmlspecialchars($_SERVER['QUERY_STRING']) ?>&from_products=1" method="POST">
+    
+  <form id="productForm" action="payment.php?cart=1&from_products=1" method="POST">
     <main class="max-w-3xl mx-auto px-4 py-8">
       <div class="flex flex-col gap-5">
-
         <div class="card flex items-center gap-4">
             <div class="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center">
                 <i class="fa-solid fa-box-open text-primary text-xl"></i>
@@ -113,18 +118,16 @@ $products = [
         <div class="card">
             <h3 class="font-poppins font-medium text-base mb-4">Kategori</h3>
             <div class="w-full bg-primary-light border-b-2 border-primary text-primary font-semibold text-sm p-3 rounded-t-lg">
-                Sewa Shuttlecock
+                Perlengkapan & Minuman
             </div>
-            
             <div class="p-4 border border-t-0 rounded-b-lg border-gray-200">
                 <h4 class="font-semibold text-slate-700 mb-3">Varian</h4>
                 <div class="space-y-3">
-                    
                     <?php foreach ($products as $product): ?>
-                    <label for="<?= $product['id'] ?>" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <label for="<?= $product['id'] ?>" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                         <div>
                             <div class="font-medium text-sm"><?= htmlspecialchars($product['nama']) ?></div>
-                            <div class="text-xs text-slate-500">Harga per tabung</div>
+                            <div class="text-xs text-slate-500">Harga satuan</div>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="font-semibold text-sm text-primary">Rp <?= number_format($product['harga'], 0, ',', '.') ?></span>
@@ -137,7 +140,6 @@ $products = [
                         </div>
                     </label>
                     <?php endforeach; ?>
-
                 </div>
             </div>
         </div>
@@ -148,7 +150,7 @@ $products = [
                 <?php foreach ($items_to_pay as $item): ?>
                 <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <div>
-                        <div class="font-semibold text-sm"><?= htmlspecialchars($item['nama_lapangan'] ?? 'Lapangan') ?></div>
+                        <div class="font-semibold text-sm text-primary uppercase mb-1"><?= htmlspecialchars($item['nama_lapangan'] ?? 'Lapangan') ?></div>
                         <div class="text-xs text-slate-500"><?= htmlspecialchars($item['jam']) ?> • <?= date('d M Y', strtotime($item['tanggal'])) ?></div>
                     </div>
                     <span class="font-medium text-sm text-slate-700">Rp <?= number_format($item['harga'], 0, ',', '.') ?></span>
@@ -156,7 +158,6 @@ $products = [
                 <?php endforeach; ?>
             </div>
         </div>
-
       </div>
     </main>
 
@@ -178,29 +179,117 @@ $products = [
     </footer>
   </form> 
 
+  <div id="cancelModal" class="fixed inset-0 z-[9999] flex items-center justify-center hidden bg-black/60 backdrop-blur-sm transition-all duration-300 opacity-0 pointer-events-none">
+    <div id="cancelModalContent" class="bg-white rounded-2xl shadow-2xl w-[90%] max-w-[320px] p-6 text-center transform scale-95 transition-transform duration-300">
+        <h3 class="text-lg font-bold text-slate-800 mb-2">Batalkan Pesanan</h3>
+        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
+            Apakah anda yakin untuk membatalkan Booking? Slot akan dilepas untuk orang lain.
+        </p>
+        <div class="flex flex-col gap-3">
+            <button id="btnCancelYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-200">IYA</button>
+            <button id="btnCancelNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">TIDAK</button>
+        </div>
+    </div>
+  </div>
+
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // === LOGIKA UTAMA: PEMBATALAN SAAT KELUAR ===
+        let isSafeExit = false;
+
+        // Logika saat User Tutup Tab / Refresh / Back
+        window.addEventListener('beforeunload', function (e) {
+            if (!isSafeExit) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Logika saat halaman benar-benar ditinggalkan (Unload)
+        window.addEventListener('pagehide', function () {
+            if (!isSafeExit) {
+                navigator.sendBeacon('cancel_booking.php');
+            }
+        });
+        
+        // === TIMER ===
+        let timeLeft = <?= $remaining_seconds ?>;
+        const timerElem = document.getElementById('countdown-timer');
+        const timerContainer = document.getElementById('timer-container');
+        
+        const countdown = setInterval(() => {
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                isSafeExit = true; 
+                alert('Waktu habis! Booking dibatalkan.');
+                window.location.href = 'cancel_booking.php';
+            } else {
+                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                const s = (timeLeft % 60).toString().padStart(2, '0');
+                timerElem.innerText = `${m}:${s}`;
+                
+                if (timeLeft < 60) {
+                  timerContainer.classList.remove('bg-indigo-600');
+                  timerContainer.classList.add('bg-red-600', 'animate-pulse');
+                }
+                timeLeft--;
+            }
+        }, 1000);
+
+        // === LOGIKA MODAL CUSTOM UNTUK BATAL ===
+        const cancelModal = document.getElementById('cancelModal');
+        const cancelModalContent = document.getElementById('cancelModalContent');
+        const btnCancelYes = document.getElementById('btnCancelYes');
+        const btnCancelNo = document.getElementById('btnCancelNo');
+
+        function showCancelModal() {
+            cancelModal.classList.remove('hidden');
+            setTimeout(() => {
+                cancelModal.classList.remove('opacity-0', 'pointer-events-none');
+                cancelModalContent.classList.remove('scale-95');
+                cancelModalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        function hideCancelModal() {
+            cancelModal.classList.add('opacity-0', 'pointer-events-none');
+            cancelModalContent.classList.remove('scale-100');
+            cancelModalContent.classList.add('scale-95');
+            setTimeout(() => {
+                cancelModal.classList.add('hidden');
+            }, 300);
+        }
+
+        if(btnCancelNo) btnCancelNo.addEventListener('click', hideCancelModal);
+        if(btnCancelYes) {
+            btnCancelYes.addEventListener('click', function() {
+                isSafeExit = true; 
+                navigator.sendBeacon('cancel_booking.php');
+                window.location.href = 'booking.php';
+            });
+        }
+        if(cancelModal) {
+            cancelModal.addEventListener('click', (e) => {
+                if(e.target === cancelModal) hideCancelModal();
+            });
+        }
+
+        // Fungsi Global untuk dipanggil onclick di header
+        window.triggerManualCancel = function() {
+            showCancelModal();
+        };
+
+        // === SCRIPT UI PRODUK ===
         const baseTotal = <?= $total_biaya_sewa ?>;
         let productTotal = 0;
-
         const totalDisplay = document.getElementById('total-display');
         const checkboxes = document.querySelectorAll('.product-checkbox');
-        
-        // --- Perubahan Dimulai Di Sini ---
         const actionButton = document.getElementById('dynamicActionButton');
-        const paymentForm = document.querySelector('form');
-  const paymentPageUrl = "payment.php?<?= htmlspecialchars($_SERVER['QUERY_STRING']) ?>&from_products=1";
+        const productForm = document.getElementById('productForm');
+        const paymentPageUrl = "payment.php?cart=1&from_products=1";
 
-        // Style untuk tombol "Lanjutkan"
-        const continueClasses = [
-            'text-white', 'bg-primary', 'hover:bg-primaryDark', 
-            'shadow-md', 'shadow-primary/30', 'border-primary'
-        ];
-        // Style untuk tombol "Lewati"
-        const skipClasses = [
-            'text-gray-700', 'bg-white', 'hover:bg-gray-100', 
-            'border-gray-300'
-        ];
+        const continueClasses = ['text-white', 'bg-primary', 'hover:bg-primaryDark', 'shadow-md', 'border-transparent'];
+        const skipClasses = ['text-gray-700', 'bg-white', 'hover:bg-gray-100', 'border-gray-300'];
 
         function formatRupiah(angka) {
             return 'Rp ' + angka.toLocaleString('id-ID');
@@ -209,49 +298,47 @@ $products = [
         function updateTotalsAndButton() {
             productTotal = 0;
             let itemsSelected = false;
-            
             checkboxes.forEach(cb => {
                 if (cb.checked) {
                     productTotal += parseFloat(cb.dataset.harga);
                     itemsSelected = true;
                 }
             });
-            
-            // Update tampilan total di footer
-            const newTotal = baseTotal + productTotal;
-            totalDisplay.textContent = formatRupiah(newTotal);
+            totalDisplay.textContent = formatRupiah(baseTotal + productTotal);
 
-            // Update Tombol Aksi
             if (itemsSelected) {
                 actionButton.textContent = 'Lanjutkan';
-                actionButton.setAttribute('type', 'submit'); // Penting: Ubah jadi tombol submit
+                actionButton.setAttribute('type', 'submit');
                 actionButton.classList.remove(...skipClasses);
                 actionButton.classList.add(...continueClasses);
             } else {
                 actionButton.textContent = 'Lewati';
-                actionButton.setAttribute('type', 'button'); // Penting: Ubah jadi tombol biasa
+                actionButton.setAttribute('type', 'button');
                 actionButton.classList.remove(...continueClasses);
                 actionButton.classList.add(...skipClasses);
             }
         }
 
-        // Tambahkan listener ke setiap checkbox
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', updateTotalsAndButton);
-        });
+        checkboxes.forEach(cb => cb.addEventListener('change', updateTotalsAndButton));
 
-        // Tambahkan listener ke tombol (hanya jika tipenya BUKAN submit)
+        // === PERBAIKAN: EVENT LISTENER TOMBOL LEWATI/LANJUTKAN ===
         actionButton.addEventListener('click', function(e) {
-            if (actionButton.getAttribute('type') === 'button') {
-                // Jika ini tombol "Lewati", arahkan manual
-                e.preventDefault(); 
-                window.location.href = paymentPageUrl;
-            }
-            // Jika tipenya "submit", biarkan form bekerja normal
-        });
+            // PENTING: Set isSafeExit = true SEBELUM melakukan aksi apapun
+            // Ini mencegah alert "Keluar dari situs?" muncul
+            isSafeExit = true;
 
-        // Jalankan sekali saat memuat untuk jaga-jaga jika ada yg sudah tercentang (misal, saat back)
-        updateTotalsAndButton(); 
+            if (actionButton.getAttribute('type') === 'button') {
+                e.preventDefault();
+                window.location.href = paymentPageUrl;
+            } else {
+                // Biarkan form submit berjalan (isSafeExit sudah true)
+            }
+        });
+        
+        // Backup: Pastikan submit form juga men-trigger safe exit
+        productForm.addEventListener('submit', function() {
+            isSafeExit = true;
+        });
     });
   </script>
 </body>

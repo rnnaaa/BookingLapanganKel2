@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="container-fluid">
       <form action="" method="POST" enctype="multipart/form-data">
         <div class="card shadow-lg border-0">
-          <div class="card-header bg-primary text-white">
+          <div class="card-header text-white" style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);">
             <h3 class="card-title mb-0"><i class="fas fa-futbol mr-2"></i> Formulir Tambah Lapangan</h3>
           </div>
 

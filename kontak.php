@@ -72,29 +72,6 @@ require 'include_user/header.php';
                 required
               >
             </div>
-<<<<<<< HEAD
-          </a>
-          <div class="hidden lg:flex flex-1 justify-center">
-            <ul id="topNav" class="flex gap-8 items-end">
-              <li>
-                <a href="/BookingLapanganKel2/index.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Beranda</a>
-              </li>
-              <li><a href="#" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Lapangan</a></li>
-              <li><a href="kontak.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300 active">Kontak</a></li>
-              <li><a href="member.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Member</a></li>
-              <li><a href="riwayat.php" class="nav-link px-2 py-1 text-sm transition-colors duration-300">Riwayat</a></li>
-              <li>
-                <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer">
-                <i class="fa-solid fa-cart-shopping text-lg"></i>
-                <span id="cartCount"
-                      class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-semibold rounded-full px-1.5 py-0.5">
-                  <?= count($_SESSION['keranjang'] ?? []) ?>
-                </span>
-                </a>
-              </li>           
-            </ul>
-=======
->>>>>>> c1156a84b9a5c90545d726a175172cd2f8054c82
           </div>
 
           <div class="mb-4">

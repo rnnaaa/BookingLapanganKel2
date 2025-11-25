@@ -18,13 +18,11 @@ if (isset($_SESSION['id_user'])) { // Hanya cek jika user sudah login
             session_unset();
             session_destroy();
             
-            // Arahkan ke halaman login dengan pesan timeout
-            // (Kita gunakan JavaScript redirect agar tidak konflik dengan header PHP lain)
-            echo "<script>
-                    alert('Anda telah logout otomatis karena tidak aktif selama 20 menit.');
-                    window.location.href = '/BookingLapanganKel2/index.php';
-                  </script>";
-            exit; // Hentikan sisa script
+            // === PERUBAHAN DI SINI ===
+            // Menggunakan header PHP untuk redirect senyap (tanpa notifikasi)
+            // Pastikan path '/BookingLapanganKel2/index.php' sesuai folder project Anda
+            header("Location: /BookingLapanganKel2/index.php");
+            exit; // Penting: Hentikan script agar halaman tidak lanjut dimuat
             
         } else {
             // Jika belum timeout, perbarui waktu aktivitas terakhir
@@ -85,7 +83,7 @@ $base_url = '/BookingLapanganKel2';
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <link rel="stylesheet" href="<?= $base_url ?>/assets/css/dashboard.css" />
+    <link rel="stylesheet" href="<?= $base_url ?>../assets/css/dashboard.css" />
 
     <style type="text/tailwindcss">
         body { font-family: 'Inter', sans-serif; background-color: #f6f8fb; }
@@ -195,7 +193,7 @@ $base_url = '/BookingLapanganKel2';
                         <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm">Lapangan</a></li>
                         <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm">Kontak</a></li>
                         <li><a href="<?= $base_url ?>/member.php" class="nav-link px-2 py-1 text-sm">Member</a></li>
-                        <li><a href="<?= $base_url ?>/riwayat.php" class="nav-link px-2 py-1 text-sm">Riwayat</a></li>
+                        <li><a href="<?= $base_url ?>/riwayat/riwayat.php" class="nav-link px-2 py-1 text-sm">Riwayat</a></li>
                         <li>
                             <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer" title="Lihat Keranjang">
                                 <i class="fa-solid fa-cart-shopping text-lg"></i>
@@ -214,17 +212,21 @@ $base_url = '/BookingLapanganKel2';
                         if (isset($_SESSION['foto_profil']) && !empty($_SESSION['foto_profil'])) {
                             $foto_profil = $base_url . '/uploads/profiles/' . htmlspecialchars($_SESSION['foto_profil']);
                         }
-                        $nama_depan = explode(' ', htmlspecialchars($_SESSION['nama']))[0];
+                        
+                        // --- PERUBAHAN: Gunakan Username ---
+                        // Pastikan di login.php Anda sudah menyimpan $_SESSION['username']
+                        $tampil_username = isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : 'Member';
                         ?>
 
                         <a href="<?= $base_url ?>/DashPengguna.php" 
                         class="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary transition-colors duration-300"
                         title="Lihat Dashboard">
                             <img src="<?= $foto_profil ?>" alt="Foto Profil" class="w-9 h-9 rounded-full object-cover border-2 border-primary-light">
-                            <span>Halo, <?= $nama_depan ?></span>
+                            <span>Halo, <?= $tampil_username ?></span>
                         </a>
+                        
                         <a href="<?= $base_url ?>/auth/php/logout.php" id="btnLogout" class="text-sm text-gray-500 hover:text-red-600" title="Keluar">
-                           <i class="fa-solid fa-right-from-bracket"></i>
+                        <i class="fa-solid fa-right-from-bracket"></i>
                         </a>
 
                     <?php else: ?>
