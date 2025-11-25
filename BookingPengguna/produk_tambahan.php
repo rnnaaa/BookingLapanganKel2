@@ -18,8 +18,9 @@ if (!isset($_SESSION['temp_booking_id']) || !isset($_SESSION['booking_expired_at
 $expired_time = strtotime($_SESSION['booking_expired_at']);
 $remaining_seconds = $expired_time - time();
 
+// UPDATE PHP: Redirect biasa jika expired server-side
 if ($remaining_seconds <= 0) {
-    echo "<script>window.location.href='cancel_booking.php';</script>";
+    header("Location: cancel_booking.php");
     exit;
 }
 
@@ -50,6 +51,7 @@ $products = [
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Produk Tambahan | Rush Academy</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
   
@@ -72,27 +74,23 @@ $products = [
 
 <body class="bg-softGray text-slate-900 antialiased">
 
- <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
+<header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
       <div class="max-w-5xl mx-auto px-4">
         <nav class="flex items-center justify-between h-20">
-          
           <a href="#" class="flex items-center gap-4 pointer-events-none">
             <div class="w-14 h-14 flex items-center justify-center">
               <img src="../assets/images/LogoRush.png" alt="Logo" class="w-full h-full object-contain">
             </div>
-            
             <div class="hidden sm:block">
               <h1 class="font-poppins font-bold text-xl text-slate-900 leading-tight">Rush Badminton Academy</h1>
               <p class="text-sm font-medium text-slate-500 mt-0.5">Booking Lapangan Online</p>
             </div>
           </a>
-
           <div class="flex items-center gap-4">
               <div id="timer-container" class="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-md transition-colors duration-300">
                   <i class="fa-regular fa-clock text-xs opacity-80"></i>
                   <span id="countdown-timer" class="font-mono font-bold text-sm tracking-wider">00:00</span>
               </div>
-
               <button onclick="triggerManualCancel()" class="text-sm font-medium text-slate-500 hover:text-red-600 flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-red-50 transition-all" title="Batalkan Pesanan">
                   <i class="fa-solid fa-right-from-bracket text-lg"></i>
                   <span class="hidden sm:inline">Batalkan Booking</span>
@@ -101,7 +99,7 @@ $products = [
         </nav>
       </div>
     </header>
-    
+
   <form id="productForm" action="payment.php?cart=1&from_products=1" method="POST">
     <main class="max-w-3xl mx-auto px-4 py-8">
       <div class="flex flex-col gap-5">
@@ -169,51 +167,73 @@ $products = [
                     Rp <?= number_format($total_biaya_sewa, 0, ',', '.') ?>
                 </div>
             </div>
-            
-            <button type="button" 
-                    id="dynamicActionButton"
-                    class="px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all duration-300">
-                Lewati
-            </button>
+            <button type="button" id="dynamicActionButton" class="px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all duration-300">Lewati</button>
         </div>
     </footer>
   </form> 
 
-  <div id="cancelModal" class="fixed inset-0 z-[9999] flex items-center justify-center hidden bg-black/60 backdrop-blur-sm transition-all duration-300 opacity-0 pointer-events-none">
-    <div id="cancelModalContent" class="bg-white rounded-2xl shadow-2xl w-[90%] max-w-[320px] p-6 text-center transform scale-95 transition-transform duration-300">
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Batalkan Pesanan</h3>
-        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-            Apakah anda yakin untuk membatalkan Booking? Slot akan dilepas untuk orang lain.
-        </p>
-        <div class="flex flex-col gap-3">
-            <button id="btnCancelYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-200">IYA</button>
-            <button id="btnCancelNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">TIDAK</button>
-        </div>
-    </div>
-  </div>
+<script>
+    let isSafeExit = false;
+    let timeLeft = <?= $remaining_seconds ?>;
 
-  <script>
+    // --- 1. FUNGSI KELUAR HALAMAN ---
+    function exitPage() {
+        isSafeExit = true;
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        navigator.sendBeacon('cancel_booking.php?ajax=1');
+        window.location.href = 'booking.php';
+    }
+
+    // --- 2. TOMBOL BATAL MANUAL ---
+    function triggerManualCancel() {
+        Swal.fire({
+            title: 'Batalkan Booking?',
+            text: "Slot yang sudah dipilih akan dilepas kembali.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Batalkan',
+            cancelButtonText: 'Kembali'
+        }).then((result) => {
+            if (result.isConfirmed) exitPage();
+        });
+    }
+
+    // --- 3. CEGAH BACK BUTTON (SWEETALERT) ---
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        if (isSafeExit) return;
+        history.pushState(null, null, location.href);
+        Swal.fire({
+            title: 'Yakin ingin keluar?',
+            text: "Booking Anda belum selesai dan akan dibatalkan.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Keluar',
+            cancelButtonText: 'Lanjut'
+        }).then((result) => {
+            if (result.isConfirmed) exitPage();
+        });
+    };
+
+    // --- 4. CEGAH REFRESH/CLOSE (NATIVE) ---
+    const handleBeforeUnload = (e) => {
+        if (isSafeExit || timeLeft <= 0) return;
+        e.preventDefault();
+        e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', function () {
+        if (!isSafeExit) navigator.sendBeacon('cancel_booking.php?ajax=1');
+    });
+    
+    // === DOM LOADED ===
     document.addEventListener('DOMContentLoaded', function() {
-        // === LOGIKA UTAMA: PEMBATALAN SAAT KELUAR ===
-        let isSafeExit = false;
-
-        // Logika saat User Tutup Tab / Refresh / Back
-        window.addEventListener('beforeunload', function (e) {
-            if (!isSafeExit) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        });
-
-        // Logika saat halaman benar-benar ditinggalkan (Unload)
-        window.addEventListener('pagehide', function () {
-            if (!isSafeExit) {
-                navigator.sendBeacon('cancel_booking.php');
-            }
-        });
         
-        // === TIMER ===
-        let timeLeft = <?= $remaining_seconds ?>;
+        // --- TIMER ---
         const timerElem = document.getElementById('countdown-timer');
         const timerContainer = document.getElementById('timer-container');
         
@@ -221,13 +241,25 @@ $products = [
             if (timeLeft <= 0) {
                 clearInterval(countdown);
                 isSafeExit = true; 
-                alert('Waktu habis! Booking dibatalkan.');
-                window.location.href = 'cancel_booking.php';
+                window.removeEventListener('beforeunload', handleBeforeUnload);
+
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Waktu Habis!',
+                  text: 'Batas waktu pembayaran 7 menit telah berakhir.',
+                  confirmButtonColor: '#0b63d6',
+                  confirmButtonText: 'Kembali ke Booking',
+                  allowOutsideClick: false
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        navigator.sendBeacon('cancel_booking.php?ajax=1');
+                        window.location.href = 'booking.php'; 
+                    }
+                });
             } else {
                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                 const s = (timeLeft % 60).toString().padStart(2, '0');
                 timerElem.innerText = `${m}:${s}`;
-                
                 if (timeLeft < 60) {
                   timerContainer.classList.remove('bg-indigo-600');
                   timerContainer.classList.add('bg-red-600', 'animate-pulse');
@@ -236,58 +268,13 @@ $products = [
             }
         }, 1000);
 
-        // === LOGIKA MODAL CUSTOM UNTUK BATAL ===
-        const cancelModal = document.getElementById('cancelModal');
-        const cancelModalContent = document.getElementById('cancelModalContent');
-        const btnCancelYes = document.getElementById('btnCancelYes');
-        const btnCancelNo = document.getElementById('btnCancelNo');
-
-        function showCancelModal() {
-            cancelModal.classList.remove('hidden');
-            setTimeout(() => {
-                cancelModal.classList.remove('opacity-0', 'pointer-events-none');
-                cancelModalContent.classList.remove('scale-95');
-                cancelModalContent.classList.add('scale-100');
-            }, 10);
-        }
-
-        function hideCancelModal() {
-            cancelModal.classList.add('opacity-0', 'pointer-events-none');
-            cancelModalContent.classList.remove('scale-100');
-            cancelModalContent.classList.add('scale-95');
-            setTimeout(() => {
-                cancelModal.classList.add('hidden');
-            }, 300);
-        }
-
-        if(btnCancelNo) btnCancelNo.addEventListener('click', hideCancelModal);
-        if(btnCancelYes) {
-            btnCancelYes.addEventListener('click', function() {
-                isSafeExit = true; 
-                navigator.sendBeacon('cancel_booking.php');
-                window.location.href = 'booking.php';
-            });
-        }
-        if(cancelModal) {
-            cancelModal.addEventListener('click', (e) => {
-                if(e.target === cancelModal) hideCancelModal();
-            });
-        }
-
-        // Fungsi Global untuk dipanggil onclick di header
-        window.triggerManualCancel = function() {
-            showCancelModal();
-        };
-
-        // === SCRIPT UI PRODUK ===
+        // --- LOGIKA PRODUK ---
         const baseTotal = <?= $total_biaya_sewa ?>;
         let productTotal = 0;
         const totalDisplay = document.getElementById('total-display');
         const checkboxes = document.querySelectorAll('.product-checkbox');
         const actionButton = document.getElementById('dynamicActionButton');
-        const productForm = document.getElementById('productForm');
-        const paymentPageUrl = "payment.php?cart=1&from_products=1";
-
+        
         const continueClasses = ['text-white', 'bg-primary', 'hover:bg-primaryDark', 'shadow-md', 'border-transparent'];
         const skipClasses = ['text-gray-700', 'bg-white', 'hover:bg-gray-100', 'border-gray-300'];
 
@@ -321,23 +308,23 @@ $products = [
 
         checkboxes.forEach(cb => cb.addEventListener('change', updateTotalsAndButton));
 
-        // === PERBAIKAN: EVENT LISTENER TOMBOL LEWATI/LANJUTKAN ===
+        // Tombol Lanjut / Lewati
         actionButton.addEventListener('click', function(e) {
-            // PENTING: Set isSafeExit = true SEBELUM melakukan aksi apapun
-            // Ini mencegah alert "Keluar dari situs?" muncul
+            // Set Safe Exit agar tidak dicegat SweetAlert/Native Alert saat pindah halaman
             isSafeExit = true;
+            window.removeEventListener('beforeunload', handleBeforeUnload);
 
             if (actionButton.getAttribute('type') === 'button') {
+                // Jika tombol "Lewati" (Button biasa -> Pindah manual)
                 e.preventDefault();
-                window.location.href = paymentPageUrl;
-            } else {
-                // Biarkan form submit berjalan (isSafeExit sudah true)
+                window.location.href = "payment.php?cart=1&from_products=1";
             }
+            // Jika "Lanjutkan" (Submit Form), biarkan form submit
         });
         
-        // Backup: Pastikan submit form juga men-trigger safe exit
-        productForm.addEventListener('submit', function() {
+        document.getElementById('productForm').addEventListener('submit', function() {
             isSafeExit = true;
+            window.removeEventListener('beforeunload', handleBeforeUnload);
         });
     });
   </script>

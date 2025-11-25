@@ -18,6 +18,7 @@ if (!isset($_SESSION['temp_booking_id']) || !isset($_SESSION['booking_expired_at
 $expired_time = strtotime($_SESSION['booking_expired_at']);
 $remaining_seconds = $expired_time - time();
 
+// UPDATE PHP: Jika expired di server side, lempar ke cancel_booking.php (yang sekarang sudah aman)
 if ($remaining_seconds <= 0) {
     header("Location: cancel_booking.php"); 
     exit;
@@ -25,7 +26,7 @@ if ($remaining_seconds <= 0) {
 
 // 3. Ambil Data dari SESSION
 $items_to_pay = $_SESSION['keranjang'] ?? [];
-
+// ... (Sisa kode PHP sama seperti sebelumnya untuk ambil keranjang & produk) ...
 if (empty($items_to_pay)) {
     header("Location: booking.php");
     exit;
@@ -34,7 +35,7 @@ if (empty($items_to_pay)) {
 $produk_tambahan = [];
 $total_biaya_produk = 0;
 
-// Logika Produk (Hapus/Tambah/Skip)
+// Logika Produk (Hapus/Tambah/Skip) - Tetap sama
 if (isset($_GET['action']) && $_GET['action'] === 'remove_product' && isset($_GET['product_id'])) {
     unset($_SESSION['produk_tambahan'][$_GET['product_id']]);
     header("Location: payment.php?cart=1");
@@ -47,19 +48,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'remove_product' && isset($_GE
     unset($_SESSION['produk_tambahan']);
 }
 
-// Hitung Total
+// Hitung Total - Tetap sama
 if (isset($_SESSION['produk_tambahan']) && is_array($_SESSION['produk_tambahan'])) {
     foreach ($_SESSION['produk_tambahan'] as $nama => $harga) {
         $produk_tambahan[$nama] = (float)$harga;
         $total_biaya_produk += (float)$harga;
     }
 }
-
 $total_biaya_sewa = 0;
 foreach ($items_to_pay as $item) {
     $total_biaya_sewa += (float)$item['harga'];
 }
-
 $total_biaya = $total_biaya_sewa + $total_biaya_produk;
 ?>
 <!DOCTYPE html>
@@ -70,6 +69,7 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
   <title>Pembayaran | Rush Academy</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
   
@@ -99,12 +99,10 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
 <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
       <div class="max-w-5xl mx-auto px-4">
         <nav class="flex items-center justify-between h-20">
-          
           <a href="#" class="flex items-center gap-4 pointer-events-none">
             <div class="w-14 h-14 flex items-center justify-center">
               <img src="../assets/images/LogoRush.png" alt="Logo" class="w-full h-full object-contain">
             </div>
-            
             <div class="hidden sm:block">
               <h1 class="font-poppins font-bold text-xl text-slate-900 leading-tight">Rush Badminton Academy</h1>
               <p class="text-sm font-medium text-slate-500 mt-0.5">Booking Lapangan Online</p>
@@ -123,12 +121,11 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
           </div>
         </nav>
       </div>
-    </header>
+</header>
 
-  <form id="paymentForm" action="verifikasi_payment.php?<?= htmlspecialchars($_SERVER['QUERY_STRING']) ?>" method="POST">
+<form id="paymentForm" action="verifikasi_payment.php?<?= htmlspecialchars($_SERVER['QUERY_STRING']) ?>" method="POST">
     <main class="max-w-5xl mx-auto px-4 py-8">
       <div class="grid lg:grid-cols-3 gap-6">
-
         <div class="lg:col-span-2 flex flex-col gap-5">
           <div class="card" id="item-list-card">
               <h3 class="font-poppins font-semibold text-base mb-4">Item yang Dibayar</h3>
@@ -186,17 +183,14 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
               
               <div class="card">
                 <h3 class="font-poppins font-semibold text-base mb-4">Rincian Biaya</h3>
-                
                 <div class="flex justify-between text-sm mb-2">
                     <span class="text-slate-600">Biaya Sewa</span>
                     <span class="font-medium">Rp <?= number_format($total_biaya_sewa, 0, ',', '.') ?></span>
                 </div>
-
                 <div class="flex justify-between text-sm">
                     <span class="text-slate-600">Biaya Produk Tambahan</span>
                     <span class="font-medium">Rp <?= number_format($total_biaya_produk, 0, ',', '.') ?></span>
                 </div>
-
                 <?php if (!empty($produk_tambahan)): ?>
                 <div class="text-xs text-slate-500 pl-4 border-l-2 border-gray-200 ml-2 mt-1 space-y-1">
                     <?php foreach ($produk_tambahan as $nama => $harga): ?>
@@ -213,12 +207,11 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
-
                 <div class="flex justify-between font-bold text-base pt-4 mt-4 border-t border-slate-200">
                     <span>Total Bayar</span>
                     <span>Rp <?= number_format($total_biaya, 0, ',', '.') ?></span>
                 </div>
-            </div>
+              </div>
 
               <div class="card">
                   <h3 class="font-poppins font-semibold text-base mb-4">Atur Pembayaran</h3>
@@ -288,107 +281,89 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
     </div>
   </div>
 
-  <div id="cancelModal" class="fixed inset-0 z-[9999] flex items-center justify-center hidden bg-black/60 backdrop-blur-sm transition-all duration-300 opacity-0 pointer-events-none">
-    <div id="cancelModalContent" class="bg-white rounded-2xl shadow-2xl w-[90%] max-w-[320px] p-6 text-center transform scale-95 transition-transform duration-300">
-        
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Batalkan Pesanan</h3>
-        
-        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-            Apakah anda yakin untuk membatalkan Booking? Slot akan dilepas untuk orang lain.
-        </p>
-        
-        <div class="flex flex-col gap-3">
-            <button id="btnCancelYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-200">
-                IYA
-            </button>
-            
-            <button id="btnCancelNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">
-                TIDAK
-            </button>
-        </div>
-    </div>
-  </div>
-
-  <script>
-    // Status keamanan keluar halaman
+<script>
     let isSafeExit = false;
+    let timeLeft = <?= $remaining_seconds ?>;
 
-    // === 1. LOGIKA MODAL CUSTOM UNTUK BATAL ===
-    const cancelModal = document.getElementById('cancelModal');
-    const cancelModalContent = document.getElementById('cancelModalContent');
-    const btnCancelYes = document.getElementById('btnCancelYes');
-    const btnCancelNo = document.getElementById('btnCancelNo');
-
-    function showCancelModal() {
-        cancelModal.classList.remove('hidden');
-        setTimeout(() => {
-            cancelModal.classList.remove('opacity-0', 'pointer-events-none');
-            cancelModalContent.classList.remove('scale-95');
-            cancelModalContent.classList.add('scale-100');
-        }, 10);
+    // --- 1. FUNGSI KELUAR HALAMAN (CLEANUP) ---
+    function exitPage() {
+        isSafeExit = true;
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        navigator.sendBeacon('cancel_booking.php?ajax=1');
+        window.location.href = 'booking.php';
     }
 
-    function hideCancelModal() {
-        cancelModal.classList.add('opacity-0', 'pointer-events-none');
-        cancelModalContent.classList.remove('scale-100');
-        cancelModalContent.classList.add('scale-95');
-        setTimeout(() => {
-            cancelModal.classList.add('hidden');
-        }, 300);
-    }
-
-    // Event Listener Modal Batal
-    if(btnCancelNo) btnCancelNo.addEventListener('click', hideCancelModal);
-    
-    if(btnCancelYes) {
-        btnCancelYes.addEventListener('click', function() {
-            // Eksekusi Pembatalan
-            isSafeExit = true; 
-            navigator.sendBeacon('cancel_booking.php');
-            window.location.href = 'booking.php';
-        });
-    }
-
-    if(cancelModal) {
-        cancelModal.addEventListener('click', (e) => {
-            if(e.target === cancelModal) hideCancelModal();
-        });
-    }
-
-    // === 2. UPDATE FUNGSI TRIGGER MANUAL (FIX BUG) ===
-    // Fungsi ini menggantikan 'confirm()' bawaan dengan modal custom
+    // --- 2. TOMBOL BATAL MANUAL (HEADER) ---
     function triggerManualCancel() {
-        showCancelModal();
+        Swal.fire({
+            title: 'Batalkan Booking?',
+            text: "Slot yang sudah dipilih akan dilepas kembali.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Batalkan',
+            cancelButtonText: 'Kembali'
+        }).then((result) => {
+            if (result.isConfirmed) exitPage();
+        });
     }
 
-    // Logika saat User Tutup Tab / Refresh / Back
-    window.addEventListener('beforeunload', function (e) {
-        if (!isSafeExit) {
-            e.preventDefault();
-            e.returnValue = '';
-        }
-    });
+    // --- 3. CEGAH TOMBOL BACK BROWSER/HP (SWEETALERT) ---
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        if (isSafeExit) return;
+        history.pushState(null, null, location.href); // Push lagi agar tetap di halaman
+        Swal.fire({
+            title: 'Yakin ingin keluar?',
+            text: "Proses pembayaran belum selesai. Booking Anda akan dibatalkan.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Keluar',
+            cancelButtonText: 'Lanjut Bayar'
+        }).then((result) => {
+            if (result.isConfirmed) exitPage();
+        });
+    };
 
-    // Logika saat halaman benar-benar ditinggalkan (Unload)
+    // --- 4. CEGAH REFRESH / TUTUP TAB (NATIVE) ---
+    const handleBeforeUnload = (e) => {
+        if (isSafeExit || timeLeft <= 0) return;
+        e.preventDefault();
+        e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', function () {
-        if (!isSafeExit) {
-            navigator.sendBeacon('cancel_booking.php');
-        }
+        if (!isSafeExit) navigator.sendBeacon('cancel_booking.php?ajax=1');
     });
 
+    // === DOM LOADED ===
     document.addEventListener('DOMContentLoaded', function() {
       
-      // --- TIMER ---
-      let timeLeft = <?= $remaining_seconds ?>;
+      // --- LOGIKA TIMER ---
       const timerElem = document.getElementById('countdown-timer');
       const timerContainer = document.getElementById('timer-container');
 
       const countdown = setInterval(() => {
           if (timeLeft <= 0) {
               clearInterval(countdown);
-              isSafeExit = true;
-              alert('Waktu pembayaran habis! Slot akan dilepas.');
-              window.location.href = 'cancel_booking.php';
+              isSafeExit = true; // Matikan guard karena akan dipaksa keluar
+              window.removeEventListener('beforeunload', handleBeforeUnload);
+
+              Swal.fire({
+                  icon: 'error',
+                  title: 'Waktu Habis!',
+                  text: 'Batas waktu pembayaran 7 menit telah berakhir.',
+                  confirmButtonColor: '#0b63d6',
+                  confirmButtonText: 'Kembali ke Booking',
+                  allowOutsideClick: false
+              }).then(() => {
+                  navigator.sendBeacon('cancel_booking.php?ajax=1');
+                  window.location.href = 'booking.php'; 
+              });
+              
           } else {
               const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
               const s = (timeLeft % 60).toString().padStart(2, '0');
@@ -401,39 +376,53 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
           }
       }, 1000);
 
-      // --- TOMBOL HAPUS ITEM (KERANJANG) ---
+      // --- HAPUS ITEM (SWEETALERT) ---
       const deleteButtons = document.querySelectorAll('.delete-item-btn');
       deleteButtons.forEach(btn => {
           btn.addEventListener('click', function() {
-              if (!confirm('Hapus item ini dari keranjang?')) return; // Ini boleh tetap confirm biasa
-              isSafeExit = true;
               const index = this.dataset.index;
-              const data = new URLSearchParams();
-              data.append('action', 'remove_from_cart');
-              data.append('index', index);
-              fetch('booking.php', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  body: data.toString()
-              })
-              .then(r => r.json())
-              .then(res => {
-                  if (res.status === 'ok') {
-                      if (res.count <= 0) {
-                         navigator.sendBeacon('cancel_booking.php');
-                         window.location.href = 'booking.php';
-                      } else {
-                         location.reload();
-                      }
-                  } else {
-                      alert('Gagal menghapus: ' + res.message);
-                      isSafeExit = false;
+              Swal.fire({
+                  title: 'Hapus Item?',
+                  text: "Item ini akan dihapus dari rincian.",
+                  icon: 'warning',
+                  showCancelButton: true,
+                  confirmButtonColor: '#d33',
+                  cancelButtonColor: '#3085d6',
+                  confirmButtonText: 'Ya, Hapus'
+              }).then((result) => {
+                  if (result.isConfirmed) {
+                      // Set Safe Exit SEMENTARA agar reload tidak dicegat browser
+                      isSafeExit = true; 
+                      
+                      const data = new URLSearchParams();
+                      data.append('action', 'remove_from_cart');
+                      data.append('index', index);
+
+                      fetch('booking.php', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                          body: data.toString()
+                      })
+                      .then(r => r.json())
+                      .then(res => {
+                          if (res.status === 'ok') {
+                              if (res.count <= 0) {
+                                 navigator.sendBeacon('cancel_booking.php?ajax=1');
+                                 window.location.href = 'booking.php';
+                              } else {
+                                 location.reload();
+                              }
+                          } else {
+                              isSafeExit = false; // Kembalikan guard jika gagal
+                              Swal.fire('Gagal', res.message, 'error');
+                          }
+                      });
                   }
               });
           });
       });
 
-      // --- HITUNG DP/LUNAS ---
+      // --- UI PAYMENT TYPE ---
       const paymentTypes = document.querySelectorAll('.payment-type');
       const currentPaymentAmount = document.getElementById('currentPaymentAmount');
       const paymentAmountInput = document.getElementById('paymentAmountInput');
@@ -446,23 +435,28 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
           });
       });
 
-      // --- MODAL VERIFIKASI PEMBAYARAN (BAWAAN) ---
+      // --- MODAL KONFIRMASI ---
       const paymentForm = document.getElementById('paymentForm');
       const openModalBtn = document.getElementById('openVerificationModal');
       const modal = document.getElementById('verificationModal');
       const closeModalBtn = document.getElementById('closeVerificationModal');
       const cancelBtn = document.getElementById('cancelVerificationBtn');
       const confirmBtn = document.getElementById('confirmVerificationBtn');
+      
       const openModal = () => modal && modal.classList.add('open');
       const closeModal = () => modal && modal.classList.remove('open');
+
       if (openModalBtn) openModalBtn.addEventListener('click', openModal);
       if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
       if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
       if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      
       if (confirmBtn) {
           confirmBtn.addEventListener('click', function() {
               closeModal();
-              isSafeExit = true;
+              // Izinkan pindah halaman karena mau submit
+              isSafeExit = true; 
+              window.removeEventListener('beforeunload', handleBeforeUnload);
               paymentForm.submit();
           });
       }
