@@ -36,12 +36,14 @@ $email = isset($_GET['email']) ? $_GET['email'] : '';
         
         <div class="form-group">
           <label for="email">Email</label>
-          <input type="email" name="email" id="email" class="form-control" required value="<?php echo esc($email); ?>">
+          <input type="email" name="email" id="email" class="form-control" required value="<?php echo esc($email); ?>" readonly style="background-color: #f3f4f6; cursor: not-allowed;">
         </div>
         
         <div class="form-group">
           <label for="otp">Masukkan Kode (6 digit)</label>
-          <input type="text" name="otp" id="otp" class="form-control" pattern="\d{6}" inputmode="numeric" maxlength="6" required>
+          <input type="text" name="otp" id="otp" class="form-control" 
+                 pattern="[0-9]*" inputmode="numeric" maxlength="6" 
+                 placeholder="Contoh: 123456" autocomplete="one-time-code" required>
         </div>
 
         <div>
@@ -59,5 +61,18 @@ $email = isset($_GET['email']) ? $_GET['email'] : '';
     </div>
   </main>
 
-  </body>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const otpInput = document.getElementById('otp');
+
+        if (otpInput) {
+            otpInput.addEventListener('input', function() {
+                // Hapus karakter apapun yang BUKAN angka (0-9)
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+        }
+    });
+  </script>
+
+</body>
 </html>
