@@ -4,38 +4,30 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 date_default_timezone_set('Asia/Jakarta');
 
-// === LOGIKA LOGOUT OTOMATIS (20 MENIT) ===
-if (isset($_SESSION['id_user'])) { // Hanya cek jika user sudah login
-    
-    $timeout_duration = 1200; // 20 menit x 60 detik = 1200 detik
-
+// === AUTO LOGOUT (20 MENIT) ===
+if (isset($_SESSION['id_user'])) {
+    $timeout_duration = 1200; 
     if (isset($_SESSION['last_activity'])) {
-        // Hitung selisih waktu (dalam detik)
         $inactive_time = time() - $_SESSION['last_activity'];
-
         if ($inactive_time > $timeout_duration) {
-            // Waktu habis, hancurkan session
             session_unset();
             session_destroy();
-            
-            // === PERUBAHAN DI SINI ===
-            // Menggunakan header PHP untuk redirect senyap (tanpa notifikasi)
-            // Pastikan path '/BookingLapanganKel2/index.php' sesuai folder project Anda
             header("Location: /BookingLapanganKel2/index.php");
-            exit; // Penting: Hentikan script agar halaman tidak lanjut dimuat
-            
+            exit; 
         } else {
-            // Jika belum timeout, perbarui waktu aktivitas terakhir
             $_SESSION['last_activity'] = time();
         }
     } else {
-        // Jika 'last_activity' belum ada (misal sesi lama), set sekarang
         $_SESSION['last_activity'] = time();
     }
 }
 
-// === DEFINISI BASE URL (Sangat Penting) ===
-$base_url = '/BookingLapanganKel2'; 
+// === DEFINISI BASE URL YANG ROBUST ===
+// Menggunakan logika server protocol agar aman di localhost maupun hosting
+$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+$host = $_SERVER['HTTP_HOST'];
+// Sesuaikan folder root project Anda jika berbeda
+$base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -45,6 +37,8 @@ $base_url = '/BookingLapanganKel2';
     <title>Rush Badminton</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -78,12 +72,15 @@ $base_url = '/BookingLapanganKel2';
         };
     </script>
     
-    <script>window.USER_ID = <?= json_encode($_SESSION['id_user'] ?? 0); ?>;</script>
+    <script>
+        window.USER_ID = <?= json_encode($_SESSION['id_user'] ?? 0); ?>;
+        window.BASE_URL = "<?= $base_url ?>"; // Variabel penting untuk JS
+    </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <link rel="stylesheet" href="<?= $base_url ?>../assets/css/dashboard.css" />
+    
+    <link rel="stylesheet" href="<?= $base_url ?>/assets/css/dashboard.css" />
 
     <style type="text/tailwindcss">
         body { font-family: 'Inter', sans-serif; background-color: #f6f8fb; }
@@ -92,7 +89,7 @@ $base_url = '/BookingLapanganKel2';
         .nav-link.active { color: #0b63d6 !important; font-weight: 600 !important; }
         html { scroll-behavior: smooth; }
         
-        /* Sidebar & Modal Styles (Disatukan disini agar tersedia di semua halaman) */
+        /* Sidebar Styles */
         .sidebar {
           @apply fixed top-0 flex flex-col z-[2000] border-l border-solid;
           right: -420px; width: 380px; height: 100vh; background: #fff;
@@ -110,27 +107,13 @@ $base_url = '/BookingLapanganKel2';
         .checkout-btn { @apply w-full p-[10px_12px] rounded-lg text-white font-semibold border-none cursor-pointer; background:#0b63d6; }
         .checkout-btn:disabled { @apply opacity-50 cursor-not-allowed; }
         
-        /* Style untuk .modal (dipakai oleh booking.php) */
-        /* Ini (flex, items-center, justify-center) sudah cukup untuk menengahkan .modal-panel */
-        .modal {
-            display: none; /* Sembunyi by default, diatur oleh JS */
-            @apply fixed inset-0 z-[9999] flex items-center justify-center p-4;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(4px);
-        }
-        
-        /* BLOK CSS .modal > .modal-panel YANG KONFLIK TELAH DIHAPUS */
-
         .modal-backdrop {
             @apply fixed inset-0 z-[3000] flex items-center justify-center p-4;
             background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
         }
         .modal-backdrop.hidden { display: none !important; }
-        
-        /* .modal-panel (kotak putih) tidak perlu position fixed, biarkan flexbox yang bekerja */
         .modal-panel { @apply bg-white rounded-xl shadow-lift w-full max-w-sm; }
         
-        /* Slot Card (untuk booking.php) */
         .slot-card { @apply border rounded-xl p-3 text-center transition-all duration-300 min-h-20 flex flex-col justify-center; }
         .slot-card.available { @apply bg-white border-gray-200 text-slate-700 shadow-md shadow-gray-200/50 hover:border-primary hover:shadow-lg hover:-translate-y-1 hover:bg-gray-hover cursor-pointer; }
         .slot-card.available .price { @apply text-green-600 font-bold; }
@@ -212,9 +195,6 @@ $base_url = '/BookingLapanganKel2';
                         if (isset($_SESSION['foto_profil']) && !empty($_SESSION['foto_profil'])) {
                             $foto_profil = $base_url . '/uploads/profiles/' . htmlspecialchars($_SESSION['foto_profil']);
                         }
-                        
-                        // --- PERUBAHAN: Gunakan Username ---
-                        // Pastikan di login.php Anda sudah menyimpan $_SESSION['username']
                         $tampil_username = isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : 'Member';
                         ?>
 
@@ -246,18 +226,29 @@ $base_url = '/BookingLapanganKel2';
         </div>
     </header>
 
+    <div id="loginRequiredModal" class="modal-backdrop hidden">
+      <div class="modal-panel animate-pop p-6 text-center" id="loginModalContent">
+          <h3 class="text-lg font-bold text-slate-800 mb-2">Login Diperlukan</h3>
+          <p class="text-sm text-slate-500 mb-6">Anda harus login terlebih dahulu untuk melanjutkan checkout.</p>
+          <div class="flex flex-col gap-3">
+              <button id="btnLoginYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all">IYA, LOGIN</button>
+              <button id="btnLoginNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">BATAL</button>
+          </div>
+      </div>
+    </div>
+
     <div id="mobileNav" class="lg:hidden hidden bg-white border-t border-slate-100 shadow-lg">
         <div class="px-4 py-4 flex flex-col gap-2">
             <a href="<?= $base_url ?>/index.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Beranda</a>
             <a href="<?= $base_url ?>/BookingPengguna/booking.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lapangan</a>
             <a href="<?= $base_url ?>/kontak.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Kontak</a>
             <a href="<?= $base_url ?>/member.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Member</a>
-            <a href="<?= $base_url ?>/riwayat.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Riwayat</a>
+            <a href="<?= $base_url ?>/riwayat/riwayat.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Riwayat</a>
             
             <div class="pt-2 flex gap-2 mt-2 border-t">
                  <?php if (isset($_SESSION['id_user']) && $_SESSION['id_user'] != 1): ?>
                     <a href="<?= $base_url ?>/DashPengguna.php" class="flex-1 text-center border border-primary text-primary py-2 rounded-lg font-medium">Dashboard</a>
-                    <a href="<?= $base_url ?>/auth/php/logout.php" id="btnLogoutMobile" class="flex-1 text-center bg-red-600 text-white py-2 rounded-lg font-medium">Keluar</a>
+                    <a href="<?= $base_url ?>/auth/php/logout.php" class="flex-1 text-center bg-red-600 text-white py-2 rounded-lg font-medium">Keluar</a>
                  <?php else: ?>
                     <a href="<?= $base_url ?>/auth/login.php" class="flex-1 text-center border border-primary text-primary py-2 rounded-lg font-medium">Masuk</a>
                     <a href="<?= $base_url ?>/auth/register.php" class="flex-1 text-center bg-primary text-white py-2 rounded-lg font-medium">Daftar</a>

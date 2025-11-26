@@ -1,12 +1,14 @@
 // assets/js/booking-script.js
 document.addEventListener("DOMContentLoaded", function () {
-  // === PATH ABSOLUT ===
-  const projectRoot = "/BookingLapanganKel2";
+  
+  // === PATH DINAMIS BERDASARKAN HEADER PHP ===
+  // Mengambil base_url yang diset di header.php
+  const projectRoot = window.BASE_URL || "/BookingLapanganKel2"; 
+  
   const bookingEndpoint = `${projectRoot}/BookingPengguna/booking.php`;
   const processCheckoutEndpoint = `${projectRoot}/BookingPengguna/process_checkout.php`; 
   const loginPage = `${projectRoot}/auth/login.php`; 
-  // ====================
-
+  
   const USER_ID = window.USER_ID || 0;
 
   function isLoggedIn() {
@@ -21,54 +23,28 @@ document.addEventListener("DOMContentLoaded", function () {
   const cartCount = document.getElementById("cartCount");
   const checkoutBtn = document.getElementById("checkoutBtn");
 
-  // === ELEMEN MODAL LOGIN CUSTOM ===
+  // === ELEMEN MODAL LOGIN ===
   const loginModal = document.getElementById("loginRequiredModal");
   const btnLoginYes = document.getElementById("btnLoginYes");
   const btnLoginNo = document.getElementById("btnLoginNo");
-  const loginModalContent = document.getElementById("loginModalContent");
 
-  // Fungsi Buka Modal
   function showLoginModal() {
-    if (loginModal) {
-      loginModal.classList.remove("hidden");
-      // Sedikit delay agar transisi CSS berjalan smooth
-      setTimeout(() => {
-        loginModal.classList.remove("opacity-0", "pointer-events-none");
-        loginModalContent.classList.remove("scale-95");
-        loginModalContent.classList.add("scale-100");
-      }, 10);
-    }
+    if (loginModal) loginModal.classList.remove("hidden");
   }
 
-  // Fungsi Tutup Modal
   function hideLoginModal() {
-    if (loginModal) {
-      loginModal.classList.add("opacity-0", "pointer-events-none");
-      loginModalContent.classList.remove("scale-100");
-      loginModalContent.classList.add("scale-95");
-      setTimeout(() => {
-        loginModal.classList.add("hidden");
-      }, 300); // Sesuaikan dengan durasi transition CSS
-    }
+    if (loginModal) loginModal.classList.add("hidden");
   }
 
-  // Event Listener Tombol Modal
-  if (btnLoginYes) {
-    btnLoginYes.addEventListener("click", () => {
-      window.location.href = loginPage;
-    });
-  }
-  if (btnLoginNo) {
-    btnLoginNo.addEventListener("click", hideLoginModal);
-  }
-  // Tutup jika klik di luar area modal (backdrop)
+  if (btnLoginYes) btnLoginYes.addEventListener("click", () => window.location.href = loginPage);
+  if (btnLoginNo) btnLoginNo.addEventListener("click", hideLoginModal);
   if (loginModal) {
     loginModal.addEventListener("click", (e) => {
         if (e.target === loginModal) hideLoginModal();
     });
   }
 
-// --- 1. LOGIKA KLIK JAM (HAPUS TOAST SUKSES, PERTAHANKAN ALERT ERROR) ---
+  // --- 1. LOGIKA KLIK JAM ---
   document.querySelectorAll(".jam-main").forEach((btn) => {
     btn.addEventListener("click", function () {
       const slotData = {
@@ -82,12 +58,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const data = new URLSearchParams();
       data.append("action", "add_to_cart");
-      data.append("id_jadwal_waktu", slotData.id_jadwal_waktu);
-      data.append("id_lapangan", slotData.id_lapangan);
-      data.append("tanggal", slotData.tanggal);
-      data.append("jam", slotData.jam);
-      data.append("harga", slotData.harga);
-      data.append("nama_lapangan", slotData.nama_lapangan);
+      // Copy semua property
+      for (const key in slotData) data.append(key, slotData[key]);
 
       fetch(bookingEndpoint, {
         method: "POST",
@@ -97,36 +69,21 @@ document.addEventListener("DOMContentLoaded", function () {
         .then((r) => r.json())
         .then((res) => {
           if (res.status === "ok") {
-            // === SUKSES: HANYA UPDATE UI DAN BUKA SIDEBAR ===
             addItemToSidebar(slotData);
             if (cartCount) cartCount.textContent = res.count ?? parseInt(cartCount.textContent || "0") + 1;
             if (checkoutBtn) checkoutBtn.disabled = false;
-            
-            // Otomatis buka sidebar keranjang sebagai penanda sukses
             if (sidebar) sidebar.classList.add("active");
-
-            // (Bagian Toast notifikasi hijau sudah dihapus)
-
           } else {
-            // === GAGAL / DUPLIKAT: TAMPILKAN POPUP PERINGATAN ===
             Swal.fire({
                 icon: 'warning',
                 title: 'Oops...',
                 text: res.message || "Gagal menambahkan ke keranjang",
                 confirmButtonColor: '#0b63d6',
-                confirmButtonText: 'Oke, Mengerti'
+                confirmButtonText: 'Oke'
             });
           }
         })
-        .catch((err) => {
-          console.error(err);
-          Swal.fire({
-              icon: 'error',
-              title: 'Error Jaringan',
-              text: 'Terjadi kesalahan saat menghubungi server.',
-              confirmButtonColor: '#0b63d6'
-          });
-        });
+        .catch(console.error);
     });
   });
 
@@ -144,14 +101,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // --- 3. HAPUS ITEM ---
-if (keranjangList) {
+  if (keranjangList) {
     keranjangList.addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("remove-item-btn")) {
         const idx = e.target.dataset.index;
         
-        // KODE LAMA YANG DIHAPUS:
-        // if (!confirm("Hapus item dari keranjang?")) return;
-
         const data = new URLSearchParams();
         data.append("action", "remove_from_cart");
         data.append("index", idx);
@@ -164,10 +118,7 @@ if (keranjangList) {
           .then((r) => r.json())
           .then((res) => {
             if (res.status === "ok") {
-              // Hapus elemen HTML dari sidebar secara langsung untuk efek instan
-              const el = e.target.closest(".keranjang-item");
-              if (el) el.remove();
-              
+              e.target.closest(".keranjang-item")?.remove();
               if (cartCount) cartCount.textContent = res.count ?? 0;
               
               if ((res.count ?? 0) <= 0) {
@@ -176,21 +127,16 @@ if (keranjangList) {
               } else {
                 reindexRemoveButtons();
               }
-            } else {
-              // Tetap tampilkan alert jika terjadi error dari server
-              alert(res.message || "Gagal menghapus item");
             }
           })
-          .catch((err) => console.error(err));
+          .catch(console.error);
       }
     });
   }
 
-  // --- 4. TOMBOL CHECKOUT (MODIFIED) ---
+  // --- 4. CHECKOUT ---
   if (checkoutBtn) {
     checkoutBtn.addEventListener("click", () => {
-
-      // Jika belum login, tampilkan MODAL, bukan alert
       if (!isLoggedIn()) {
         showLoginModal(); 
         return;
@@ -200,97 +146,73 @@ if (keranjangList) {
       checkoutBtn.innerText = "Memproses...";
       checkoutBtn.disabled = true;
 
+      // FETCH LANGSUNG KE PATH ABSOLUT
       fetch(processCheckoutEndpoint, { method: 'POST' })
       .then(r => r.json())
       .then(res => {
           if (res.status === 'ok') {
-              window.location.href = res.redirect;
+              // Redirect ke URL Absolut juga agar aman
+              window.location.href = projectRoot + "/BookingPengguna/" + res.redirect.replace('BookingPengguna/', '');
           } else {
-              // === UPDATE: SWEETALERT UNTUK SLOT DIAMBIL ORANG LAIN ===
               Swal.fire({
                   icon: 'error',
                   title: 'Gagal Checkout',
-                  text: res.message, // Pesan dari PHP: "Maaf, slot jam ... baru saja diambil orang lain."
+                  text: res.message,
                   confirmButtonColor: '#d33',
-                  confirmButtonText: 'Muat Ulang Jadwal',
                   allowOutsideClick: false
-              }).then(() => {
-                  // Penting: Reload halaman agar slot yang tadinya hijau berubah jadi merah (booked)
-                  location.reload(); 
-              });
-
+              }).then(() => location.reload());
               checkoutBtn.innerText = originalText;
               checkoutBtn.disabled = false;
           }
       })
       .catch(err => {
           console.error(err);
-          // Error Jaringan / Server Error
-          Swal.fire({
-              icon: 'error',
-              title: 'Terjadi Kesalahan',
-              text: 'Gagal memproses checkout. Silakan coba lagi.',
-              confirmButtonColor: '#0b63d6'
-          });
+          Swal.fire({ icon: 'error', title: 'Kesalahan Sistem', text: 'Gagal menghubungi server.', confirmButtonColor: '#0b63d6'});
           checkoutBtn.innerText = originalText;
           checkoutBtn.disabled = false;
       });
     });
   }
-
-  // --- 5. LOGOUT LOGIC ---
-  const btnLogoutBooking = document.getElementById("btnLogout");
+  
+  // --- 5. LOGOUT (DESKTOP & MOBILE) ---
+  const logoutLinks = document.querySelectorAll('a[href*="logout.php"]');
   const logoutModal = document.getElementById("logoutModal");
   const cancelLogoutBtn = document.getElementById("cancelLogoutBtn");
   const confirmLogoutBtn = document.getElementById("confirmLogoutBtn");
-  let logoutUrl = "";
+  let targetLogoutUrl = "";
 
-  if (btnLogoutBooking) {
-    btnLogoutBooking.addEventListener("click", function (e) {
-      e.preventDefault();
-      logoutUrl = this.href;
-      if (logoutModal) {
-        logoutModal.classList.remove("hidden");
-        logoutModal.classList.add("animate-fade-in");
-      }
-    });
+  if (logoutLinks.length > 0) {
+      logoutLinks.forEach(link => {
+          link.addEventListener("click", function (e) {
+              e.preventDefault();
+              targetLogoutUrl = this.href;
+              if (logoutModal) logoutModal.classList.remove("hidden");
+          });
+      });
   }
-  const closeLogoutModal = () => {
-    if (logoutModal) {
-      logoutModal.classList.add("hidden");
-      logoutModal.classList.remove("animate-fade-in");
-    }
-  };
-  if (cancelLogoutBtn) cancelLogoutBtn.addEventListener("click", closeLogoutModal);
-  if (confirmLogoutBtn) confirmLogoutBtn.addEventListener("click", () => { if (logoutUrl) window.location.href = logoutUrl; });
-  if (logoutModal) logoutModal.addEventListener("click", (e) => { if (e.target === logoutModal) closeLogoutModal(); });
+  if (cancelLogoutBtn) cancelLogoutBtn.addEventListener("click", () => logoutModal?.classList.add("hidden"));
+  if (confirmLogoutBtn) confirmLogoutBtn.addEventListener("click", () => { if (targetLogoutUrl) window.location.href = targetLogoutUrl; });
 
-  // --- HELPER FUNCTIONS ---
+  // --- HELPER ---
   function reindexRemoveButtons() {
-    if (!keranjangList) return;
-    const buttons = keranjangList.querySelectorAll(".remove-item-btn");
-    buttons.forEach((b, i) => (b.dataset.index = i));
-    const items = keranjangList.querySelectorAll(".keranjang-item");
-    items.forEach((it, i) => (it.dataset.index = i));
+    keranjangList?.querySelectorAll(".remove-item-btn").forEach((b, i) => (b.dataset.index = i));
+    keranjangList?.querySelectorAll(".keranjang-item").forEach((it, i) => (it.dataset.index = i));
   }
 
   function addItemToSidebar(item) {
-    if (!keranjangList || !cartCount) return;
-    const placeholder = keranjangList.querySelector(".text-slate-400");
-    if (placeholder) placeholder.remove();
+    if (!keranjangList) return;
+    if (keranjangList.querySelector(".text-slate-400")) keranjangList.innerHTML = '';
 
-    const idx = parseInt(cartCount.textContent || "0");
+    const idx = parseInt(cartCount?.textContent || "0");
     const wrapper = document.createElement("div");
     wrapper.className = "keranjang-item";
     wrapper.setAttribute("data-index", idx);
-
-    const namaLapanganHTML = item.nama_lapangan ? `<div class="text-xs text-slate-500">Lapangan: ${escapeHtml(item.nama_lapangan)}</div>` : "";
 
     wrapper.innerHTML = `
           <div class="left">
             <div class="text-sm font-semibold">${escapeHtml(item.jam)}</div>
             <div class="text-xs text-slate-500">${formatDate(item.tanggal)}</div>
-            ${namaLapanganHTML} 
+            <div class="text-xs text-slate-500">Lapangan: ${escapeHtml(item.nama_lapangan)}</div>
           </div>
           <div class="right">
             <div class="text-sm font-semibold">Rp ${numberWithCommas(item.harga)}</div>
@@ -300,30 +222,20 @@ if (keranjangList) {
     keranjangList.appendChild(wrapper);
   }
 
-  function numberWithCommas(x) {
-    return parseInt(x || 0).toLocaleString("id-ID");
-  }
-
+  function numberWithCommas(x) { return parseInt(x || 0).toLocaleString("id-ID"); }
+  
   function formatDate(d) {
-    try {
-      const dt = new Date(d + "T00:00:00");
-      const opts = { day: "2-digit", month: "short", year: "numeric" };
-      return dt.toLocaleDateString("id-ID", opts);
-    } catch (e) {
-      return d;
-    }
+    try { return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }); } 
+    catch (e) { return d; }
   }
 
   function escapeHtml(unsafe) {
-    return unsafe.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    return (unsafe || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
+  // Close sidebar on outside click
   document.addEventListener("click", function (e) {
-    if (!sidebar || !cartIcon) return;
-    const isSidebarActive = sidebar.classList.contains("active");
-    const isClickInsideSidebar = e.target.closest("#sidebarKeranjang");
-    const isClickInsideCartIcon = e.target.closest("#cartIcon");
-    if (isSidebarActive && !isClickInsideSidebar && !isClickInsideCartIcon) {
+    if (sidebar?.classList.contains("active") && !e.target.closest("#sidebarKeranjang") && !e.target.closest("#cartIcon")) {
       sidebar.classList.remove("active");
     }
   });

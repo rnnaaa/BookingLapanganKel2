@@ -1,251 +1,244 @@
 <?php 
 // Memanggil header.php
-// (Saya asumsikan path-nya adalah 'include_user' seperti file Anda yang lain)
 require 'include_user/header.php'; 
 ?>
 
 <style>
-  /* Animasi hover ikon */
-  .contact-icon {
-    transition: all 0.3s ease;
-  }
-  .contact-icon:hover {
-    transform: translateY(-5px);
-  }
-  
-  /* Style untuk FAQ details */
-  details summary {
-    cursor: pointer;
-  }
-  details summary::-webkit-details-marker {
-    display: none;
-  }
-  details summary:after {
-    content: '+';
-    float: right;
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #0b63d6; /* Warna primary Anda */
-  }
-  details[open] summary:after {
-    content: '-';
-  }
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+    }
+    h1, h2, h3, h4, h5, h6, .font-poppins {
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    /* Animasi Custom */
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    .animate-float {
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    /* Styling Details/Summary untuk FAQ */
+    details > summary {
+        list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+        display: none;
+    }
+    details[open] summary ~ * {
+        animation: slideDown 0.3s ease-in-out;
+    }
+    @keyframes slideDown {
+        0% { opacity: 0; transform: translateY(-10px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
 </style>
 
 <main>
-  <section class="py-16 bg-gradient-to-r from-primary to-primaryDark text-white">
-    <div class="max-w-7xl mx-auto px-4 text-center">
-      <h1 class="text-4xl md:text-5xl font-poppins font-bold mb-4">Hubungi SportField</h1>
-      <p class="text-xl text-white/90 max-w-2xl mx-auto">Kami siap membantu Anda dengan segala pertanyaan tentang booking lapangan, fasilitas, dan informasi lainnya</p>
-    </div>
-  </section>
-
-  <section class="py-20 bg-white">
-    <div class="max-w-4xl mx-auto px-4">
-      <div class="text-center mb-12">
-        <h2 class="text-4xl font-poppins font-bold mb-4">Berikan Saran & Kritik</h2>
-        <p class="text-lg text-slate-600">Masukan Anda sangat berharga untuk meningkatkan kualitas layanan kami</p>
-      </div>
-
-      <div class="bg-white rounded-2xl shadow-soft p-8">
-        <form id="saranForm" onsubmit="submitSaran(event)">
-          <div class="grid md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label for="nama" class="block text-sm font-medium text-slate-700 mb-2">Nama Lengkap *</label>
-              <input 
-                type="text" 
-                id="nama" 
-                name="nama"
-                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
-                placeholder="Masukkan nama lengkap"
-                required
-              >
-            </div>
-            <div>
-              <label for="email" class="block text-sm font-medium text-slate-700 mb-2">Email *</label>
-              <input 
-                type="email" 
-                id="email" 
-                name="email"
-                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
-                placeholder="email@contoh.com"
-                required
-              >
-            </div>
-          </div>
-
-          <div class="mb-4">
-            <label for="kategori" class="block text-sm font-medium text-slate-700 mb-2">Kategori *</label>
-            <select 
-              id="kategori" 
-              name="kategori"
-              class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
-              required
-            >
-              <option value="" disabled selected>Pilih kategori saran/kritik</option>
-              <option value="fasilitas">Fasilitas Lapangan</option>
-              <option value="pelayanan">Pelayanan Admin</option>
-              <option value="booking">Proses Booking</option>
-              <option value="harga">Harga & Promo</option>
-              <option value="kebersihan">Kebersihan</option>
-              <option value="lainnya">Lainnya</option>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-slate-700 mb-2">Rating Pengalaman *</label>
-            <div class="flex items-center gap-2" id="ratingStars">
-              <input type="hidden" id="rating" name="rating" value="0" required>
-              <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors" data-rating="1" onclick="setRating(1)">★</button>
-              <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors" data-rating="2" onclick="setRating(2)">★</button>
-              <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors" data-rating="3" onclick="setRating(3)">★</button>
-              <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors" data-rating="4" onclick="setRating(4)">★</button>
-              <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors" data-rating="5" onclick="setRating(5)">★</button>
-              <span class="ml-2 text-sm text-slate-500" id="ratingText">Pilih rating</span>
-            </div>
-          </div>
-
-          <div class="mb-4">
-            <label for="pesan" class="block text-sm font-medium text-slate-700 mb-2">Pesan / Saran / Kritik *</label>
-            <textarea 
-              id="pesan" 
-              name="pesan"
-              rows="4"
-              class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
-              placeholder="Tuliskan saran, kritik, atau pengalaman Anda menggunakan layanan SportField..."
-              required
-            ></textarea>
-          </div>
-
-          <div class="flex items-center gap-2 mb-6">
-            <input 
-              type="checkbox" 
-              id="anonim" 
-              name="anonim"
-              class="w-4 h-4 text-primary rounded focus:ring-primary/50 border-slate-300"
-            >
-            <label for="anonim" class="text-sm text-slate-600">Kirim sebagai anonim (nama tidak akan ditampilkan)</label>
-          </div>
-
-          <div class="flex gap-4">
-            <button type="button" class="border border-primary text-primary px-4 py-3 rounded-lg text-sm hover:bg-primary hover:text-white transition-all duration-300 flex-1" onclick="resetSaranForm()">Reset Form</button>
-            <button type="submit" class="bg-primary text-white px-4 py-3 rounded-lg text-sm hover:bg-primaryDark transition-all duration-300 flex-1">Kirim Saran</button>
-          </div>
-        </form>
-      </div>
-
-      <div id="saranSuccess" class="hidden mt-6 bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
-        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-semibold text-green-800 mb-2">Terima Kasih!</h3>
-        <p class="text-green-700">Saran dan kritik Anda telah berhasil dikirim. Kami akan menindaklanjuti masukan Anda untuk meningkatkan layanan SportField.</p>
-        <button class="mt-4 text-green-700 hover:text-green-800 font-medium underline" onclick="hideSuccessMessage()">Kirim saran lagi</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="py-20 bg-softGray">
-    <div class="max-w-7xl mx-auto px-4">
-      <div class="text-center mb-12">
-        <h2 class="text-4xl font-poppins font-bold mb-4">Hubungi Kami</h2>
-        <p class="text-lg text-slate-600">Pilih cara yang paling nyaman untuk menghubungi tim SportField</p>
-      </div>
-
-      <div class="grid md:grid-cols-2 gap-8">
-        <a href="https://wa.me/6285234063810" target="_blank" class="block contact-icon">
-          <div class="bg-white p-8 rounded-2xl shadow-soft hover:shadow-lift transition-all duration-300 text-center h-full">
-            <div class="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="#25D366"/>
-              </svg>
-            </div>
-            <h3 class="text-2xl font-semibold mb-4">WhatsApp</h3>
-            <p class="text-slate-600 mb-4">Klik untuk chat langsung dengan admin kami</p>
-            <div class="text-sm text-slate-500">Respon cepat untuk booking & informasi</div>
-          </div>
-        </a>
-
-        <a href="mailto:booking@sportfield.id" class="block contact-icon">
-          <div class="bg-white p-8 rounded-2xl shadow-soft hover:shadow-lift transition-all duration-300 text-center h-full">
-            <div class="w-32 h-32 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" fill="#4285F4"/>
-                <path d="M22 6L12 13L2 6V6C2 4.9 2.9 4 4 4H20C21.1 4 22 4.9 22 6V6Z" fill="#34A853"/>
-                <path d="M2 18L12 11L22 18V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V18Z" fill="#FBBC04"/>
-                <path d="M22 6L12 13L2 6" fill="#EA4335"/>
-              </svg>
-            </div>
-            <h3 class="text-2xl font-semibold mb-4">Email</h3>
-            <p class="text-slate-600 mb-4">Kirim pertanyaan atau permintaan detail via email</p>
-            <div class="text-sm text-slate-500">booking@sportfield.id</div>
-          </div>
-        </a>
-      </div>
-
-  <section id="testimoni" class="py-20 bg-white">
-    <div class="max-w-7xl mx-auto px-4">
-      <div class="text-center mb-12">
-        <h2 class="text-4xl font-poppins font-bold mb-4">Apa Kata Mereka?</h2>
-        <p class="text-lg text-slate-600">Testimoni dari pelanggan setia SportField</p>
-      </div>
-
-      <div class="grid md:grid-cols-3 gap-8" id="testimoniContainer">
-        </div>
-
-      <div class="mt-12 text-center">
-        <p class="text-slate-600 text-sm">
-          <strong>Tips:</strong> Isi form saran & kritik di atas untuk testimoni Anda tampil di sini!
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section id="faq" class="py-20 bg-white">
-    <div class="max-w-3xl mx-auto px-4">
-      <h2 class="text-4xl font-poppins font-bold text-center mb-12">Pertanyaan Umum</h2>
-      
-      <div class="space-y-6">
-        <details class="p-6 bg-slate-50 rounded-2xl shadow-soft">
-          <summary class="font-semibold text-lg cursor-pointer">Bagaimana cara booking?</summary>
-          <p class="mt-4 text-slate-600">Pilih lapangan → pilih tanggal & jam → login → konfirmasi & DP via admin.</p>
-        </details>
+    <section class="relative overflow-hidden bg-gradient-to-r from-primary to-primaryDark text-white">
+        <div class="absolute top-10 left-10 w-32 h-32 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
+        <div class="absolute bottom-10 right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
         
-        <details class="p-6 bg-slate-50 rounded-2xl shadow-soft">
-          <summary class="font-semibold text-lg cursor-pointer">Metode pembayaran?</summary>
-          <p class="mt-4 text-slate-600">Transfer bank, e-wallet, atau pembayaran di tempat sesuai ketentuan.</p>
-        </details>
-        
-        <details class="p-6 bg-slate-50 rounded-2xl shadow-soft">
-          <summary class="font-semibold text-lg cursor-pointer">Refund?</summary>
-          <p class="mt-4 text-slate-600">Refund sesuai syarat & ketentuan; hubungi admin untuk proses.</p>
-        </details>
-      </div>
-    </div>
-  </section>
+        <div class="max-w-7xl mx-auto px-4 py-20 lg:py-24 text-center relative z-10" data-aos="fade-down">
+            <h1 class="font-poppins font-extrabold text-4xl md:text-5xl lg:text-6xl leading-tight mb-6">
+                Hubungi <span class="text-yellow-300">Rush Badminton</span>
+            </h1>
+            <p class="text-lg md:text-xl text-white/90 max-w-2xl mx-auto font-light">
+                Punya pertanyaan seputar booking, fasilitas, atau kemitraan? Kami siap membantu Anda kapan saja.
+            </p>
+        </div>
+    </section>
 
-  <section class="py-20 bg-gradient-to-r from-primary to-primaryDark text-white">
-    <div class="max-w-3xl mx-auto px-4 text-center">
-      <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Siap booking?</h2>
-      <h3 class="text-2xl md:text-3xl font-poppins font-bold mb-6">Amankan jadwalmu sekarang juga</h3>
-      <p class="text-xl text-white/90 mb-8">Klik booking, login, lalu pilih slot yang tersedia.</p>
-      <div class="mt-6">
-        <a href="<?= $base_url ?>/BookingPengguna/booking.php" class="bg-white text-primary px-8 py-4 rounded-lg font-semibold text-lg hover:bg-slate-100 transition-all duration-300 inline-block">Lihat Lapangan</a>
-      </div>
-    </div>
-  </section>
+    <section class="relative -mt-16 z-20 pb-20">
+        <div class="max-w-5xl mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <a href="https://wa.me/6285234063810" target="_blank" class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transform transition hover:-translate-y-2 duration-300 flex items-center gap-6" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                        <i class="fa-brands fa-whatsapp text-4xl text-green-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-1 font-poppins group-hover:text-green-600 transition-colors">WhatsApp Admin</h3>
+                        <p class="text-slate-500 text-sm mb-2">Respon cepat untuk booking & info</p>
+                        <span class="text-green-600 font-semibold text-sm flex items-center gap-2">
+                            Chat Sekarang <i class="fa-solid fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                        </span>
+                    </div>
+                </a>
+
+                <?php
+                    $email_tujuan = 'gilangoppo417@gmail.com'; 
+                ?>
+                <a href="https://mail.google.com/mail/?view=cm&fs=1&to=<?= $email_tujuan ?>" target="_blank" class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transform transition hover:-translate-y-2 duration-300 flex items-center gap-6" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                        <i class="fa-regular fa-envelope text-4xl text-blue-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-1 font-poppins group-hover:text-blue-600 transition-colors">Email Support</h3>
+                        <p class="text-slate-500 text-sm mb-2">Kirim email via Gmail</p>
+                        <span class="text-blue-600 font-semibold text-sm flex items-center gap-2">
+                            Tulis Pesan <i class="fa-solid fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                        </span>
+                    </div>
+                </a>
+
+            </div>
+        </div>
+    </section>
+
+    <section class="py-12">
+        <div class="max-w-3xl mx-auto px-4"> <div class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden p-8 md:p-10" data-aos="fade-up">
+                
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-bold font-poppins text-slate-800 mb-2">Kirim Saran & Masukan</h2>
+                    <p class="text-slate-500 text-sm">Bantu kami meningkatkan layanan dengan memberikan feedback Anda.</p>
+                </div>
+                
+                <form id="saranForm" onsubmit="submitSaran(event)" class="space-y-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Nama</label>
+                            <input type="text" name="nama" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" placeholder="Nama Anda" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Email</label>
+                            <input type="email" name="email" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" placeholder="email@anda.com" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Topik</label>
+                        <select name="kategori" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm cursor-pointer" required>
+                            <option value="" disabled selected>Pilih Topik...</option>
+                            <option value="fasilitas">Fasilitas Lapangan</option>
+                            <option value="pelayanan">Pelayanan Admin</option>
+                            <option value="booking">Website / Booking</option>
+                            <option value="harga">Harga & Promo</option>
+                            <option value="lainnya">Lainnya</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rating</label>
+                        <div class="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200" id="ratingStars">
+                            <input type="hidden" id="rating" name="rating" value="0" required>
+                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="1" onclick="setRating(1)">★</button>
+                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="2" onclick="setRating(2)">★</button>
+                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="3" onclick="setRating(3)">★</button>
+                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="4" onclick="setRating(4)">★</button>
+                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="5" onclick="setRating(5)">★</button>
+                            <span class="ml-auto text-xs text-slate-500 font-medium bg-white px-2 py-1 rounded-md shadow-sm" id="ratingText">Pilih Bintang</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pesan</label>
+                        <textarea name="pesan" rows="4" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none" placeholder="Tulis pengalaman Anda disini..." required></textarea>
+                    </div>
+
+                    <div class="flex items-center gap-2 mb-4">
+                        <input type="checkbox" id="anonim" name="anonim" class="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary">
+                        <label for="anonim" class="text-xs text-slate-600 cursor-pointer select-none">Kirim sebagai anonim (Sembunyikan nama)</label>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" onclick="resetSaranForm()" class="w-full md:w-auto px-6 py-3 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
+                            Reset
+                        </button>
+                        <button type="submit" class="flex-1 px-6 py-3 text-sm font-bold text-white bg-primary hover:bg-primaryDark rounded-xl shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all">
+                            Kirim Masukan
+                        </button>
+                    </div>
+                </form>
+
+                <div id="saranSuccess" class="hidden h-full flex flex-col items-center justify-center text-center animate-fade-in py-10">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-check text-3xl text-green-600"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Terima Kasih!</h3>
+                    <p class="text-slate-600 text-sm mb-6 max-w-md mx-auto">Masukan Anda telah kami terima dan akan kami jadikan evaluasi untuk pelayanan yang lebih baik.</p>
+                    <button onclick="hideSuccessMessage()" class="text-primary font-semibold hover:underline text-sm">Kirim saran lagi</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="testimoni" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-12" data-aos="fade-up">
+                <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Kata Mereka</h2>
+                <p class="text-lg text-slate-600">Pengalaman pengguna setia SportField</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8" id="testimoniContainer">
+                </div>
+        </div>
+    </section>
+
+    <section id="faq" class="py-20 bg-slate-50">
+        <div class="max-w-3xl mx-auto px-4">
+            <div class="text-center mb-12" data-aos="fade-up">
+                <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Pertanyaan Umum</h2>
+                <p class="text-slate-600">Jawaban untuk pertanyaan yang sering diajukan</p>
+            </div>
+            
+            <div class="space-y-4">
+                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="100">
+                    <summary class="flex items-center justify-between p-5 cursor-pointer">
+                        <h4 class="font-semibold text-slate-800">Bagaimana prosedur booking lapangan?</h4>
+                        <span class="text-slate-400 transition-transform group-open:rotate-180">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </span>
+                    </summary>
+                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">
+                        Sangat mudah! Pilih lapangan di halaman utama, tentukan tanggal & jam, lalu login/daftar. Setelah itu lakukan pembayaran (DP/Lunas) dan upload bukti transfer.
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="200">
+                    <summary class="flex items-center justify-between p-5 cursor-pointer">
+                        <h4 class="font-semibold text-slate-800">Metode pembayaran apa yang tersedia?</h4>
+                        <span class="text-slate-400 transition-transform group-open:rotate-180">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </span>
+                    </summary>
+                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">
+                        Kami menerima pembayaran via Transfer Bank (BCA, Mandiri) dan QRIS (GoPay, OVO, Dana, ShopeePay). Anda juga bisa melakukan pembayaran tunai langsung di lokasi.
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="300">
+                    <summary class="flex items-center justify-between p-5 cursor-pointer">
+                        <h4 class="font-semibold text-slate-800">Apakah bisa reschedule atau refund?</h4>
+                        <span class="text-slate-400 transition-transform group-open:rotate-180">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </span>
+                    </summary>
+                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">
+                        Reschedule diperbolehkan minimal H-1 sebelum jadwal main. Refund hanya dapat diproses jika ada kendala teknis dari pihak Rush Badminton atau pembatalan H-2 (dikenakan potongan admin).
+                    </div>
+                </details>
+            </div>
+        </div>
+    </section>
 </main>
 
 <script>
-  // Fungsi untuk mengatur rating ketika user mengklik bintang
+  // Fungsi untuk mengatur rating
   function setRating(value) {
     const ratingInput = document.getElementById('rating');
     const ratingText = document.getElementById('ratingText');
     const stars = document.querySelectorAll('#ratingStars button[data-rating]');
 
     ratingInput.value = String(value);
+
+    const labels = ['Sangat Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat Baik'];
+    ratingText.textContent = labels[value - 1];
+    ratingText.className = "ml-auto text-xs font-bold px-2 py-1 rounded-md shadow-sm text-white " + 
+                          (value <= 2 ? "bg-red-500" : value == 3 ? "bg-yellow-500" : "bg-green-500");
 
     stars.forEach(btn => {
       const r = parseInt(btn.getAttribute('data-rating'), 10);
@@ -257,21 +250,17 @@ require 'include_user/header.php';
         btn.classList.add('text-slate-300');
       }
     });
-
-    const labels = ['Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat Baik'];
-    ratingText.textContent = value + '/5 — ' + (labels[value - 1] || '');
   }
 
-  // Fungsi untuk mereset form saran
   function resetSaranForm() {
     const form = document.getElementById('saranForm');
     if (form) form.reset();
 
-    const ratingInput = document.getElementById('rating');
-    if (ratingInput) ratingInput.value = '0';
-
+    document.getElementById('rating').value = '0';
     const ratingText = document.getElementById('ratingText');
-    if (ratingText) ratingText.textContent = 'Pilih rating';
+    ratingText.textContent = 'Pilih Bintang';
+    ratingText.className = "ml-auto text-xs text-slate-500 font-medium bg-white px-2 py-1 rounded-md shadow-sm";
+    
     const stars = document.querySelectorAll('#ratingStars button[data-rating]');
     stars.forEach(btn => {
       btn.classList.remove('text-yellow-400');
@@ -279,109 +268,57 @@ require 'include_user/header.php';
     });
   }
 
-  // Fungsi untuk menyimpan testimoni ke localStorage
   function saveTestimonials(testimonials) {
     localStorage.setItem('sportfieldTestimonials', JSON.stringify(testimonials));
   }
 
-  // Fungsi untuk memuat testimoni dari localStorage
   function loadTestimonials() {
     const stored = localStorage.getItem('sportfieldTestimonials');
     if (stored) {
       return JSON.parse(stored);
     } else {
-      // Data testimoni default jika belum ada
       const defaultTestimonials = [
-        {
-          nama: 'Ahmad Rizki',
-          peran: 'Pengguna Fasilitas',
-          testimoni: '"Lapangan futsal berkualitas dengan harga terjangkau. Adminnya ramah dan responsif!"',
-          rating: 5
-        },
-        {
-          nama: 'Sari Dewi',
-          peran: 'Pelanggan Booking',
-          testimoni: '"Proses booking mudah dan cepat. Fasilitas lengkap dan bersih. Recommended banget!"',
-          rating: 4
-        },
-        {
-          nama: 'Budi Santoso',
-          peran: 'Pengguna Promo',
-          testimoni: '"Promo weekend-nya worth it! Lapangan basketnya luas dan nyaman untuk latihan tim."',
-          rating: 5
-        }
+        { nama: 'Ahmad Rizki', peran: 'Pengguna Fasilitas', testimoni: '"Lapangan futsal berkualitas dengan harga terjangkau. Adminnya ramah dan responsif!"', rating: 5 },
+        { nama: 'Sari Dewi', peran: 'Pelanggan Booking', testimoni: '"Proses booking mudah dan cepat. Fasilitas lengkap dan bersih. Recommended banget!"', rating: 4 },
+        { nama: 'Budi Santoso', peran: 'Pengguna Promo', testimoni: '"Promo weekend-nya worth it! Lapangan basketnya luas dan nyaman untuk latihan tim."', rating: 5 }
       ];
       saveTestimonials(defaultTestimonials);
       return defaultTestimonials;
     }
   }
 
-  // Fungsi untuk menampilkan testimoni
   function displayTestimonials() {
     const container = document.getElementById('testimoniContainer');
-    // Periksa jika container ada di halaman ini
-    if (!container) return; 
+    if (!container) return;
     
     const testimonials = loadTestimonials();
     
     if (testimonials.length === 0) {
-      container.innerHTML = `
-        <div class="col-span-3 text-center py-8">
-          <p class="text-slate-500">Belum ada testimoni. Jadilah yang pertama memberikan testimoni!</p>
-        </div>
-      `;
+      container.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-500">Belum ada testimoni.</div>`;
       return;
     }
     
-    container.innerHTML = testimonials.map((testimoni, index) => `
-      <div class="bg-slate-50 p-8 rounded-2xl shadow-soft hover:shadow-lift hover:scale-105 transform transition duration-300">
+    container.innerHTML = testimonials.map(t => `
+      <div class="bg-slate-50 p-8 rounded-2xl shadow-soft hover:shadow-lift hover:scale-105 transform transition duration-300" data-aos="zoom-in">
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-12 h-12 bg-gradient-to-r from-primary to-primaryDark rounded-full flex items-center justify-center text-white font-semibold">
-            ${testimoni.nama.charAt(0)}
+          <div class="w-12 h-12 bg-gradient-to-r from-primary to-primaryDark rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
+            ${t.nama.charAt(0)}
           </div>
           <div>
-            <div class="font-semibold">${testimoni.nama}</div>
-            <div class="text-sm text-slate-500">${testimoni.peran}</div>
+            <div class="font-bold text-slate-800">${t.nama}</div>
+            <div class="text-xs text-slate-500 font-medium uppercase tracking-wide">${t.peran}</div>
           </div>
         </div>
-        <p class="text-slate-700 italic mb-4">${testimoni.testimoni}</p>
-        <div class="flex text-yellow-400">
-          ${'★'.repeat(testimoni.rating)}${testimoni.rating < 5 ? '☆'.repeat(5 - testimoni.rating) : ''}
-          <span class="text-slate-600 ml-2">${testimoni.rating}.0</span>
+        <p class="text-slate-600 text-sm italic mb-4 leading-relaxed">${t.testimoni}</p>
+        <div class="flex text-yellow-400 text-sm">
+          ${'★'.repeat(t.rating)}${t.rating < 5 ? '☆'.repeat(5 - t.rating) : ''}
         </div>
       </div>
     `).join('');
   }
 
-  // Fungsi untuk menambahkan testimoni baru
-  function addTestimonial(nama, kategori, rating, pesan, anonim) {
-    const testimonials = loadTestimonials();
-    
-    const roleMap = {
-      'fasilitas': 'Pengguna Fasilitas',
-      'pelayanan': 'Pengguna Layanan',
-      'booking': 'Pelanggan Booking',
-      'harga': 'Pengguna Promo',
-      'kebersihan': 'Pengunjung',
-      'lainnya': 'Pelanggan'
-    };
-    
-    const newTestimonial = {
-      nama: anonim ? 'Pelanggan' : nama,
-      peran: roleMap[kategori] || 'Pelanggan',
-      testimoni: `"${pesan}"`,
-      rating: parseInt(rating)
-    };
-    
-    testimonials.unshift(newTestimonial);
-    saveTestimonials(testimonials);
-    displayTestimonials();
-  }
-
-  // Modifikasi fungsi submitSaran
   function submitSaran(event) {
     event.preventDefault();
-    
     const formData = new FormData(event.target);
     const rating = formData.get('rating');
     
@@ -389,46 +326,36 @@ require 'include_user/header.php';
       alert('Silakan berikan rating terlebih dahulu');
       return;
     }
+
+    const roleMap = { 'fasilitas': 'Member', 'pelayanan': 'Pelanggan', 'booking': 'User App', 'harga': 'Member', 'lainnya': 'Pengunjung' };
+    const testimonials = loadTestimonials();
     
-    addTestimonial(
-      formData.get('nama'),
-      formData.get('kategori'),
-      rating,
-      formData.get('pesan'),
-      formData.get('anonim') ? true : false
-    );
+    testimonials.unshift({
+      nama: formData.get('anonim') ? 'Pengguna' : formData.get('nama'),
+      peran: roleMap[formData.get('kategori')] || 'Pelanggan',
+      testimoni: `"${formData.get('pesan')}"`,
+      rating: parseInt(rating)
+    });
+    
+    saveTestimonials(testimonials);
+    displayTestimonials();
     
     document.getElementById('saranSuccess').classList.remove('hidden');
     document.getElementById('saranForm').classList.add('hidden');
-    
-    resetSaranForm();
-    
-    setTimeout(() => {
-      const testimoniSection = document.getElementById('testimoni');
-      if (testimoniSection) {
-        testimoniSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 1000);
   }
 
-  // Fungsi untuk menyembunyikan pesan sukses
   function hideSuccessMessage() {
     document.getElementById('saranSuccess').classList.add('hidden');
     document.getElementById('saranForm').classList.remove('hidden');
     resetSaranForm();
   }
 
-  // Panggil displayTestimonials saat halaman dimuat
-  // Kita tambahkan listener baru karena script ini inline
   document.addEventListener('DOMContentLoaded', function() {
     displayTestimonials();
   });
-
-  // Catatan: Logika untuk mobile menu (mobileBtn) sudah ditangani
-  // oleh 'booking-script.js' yang dimuat oleh 'footer.php'.
 </script>
 
 <?php 
 // Memanggil footer.php
 require 'include_user/footer.php'; 
-?>     
+?>
