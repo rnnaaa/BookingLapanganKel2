@@ -1,14 +1,25 @@
 <?php
+// File: pengeluaran.php
+
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 
+// PASTIKAN SESSION SUDAH DIMULAI DI SINI ATAU DI HEADER.PHP
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Ambil data pengeluaran
+
+// Ambil data pengeluaran dengan JOIN
 $qData = mysqli_query($conn, "
-    SELECT p.*, u.nama AS input_by_nama
+    SELECT 
+        p.*, 
+        u_input.nama AS input_by_nama,
+        u_update.nama AS updated_by_nama
     FROM pengeluaran p
-    LEFT JOIN users u ON p.input_by = u.id_user
+    LEFT JOIN users u_input ON p.input_by = u_input.id_user
+    LEFT JOIN users u_update ON p.updated_by = u_update.id_user
     ORDER BY p.tanggal DESC
 ");
 
@@ -19,12 +30,10 @@ include('../includes/sidebar.php');
 
 <div class="content-wrapper animate__animated animate__fadeIn">
 
-<!-- HEADER -->
 <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
         <h1><i class="fas fa-wallet mr-2"></i> Data Pengeluaran</h1>
 
-        <!-- Tombol seperti di member -->
         <button class="btn btn-primary shadow-sm" data-bs-toggle="collapse" data-bs-target="#formTambah">
             <i class="fas fa-plus-circle"></i> Tambah Pengeluaran
         </button>
@@ -33,7 +42,6 @@ include('../includes/sidebar.php');
 
 <section class="content">
 
-<!-- ===== FORM TAMBAH ===== -->
 <div class="collapse mt-3" id="formTambah">
     <div class="card card-primary shadow-lg border-0">
 
@@ -41,7 +49,7 @@ include('../includes/sidebar.php');
             <h3 class="card-title mb-0"><i class="fas fa-plus-circle"></i> Tambah Pengeluaran</h3>
         </div>
 
-        <form id="formPengeluaran">
+        <form method="POST" action="pengeluaran_tambah.php">
             <div class="card-body row g-3">
 
                 <div class="col-md-4">
@@ -71,7 +79,7 @@ include('../includes/sidebar.php');
             </div>
 
             <div class="card-footer text-end">
-                <button type="button" onclick="simpanPengeluaran()" class="btn btn-success">
+                <button type="submit" class="btn btn-success">
                     <i class="fas fa-save"></i> Simpan
                 </button>
             </div>
@@ -79,7 +87,6 @@ include('../includes/sidebar.php');
     </div>
 </div>
 
-<!-- ===== TABEL ===== -->
 <div class="card shadow-lg border-0 mt-4">
 
     <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
@@ -95,32 +102,41 @@ include('../includes/sidebar.php');
                     <th>Kategori</th>
                     <th>Keterangan</th>
                     <th>Jumlah</th>
-                    <th>Input By</th>
+                    <th>Log Audit</th> 
                     <th>Aksi</th>
                 </tr>
             </thead>
             <tbody>
-            <?php $no=1; while($p=mysqli_fetch_assoc($qData)): ?>
+            <?php $no=1; while($p=mysqli_fetch_assoc($qData)): 
+                // Tentukan nama dan waktu untuk kolom Log Audit
+                $log_nama = htmlspecialchars($p['updated_by_nama'] ?? $p['input_by_nama']);
+                $log_waktu_raw = $p['updated_at'] ?? $p['created_at']; 
+                $log_waktu = $log_waktu_raw ? date('d/m H:i', strtotime($log_waktu_raw)) : '';
+            ?>
                 <tr>
                     <td class="text-center"><?= $no++ ?></td>
                     <td class="text-center"><?= date('d-m-Y', strtotime($p['tanggal'])) ?></td>
                     <td class="text-center"><?= htmlspecialchars($p['kategori']) ?></td>
                     <td><?= htmlspecialchars($p['keterangan'] ?? '-') ?></td>
                     <td class="text-end fw-bold text-danger">Rp <?= number_format($p['jumlah'],0,',','.') ?></td>
-                    <td class="text-center"><?= htmlspecialchars($p['input_by_nama'] ?? '-') ?></td>
-
+                    
+                    <td class="text-center">
+                        <?php if($log_waktu): ?>
+                            <i class="fas fa-pencil-alt me-1" style="color: #0e5c91;"></i>
+                            <span class="d-inline-block fw-bold"><?= $log_nama ?></span>
+                            <br>
+                            <span class="ms-3 text-muted" style="font-size: 0.85em;"><?= $log_waktu ?></span>
+                        <?php else: ?>
+                            -
+                        <?php endif; ?>
+                    </td>
                     <td class="text-center">
                         <a href="pengeluaran_edit.php?id=<?= $p['id_pengeluaran'] ?>"
-                           class="btn btn-warning btn-sm">
-                            <i class="fas fa-edit"></i>
+                           class="btn btn-sm text-white" 
+                           style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
+                            <i class="fas fa-edit"></i> Edit Data
                         </a>
-
-                        <a href="pengeluaran_hapus.php?id=<?= $p['id_pengeluaran'] ?>"
-                           class="btn btn-danger btn-sm"
-                           onclick="return confirm('Yakin ingin menghapus?');">
-                            <i class="fas fa-trash"></i>
-                        </a>
-                    </td>
+                        </td>
                 </tr>
             <?php endwhile; ?>
             </tbody>
@@ -136,26 +152,18 @@ include('../includes/sidebar.php');
 
 <script>
 $(document).ready(function() {
-    $('#tblPengeluaran').DataTable();
+    
+    <?php if (isset($_SESSION['toast_success'])): ?>
+        toastr.success("<?= $_SESSION['toast_success'] ?>", "Sukses!");
+        <?php unset($_SESSION['toast_success']); // Hapus session agar tidak muncul lagi ?>
+    <?php endif; ?>
+
+    <?php if (isset($_SESSION['toast_error'])): ?>
+        toastr.error("<?= $_SESSION['toast_error'] ?>", "Gagal!");
+        <?php unset($_SESSION['toast_error']); // Hapus session agar tidak muncul lagi ?>
+    <?php endif; ?>
+
+    // Hapus fungsi simpanPengeluaran() yang lama (berbasis AJAX)
+
 });
-
-// AJAX SIMPAN
-function simpanPengeluaran() {
-    let data = $('#formPengeluaran').serialize();
-
-    $.post("pengeluaran_tambah.php", data, function(res) {
-        try {
-            let x = JSON.parse(res);
-
-            if (x.status === 'success') {
-                location.reload();
-            } else {
-                alert("Gagal: " + x.message);
-            }
-
-        } catch (e) {
-            alert("Terjadi kesalahan.");
-        }
-    });
-}
 </script>

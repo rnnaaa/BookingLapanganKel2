@@ -58,14 +58,15 @@ $slots = $stmt->get_result();
     </div>
 
     <div class="header">
-        <h1>GOR BADMINTON JAYA</h1>
-        <p>Jl. Raya Stadion No. 123, Jakarta | Telp: 0812-3456-7890</p>
-        <h2>INVOICE / BUKTI BOOKING</h2>
+        <h1>RUSH BADMINTOON ACADEMY</h1>
+        <p>Jl. Kalimantan Gg.14, Krajan Timur, Sumber Sari, Kec Sumber Sari,</p>
+        <p>Kab Jember, Jawa Timur| Telp: 0812-3456-7890</p>
+        <h2>BUKTI BOOKING</h2>
     </div>
 
     <table class="info-table">
         <tr>
-            <td width="15%"><strong>No Invoice</strong></td>
+            <td width="15%"><strong>No</strong></td>
             <td width="35%">: INV-<?= date('Ymd', strtotime($data['created_at'])) ?>-<?= $id_booking ?></td>
             <td width="15%"><strong>Tanggal</strong></td>
             <td>: <?= date('d F Y H:i', strtotime($data['created_at'])) ?></td>
@@ -119,7 +120,7 @@ $slots = $stmt->get_result();
     </div>
 
     <div class="footer">
-        <p>Terima kasih telah memesan lapangan di GOR Badminton Jaya.</p>
+        <p>Terima kasih telah memesan lapangan di Rush Badmintoon Academy.</p>
         <p>Harap simpan bukti ini sebagai tiket masuk.</p>
     </div>
 

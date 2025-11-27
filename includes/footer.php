@@ -1,22 +1,19 @@
 <footer class="main-footer text-sm d-flex justify-content-between align-items-center flex-wrap">
   <div class="footer-left">
-    <strong>Copyright &copy; 2021 - <?= date('Y'); ?> 
+    <!-- <strong>Copyright &copy; 2021 - <?= date('Y'); ?>  -->
       <a href="#" class="text-primary">Badmintoon</a>.
     </strong> 
-    All rights reserved.
+    <!-- All rights reserved. -->
   </div>
 
-  <div class="footer-right text-muted">
+  <!-- <div class="footer-right text-muted">
     <b>Version</b> 3.2.0
-  </div>
+  </div> -->
 </footer>
 
 
 <aside class="control-sidebar control-sidebar-dark"></aside>
 </div>
-<!-- ./wrapper -->
-
-<!-- URUTAN BENAR JAVASCRIPT LIBRARY -->
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 <script src="../public/asseth/tampilan_admin/plugins/jquery-ui/jquery-ui.min.js"></script>
 <script>$.widget.bridge('uibutton', $.ui.button)</script>
@@ -47,7 +44,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-<!-- SCRIPT GLOBAL: LOADER, DATATABLES, DARK MODE, TOASTR -->
 <script>
 $(function () {
   const $loader = $("#tableLoader");
@@ -167,6 +163,25 @@ $(function () {
     opacity: 1;
     transform: translateY(0);
   }
+
+  /* --- PERBAIKAN UNTUK HEADER TABEL DATATABLES (WARNA SOLID #1874AD) --- */
+  table.dataTable thead th {
+    /* Menggunakan warna solid #1874ad */
+    background-color: #1874ad !important;
+    /* Menghapus properti background gradient */
+    background: #1874ad !important; 
+    /* Atur warna teks menjadi putih agar terlihat jelas */
+    color: white !important;
+    /* Atur border-color untuk konsistensi */
+    border-color: #1874ad !important;
+  }
+
+  /* Opsional: Jika Anda ingin mengatur hover/active state juga */
+  table.dataTable thead th.sorting:hover {
+    background-color: #11689b !important; /* Warna sedikit lebih gelap saat hover */
+    background: #11689b !important;
+  }
+  /* ------------------------------------------------ */
 </style>
 
 <div id="tableLoader">

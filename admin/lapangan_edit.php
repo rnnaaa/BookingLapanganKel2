@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <section class="content">
     <div class="container-fluid">
       <div class="card shadow-lg border-0">
-        <div class="card-header bg-warning text-dark">
+        <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
           <h3 class="card-title mb-0"><i class="fas fa-pen"></i> Form Edit Lapangan</h3>
         </div>
 
