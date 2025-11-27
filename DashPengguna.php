@@ -159,58 +159,77 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
             
             <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div class="max-w-lg">
-                    <h2 class="text-2xl sm:text-3xl font-poppins font-bold mb-2 leading-tight">Selamat Datang, <?= $nama_depan ?>! 👋</h2>
+                    <h2 class="text-2xl sm:text-3xl font-poppins font-bold mb-2 leading-tight">Selamat Datang, <?= $nama_depan ?>!</h2>
                     <p class="text-white/80 text-sm sm:text-lg">Siap untuk bermain badminton hari ini?</p>
                 </div>
-                <a href="BookingPengguna/booking.php" class="w-full sm:w-auto bg-white text-primary hover:bg-slate-100 px-6 py-3 rounded-xl font-bold shadow-md transition-all transform hover:scale-105 flex items-center justify-center gap-2 text-sm sm:text-base">
-                    <i class="fa-regular fa-calendar-plus"></i> Booking Sekarang
-                </a>
+                
+                <div class="flex flex-wrap gap-3 w-full sm:w-auto">
+                    <a href="BookingPengguna/booking.php" class="flex-1 sm:flex-none bg-white text-primary hover:bg-slate-100 px-6 py-3 rounded-xl font-bold shadow-md transition-all transform hover:scale-105 flex items-center justify-center gap-2 text-sm sm:text-base">
+                        <i class="fa-regular fa-calendar-plus"></i> Booking Sekarang
+                    </a>
+                    
+                    <a href="riwayat/riwayat.php" class="flex-1 sm:flex-none bg-white/20 hover:bg-white/30 text-white border border-white/30 px-6 py-3 rounded-xl font-bold backdrop-blur-sm transition-all flex items-center justify-center gap-2 text-sm sm:text-base shadow-sm">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Riwayat
+                    </a>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-start gap-4 hover:shadow-md transition-all animate-fade-in-up" style="animation-delay: 0.1s;">
-                <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0">
-                    <i class="fa-solid fa-clipboard-list"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Riwayat Order</p>
-                    <h3 class="text-2xl font-bold text-slate-800 mt-1" id="statTotal">0</h3>
-                    <p class="text-xs text-slate-500 mt-1">Kali melakukan booking</p>
-                </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-start gap-4 hover:shadow-md transition-all animate-fade-in-up" style="animation-delay: 0.2s;">
-                <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center text-xl shrink-0">
-                    <i class="fa-regular fa-calendar-check"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Jadwal Belum Main</p>
-                    <h3 class="text-2xl font-bold text-slate-800 mt-1" id="statActive">0</h3>
-                    <p class="text-xs text-slate-500 mt-1">Sesi belum dimainkan</p>
+            <div class="relative overflow-hidden bg-white rounded-2xl shadow-md border border-slate-100 p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 animate-fade-in-up group" style="animation-delay: 0.1s;">
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold uppercase tracking-wider">Riwayat Order</p>
+                        <h3 class="text-3xl font-extrabold text-slate-800 mt-1" id="statTotal">0</h3>
+                        <p class="text-sm text-slate-600 mt-1">Kali melakukan booking</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-start gap-4 hover:shadow-md transition-all animate-fade-in-up" style="animation-delay: 0.3s;">
-                <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0">
-                    <i class="fa-solid fa-stopwatch"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Total Durasi</p>
-                    <h3 class="text-2xl font-bold text-slate-800 mt-1" id="statHours">0</h3>
-                    <p class="text-xs text-slate-500 mt-1">Jam berolahraga</p>
+            <div class="relative overflow-hidden bg-white rounded-2xl shadow-md border border-slate-100 p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 animate-fade-in-up group" style="animation-delay: 0.2s;">
+                <div class="absolute inset-0 bg-gradient-to-br from-green-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        <i class="fa-regular fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold uppercase tracking-wider">Jadwal Belum Main</p>
+                        <h3 class="text-3xl font-extrabold text-slate-800 mt-1" id="statActive">0</h3>
+                        <p class="text-sm text-slate-600 mt-1">Sesi belum dimainkan</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-start gap-4 hover:shadow-md transition-all animate-fade-in-up" style="animation-delay: 0.4s;">
-                <div class="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl shrink-0">
-                    <i class="fa-solid fa-money-bill-wave"></i>
+            <div class="relative overflow-hidden bg-white rounded-2xl shadow-md border border-slate-100 p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 animate-fade-in-up group" style="animation-delay: 0.3s;">
+                <div class="absolute inset-0 bg-gradient-to-br from-purple-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        <i class="fa-solid fa-stopwatch"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold uppercase tracking-wider">Total Durasi</p>
+                        <h3 class="text-3xl font-extrabold text-slate-800 mt-1" id="statHours">0</h3>
+                        <p class="text-sm text-slate-600 mt-1">Jam berolahraga</p>
+                    </div>
                 </div>
-                <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Total Pengeluaran</p>
-                    <h3 class="text-lg sm:text-xl font-bold text-slate-800 mt-1 truncate" id="statTotalSpend">Rp 0</h3>
-                    <p class="text-xs text-slate-500 mt-1">Selama menggunakan aplikasi</p>
+            </div>
+
+            <div class="relative overflow-hidden bg-white rounded-2xl shadow-md border border-slate-100 p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 animate-fade-in-up group" style="animation-delay: 0.4s;">
+                <div class="absolute inset-0 bg-gradient-to-br from-orange-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold uppercase tracking-wider">Total Pengeluaran</p>
+                        <h3 class="text-2xl font-extrabold text-slate-800 mt-1 truncate" id="statTotalSpend">Rp 0</h3>
+                        <p class="text-sm text-slate-600 mt-1">Selama menggunakan aplikasi</p>
+                    </div>
                 </div>
             </div>
 
@@ -240,7 +259,7 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
     </main>
 
     <footer class="py-6 sm:py-8 text-center text-xs sm:text-sm text-slate-500 px-4">
-        &copy; 2025 SportField — Semua hak dilindungi.
+        &copy; 2025 Rush Badminton Academy. Dibuat dengan ❤️.
     </footer>
 
     <div id="modalOverlay" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden transition-opacity duration-300 opacity-0 flex items-center justify-center p-4 sm:p-6">

@@ -18,43 +18,57 @@ if (!isset($_SESSION['temp_booking_id']) || !isset($_SESSION['booking_expired_at
 $expired_time = strtotime($_SESSION['booking_expired_at']);
 $remaining_seconds = $expired_time - time();
 
-// UPDATE PHP: Jika expired di server side, lempar ke cancel_booking.php (yang sekarang sudah aman)
 if ($remaining_seconds <= 0) {
     header("Location: cancel_booking.php"); 
     exit;
 }
 
-// 3. Ambil Data dari SESSION
-$items_to_pay = $_SESSION['keranjang'] ?? [];
-// ... (Sisa kode PHP sama seperti sebelumnya untuk ambil keranjang & produk) ...
+// 3. Ambil Data Keranjang
+$items_to_pay = isset($_SESSION['keranjang']) && is_array($_SESSION['keranjang']) ? $_SESSION['keranjang'] : [];
+
 if (empty($items_to_pay)) {
     header("Location: booking.php");
     exit;
 }
 
-$produk_tambahan = [];
+// === INISIALISASI VARIABEL ===
+$produk_tambahan = []; 
 $total_biaya_produk = 0;
 
-// Logika Produk (Hapus/Tambah/Skip) - Tetap sama
+// 4. Logika Produk (Hapus/Tambah/Skip)
 if (isset($_GET['action']) && $_GET['action'] === 'remove_product' && isset($_GET['product_id'])) {
     unset($_SESSION['produk_tambahan'][$_GET['product_id']]);
     header("Location: payment.php?cart=1");
     exit;
+
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['produk'])) {
-    $_SESSION['produk_tambahan'] = $_POST['produk'];
+    $new_products = [];
+    foreach ($_POST['produk'] as $id => $val) {
+        $parts = explode('|', $val); // Format: "Harga|Nama"
+        if (count($parts) >= 2) {
+            $new_products[$id] = [
+                'harga' => (float)$parts[0],
+                'nama'  => $parts[1]
+            ];
+        }
+    }
+    $_SESSION['produk_tambahan'] = $new_products;
     header("Location: payment.php?cart=1");
     exit;
+
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['skip_products'])) {
     unset($_SESSION['produk_tambahan']);
 }
 
-// Hitung Total - Tetap sama
+// 5. Ambil Data Produk dari Session & Hitung Total
 if (isset($_SESSION['produk_tambahan']) && is_array($_SESSION['produk_tambahan'])) {
-    foreach ($_SESSION['produk_tambahan'] as $nama => $harga) {
-        $produk_tambahan[$nama] = (float)$harga;
-        $total_biaya_produk += (float)$harga;
+    $produk_tambahan = $_SESSION['produk_tambahan']; // Assign ke variabel lokal
+    foreach ($produk_tambahan as $item) {
+        $total_biaya_produk += (float)$item['harga'];
     }
 }
+
+// 6. Hitung Total Keseluruhan
 $total_biaya_sewa = 0;
 foreach ($items_to_pay as $item) {
     $total_biaya_sewa += (float)$item['harga'];
@@ -113,7 +127,6 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                   <i class="fa-regular fa-clock text-xs opacity-80"></i>
                   <span id="countdown-timer" class="font-mono font-bold text-sm tracking-wider">00:00</span>
               </div>
-
               <button onclick="triggerManualCancel()" class="text-sm font-medium text-slate-500 hover:text-red-600 flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-red-50 transition-all" title="Batalkan Pesanan">
                   <i class="fa-solid fa-right-from-bracket text-lg"></i>
                   <span class="hidden sm:inline">Batalkan Booking</span>
@@ -183,6 +196,7 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
               
               <div class="card">
                 <h3 class="font-poppins font-semibold text-base mb-4">Rincian Biaya</h3>
+                
                 <div class="flex justify-between text-sm mb-2">
                     <span class="text-slate-600">Biaya Sewa</span>
                     <span class="font-medium">Rp <?= number_format($total_biaya_sewa, 0, ',', '.') ?></span>
@@ -191,22 +205,27 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                     <span class="text-slate-600">Biaya Produk Tambahan</span>
                     <span class="font-medium">Rp <?= number_format($total_biaya_produk, 0, ',', '.') ?></span>
                 </div>
+                
                 <?php if (!empty($produk_tambahan)): ?>
-                <div class="text-xs text-slate-500 pl-4 border-l-2 border-gray-200 ml-2 mt-1 space-y-1">
-                    <?php foreach ($produk_tambahan as $nama => $harga): ?>
-                        <div class="flex justify-between items-center">
-                            <span><?= htmlspecialchars($nama) ?> (Rp <?= number_format($harga, 0, ',', '.') ?>)</span>
+                <div class="text-xs text-slate-500 pl-4 border-l-2 border-gray-200 ml-2 mt-2 space-y-2">
+                    <?php foreach ($produk_tambahan as $id => $item): ?>
+                        <div class="flex justify-between items-center group">
+                            <span><?= htmlspecialchars($item['nama']) ?> (Rp <?= number_format($item['harga'], 0, ',', '.') ?>)</span>
                             <?php
                             $baseQueryParams = $_GET;
                             unset($baseQueryParams['action'], $baseQueryParams['product_id']);
-                            $removeParams = array_merge($baseQueryParams, ['action' => 'remove_product', 'product_id' => $nama]);
+                            $removeParams = array_merge($baseQueryParams, ['action' => 'remove_product', 'product_id' => $id]);
                             ?>
                             <a href="payment.php?<?= http_build_query($removeParams) ?>" 
-                               class="text-red-500 hover:text-red-700 text-xs font-medium ml-2">Hapus</a>
+                               class="text-slate-300 hover:text-red-500 transition-colors product-remove-btn" 
+                               title="Hapus Produk">
+                               <i class="fa-solid fa-circle-xmark"></i>
+                            </a>
                         </div>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
+
                 <div class="flex justify-between font-bold text-base pt-4 mt-4 border-t border-slate-200">
                     <span>Total Bayar</span>
                     <span>Rp <?= number_format($total_biaya, 0, ',', '.') ?></span>
@@ -257,13 +276,13 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
         </div>
       </div>
     </main>
-  </form> 
+</form> 
 
-  <footer class="bg-white border-t mt-16 py-8 text-center text-sm text-slate-500">
+<footer class="bg-white border-t mt-16 py-8 text-center text-sm text-slate-500">
     © 2025 Rush Academy — All rights reserved
-  </footer>
+</footer>
 
-  <div id="verificationModal" class="modal-backdrop">
+<div id="verificationModal" class="modal-backdrop">
     <div class="modal-panel animate-modal-pop-in">
         <div class="flex justify-between items-center p-4 border-b border-gray-200">
             <h3 class="font-poppins font-semibold text-lg text-slate-800">Konfirmasi Pesanan</h3>
@@ -279,9 +298,9 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
             <button id="confirmVerificationBtn" type="button" class="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primaryDark rounded-lg transition-colors">Ya, Sudah Sesuai</button>
         </div>
     </div>
-  </div>
+</div>
 
-<script>
+  <script>
     let isSafeExit = false;
     let timeLeft = <?= $remaining_seconds ?>;
 
@@ -376,7 +395,16 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
           }
       }, 1000);
 
-      // --- HAPUS ITEM (SWEETALERT) ---
+      // --- FIX: Hapus Produk Tambahan (Bypass Alert) ---
+      // Saat user klik hapus produk, kita izinkan reload halaman
+      const productRemoveBtns = document.querySelectorAll('.product-remove-btn');
+      productRemoveBtns.forEach(btn => {
+          btn.addEventListener('click', function() {
+              isSafeExit = true; // Tandai aman keluar untuk reload
+          });
+      });
+
+      // --- HAPUS ITEM KERANJANG (SWEETALERT) ---
       const deleteButtons = document.querySelectorAll('.delete-item-btn');
       deleteButtons.forEach(btn => {
           btn.addEventListener('click', function() {
@@ -391,7 +419,6 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                   confirmButtonText: 'Ya, Hapus'
               }).then((result) => {
                   if (result.isConfirmed) {
-                      // Set Safe Exit SEMENTARA agar reload tidak dicegat browser
                       isSafeExit = true; 
                       
                       const data = new URLSearchParams();
@@ -413,7 +440,7 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                                  location.reload();
                               }
                           } else {
-                              isSafeExit = false; // Kembalikan guard jika gagal
+                              isSafeExit = false; 
                               Swal.fire('Gagal', res.message, 'error');
                           }
                       });

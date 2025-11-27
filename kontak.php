@@ -1,6 +1,74 @@
-<?php 
-// Memanggil header.php
+<?php
+// 1. MULAI SESSION & KONEKSI DATABASE (WAJIB DI PALING ATAS)
+session_start();
+require 'config/database.php'; 
+
+// ============================================================
+// 2. LOGIKA BACKEND: HANDLE SUBMIT SARAN (AJAX)
+// ============================================================
+// Kita taruh di sini agar tidak ikut me-load Header HTML saat request AJAX
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_saran') {
+    
+    // Pastikan tidak ada output lain sebelum JSON
+    if (ob_get_length()) ob_clean(); 
+    header('Content-Type: application/json');
+
+    $nama = trim($_POST['nama']);
+    $email = trim($_POST['email']);
+    $kategori = trim($_POST['kategori']);
+    $rating = (int)$_POST['rating'];
+    $pesan = trim($_POST['pesan']);
+    $is_anonim = isset($_POST['anonim']) ? 1 : 0;
+
+    // Validasi Sederhana
+    if (empty($nama) || empty($pesan) || $rating < 1) {
+        echo json_encode(['status' => 'error', 'message' => 'Data tidak lengkap']);
+        exit;
+    }
+
+    // Insert ke Database
+    $stmt = $conn->prepare("INSERT INTO saran (nama, email, kategori, rating, pesan, is_anonim) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssisi", $nama, $email, $kategori, $rating, $pesan, $is_anonim);
+    
+    if ($stmt->execute()) {
+        echo json_encode(['status' => 'success']);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Gagal menyimpan ke database: ' . $conn->error]);
+    }
+    exit; // Berhenti di sini agar HTML di bawah tidak ikut terkirim
+}
+
+// ============================================================
+// 3. LOAD HEADER & DATA VIEW
+// ============================================================
 require 'include_user/header.php'; 
+
+// Ambil Data Testimoni Terbaru dari Database
+$testimonials = [];
+$query = "SELECT * FROM saran ORDER BY created_at DESC LIMIT 6"; 
+$result = mysqli_query($conn, $query);
+
+if ($result) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        $roleMap = [
+            'fasilitas' => 'Member', 
+            'pelayanan' => 'Pelanggan', 
+            'booking' => 'User App', 
+            'harga' => 'Member', 
+            'lainnya' => 'Pengunjung'
+        ];
+        
+        $displayName = ($row['is_anonim'] == 1) ? 'Pengguna' : htmlspecialchars($row['nama']);
+        $displayRole = $roleMap[$row['kategori']] ?? 'Pelanggan';
+
+        $testimonials[] = [
+            'nama' => $displayName,
+            'peran' => $displayRole,
+            'testimoni' => htmlspecialchars($row['pesan']),
+            'rating' => (int)$row['rating']
+        ];
+    }
+}
 ?>
 
 <style>
@@ -69,9 +137,7 @@ require 'include_user/header.php';
                     </div>
                 </a>
 
-                <?php
-                    $email_tujuan = 'gilangoppo417@gmail.com'; 
-                ?>
+                <?php $email_tujuan = 'gilangoppo417@gmail.com'; ?>
                 <a href="https://mail.google.com/mail/?view=cm&fs=1&to=<?= $email_tujuan ?>" target="_blank" class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transform transition hover:-translate-y-2 duration-300 flex items-center gap-6" data-aos="fade-up" data-aos-delay="200">
                     <div class="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                         <i class="fa-regular fa-envelope text-4xl text-blue-600"></i>
@@ -90,7 +156,8 @@ require 'include_user/header.php';
     </section>
 
     <section class="py-12">
-        <div class="max-w-3xl mx-auto px-4"> <div class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden p-8 md:p-10" data-aos="fade-up">
+        <div class="max-w-3xl mx-auto px-4">
+            <div class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden p-8 md:p-10" data-aos="fade-up">
                 
                 <div class="text-center mb-8">
                     <h2 class="text-2xl font-bold font-poppins text-slate-800 mb-2">Kirim Saran & Masukan</h2>
@@ -148,7 +215,7 @@ require 'include_user/header.php';
                         <button type="button" onclick="resetSaranForm()" class="w-full md:w-auto px-6 py-3 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
                             Reset
                         </button>
-                        <button type="submit" class="flex-1 px-6 py-3 text-sm font-bold text-white bg-primary hover:bg-primaryDark rounded-xl shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all">
+                        <button type="submit" id="btnKirim" class="flex-1 px-6 py-3 text-sm font-bold text-white bg-primary hover:bg-primaryDark rounded-xl shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all">
                             Kirim Masukan
                         </button>
                     </div>
@@ -173,8 +240,7 @@ require 'include_user/header.php';
                 <p class="text-lg text-slate-600">Pengalaman pengguna setia SportField</p>
             </div>
 
-            <div class="grid md:grid-cols-3 gap-8" id="testimoniContainer">
-                </div>
+            <div class="grid md:grid-cols-3 gap-8" id="testimoniContainer"></div>
         </div>
     </section>
 
@@ -184,42 +250,27 @@ require 'include_user/header.php';
                 <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Pertanyaan Umum</h2>
                 <p class="text-slate-600">Jawaban untuk pertanyaan yang sering diajukan</p>
             </div>
-            
             <div class="space-y-4">
-                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="100">
+                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md">
                     <summary class="flex items-center justify-between p-5 cursor-pointer">
                         <h4 class="font-semibold text-slate-800">Bagaimana prosedur booking lapangan?</h4>
-                        <span class="text-slate-400 transition-transform group-open:rotate-180">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </span>
+                        <span class="text-slate-400 transition-transform group-open:rotate-180"><i class="fa-solid fa-chevron-down"></i></span>
                     </summary>
-                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">
-                        Sangat mudah! Pilih lapangan di halaman utama, tentukan tanggal & jam, lalu login/daftar. Setelah itu lakukan pembayaran (DP/Lunas) dan upload bukti transfer.
-                    </div>
+                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">Pilih lapangan, login, bayar DP/Lunas, upload bukti. Selesai!</div>
                 </details>
-
-                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="200">
+                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md">
                     <summary class="flex items-center justify-between p-5 cursor-pointer">
                         <h4 class="font-semibold text-slate-800">Metode pembayaran apa yang tersedia?</h4>
-                        <span class="text-slate-400 transition-transform group-open:rotate-180">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </span>
+                        <span class="text-slate-400 transition-transform group-open:rotate-180"><i class="fa-solid fa-chevron-down"></i></span>
                     </summary>
-                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">
-                        Kami menerima pembayaran via Transfer Bank (BCA, Mandiri) dan QRIS (GoPay, OVO, Dana, ShopeePay). Anda juga bisa melakukan pembayaran tunai langsung di lokasi.
-                    </div>
+                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">Transfer Bank (BCA, Mandiri) dan QRIS.</div>
                 </details>
-
-                <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="300">
+                 <details class="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-md">
                     <summary class="flex items-center justify-between p-5 cursor-pointer">
                         <h4 class="font-semibold text-slate-800">Apakah bisa reschedule atau refund?</h4>
-                        <span class="text-slate-400 transition-transform group-open:rotate-180">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </span>
+                        <span class="text-slate-400 transition-transform group-open:rotate-180"><i class="fa-solid fa-chevron-down"></i></span>
                     </summary>
-                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">
-                        Reschedule diperbolehkan minimal H-1 sebelum jadwal main. Refund hanya dapat diproses jika ada kendala teknis dari pihak Rush Badminton atau pembatalan H-2 (dikenakan potongan admin).
-                    </div>
+                    <div class="px-5 pb-5 text-slate-600 text-sm leading-relaxed">Reschedule H-1, Refund H-2. Hubungi admin.</div>
                 </details>
             </div>
         </div>
@@ -227,14 +278,15 @@ require 'include_user/header.php';
 </main>
 
 <script>
-  // Fungsi untuk mengatur rating
+  // 1. DATA TESTIMONI DARI PHP
+  const dbTestimonials = <?= json_encode($testimonials) ?>;
+
   function setRating(value) {
     const ratingInput = document.getElementById('rating');
     const ratingText = document.getElementById('ratingText');
     const stars = document.querySelectorAll('#ratingStars button[data-rating]');
 
     ratingInput.value = String(value);
-
     const labels = ['Sangat Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat Baik'];
     ratingText.textContent = labels[value - 1];
     ratingText.className = "ml-auto text-xs font-bold px-2 py-1 rounded-md shadow-sm text-white " + 
@@ -253,13 +305,10 @@ require 'include_user/header.php';
   }
 
   function resetSaranForm() {
-    const form = document.getElementById('saranForm');
-    if (form) form.reset();
-
+    document.getElementById('saranForm').reset();
     document.getElementById('rating').value = '0';
-    const ratingText = document.getElementById('ratingText');
-    ratingText.textContent = 'Pilih Bintang';
-    ratingText.className = "ml-auto text-xs text-slate-500 font-medium bg-white px-2 py-1 rounded-md shadow-sm";
+    document.getElementById('ratingText').textContent = 'Pilih Bintang';
+    document.getElementById('ratingText').className = "ml-auto text-xs text-slate-500 font-medium bg-white px-2 py-1 rounded-md shadow-sm";
     
     const stars = document.querySelectorAll('#ratingStars button[data-rating]');
     stars.forEach(btn => {
@@ -268,48 +317,27 @@ require 'include_user/header.php';
     });
   }
 
-  function saveTestimonials(testimonials) {
-    localStorage.setItem('sportfieldTestimonials', JSON.stringify(testimonials));
-  }
-
-  function loadTestimonials() {
-    const stored = localStorage.getItem('sportfieldTestimonials');
-    if (stored) {
-      return JSON.parse(stored);
-    } else {
-      const defaultTestimonials = [
-        { nama: 'Ahmad Rizki', peran: 'Pengguna Fasilitas', testimoni: '"Lapangan futsal berkualitas dengan harga terjangkau. Adminnya ramah dan responsif!"', rating: 5 },
-        { nama: 'Sari Dewi', peran: 'Pelanggan Booking', testimoni: '"Proses booking mudah dan cepat. Fasilitas lengkap dan bersih. Recommended banget!"', rating: 4 },
-        { nama: 'Budi Santoso', peran: 'Pengguna Promo', testimoni: '"Promo weekend-nya worth it! Lapangan basketnya luas dan nyaman untuk latihan tim."', rating: 5 }
-      ];
-      saveTestimonials(defaultTestimonials);
-      return defaultTestimonials;
-    }
-  }
-
   function displayTestimonials() {
     const container = document.getElementById('testimoniContainer');
     if (!container) return;
     
-    const testimonials = loadTestimonials();
-    
-    if (testimonials.length === 0) {
-      container.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-500">Belum ada testimoni.</div>`;
+    if (dbTestimonials.length === 0) {
+      container.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-500">Belum ada testimoni. Jadilah yang pertama memberikan ulasan!</div>`;
       return;
     }
     
-    container.innerHTML = testimonials.map(t => `
+    container.innerHTML = dbTestimonials.map(t => `
       <div class="bg-slate-50 p-8 rounded-2xl shadow-soft hover:shadow-lift hover:scale-105 transform transition duration-300" data-aos="zoom-in">
         <div class="flex items-center gap-3 mb-4">
           <div class="w-12 h-12 bg-gradient-to-r from-primary to-primaryDark rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
-            ${t.nama.charAt(0)}
+            ${t.nama.charAt(0).toUpperCase()}
           </div>
           <div>
             <div class="font-bold text-slate-800">${t.nama}</div>
             <div class="text-xs text-slate-500 font-medium uppercase tracking-wide">${t.peran}</div>
           </div>
         </div>
-        <p class="text-slate-600 text-sm italic mb-4 leading-relaxed">${t.testimoni}</p>
+        <p class="text-slate-600 text-sm italic mb-4 leading-relaxed">"${t.testimoni}"</p>
         <div class="flex text-yellow-400 text-sm">
           ${'★'.repeat(t.rating)}${t.rating < 5 ? '☆'.repeat(5 - t.rating) : ''}
         </div>
@@ -317,37 +345,52 @@ require 'include_user/header.php';
     `).join('');
   }
 
+  // 2. KIRIM DATA KE DATABASE VIA AJAX
   function submitSaran(event) {
     event.preventDefault();
-    const formData = new FormData(event.target);
-    const rating = formData.get('rating');
+    const form = event.target;
+    const formData = new FormData(form);
     
-    if (rating === '0') {
+    if (formData.get('rating') === '0') {
       alert('Silakan berikan rating terlebih dahulu');
       return;
     }
 
-    const roleMap = { 'fasilitas': 'Member', 'pelayanan': 'Pelanggan', 'booking': 'User App', 'harga': 'Member', 'lainnya': 'Pengunjung' };
-    const testimonials = loadTestimonials();
-    
-    testimonials.unshift({
-      nama: formData.get('anonim') ? 'Pengguna' : formData.get('nama'),
-      peran: roleMap[formData.get('kategori')] || 'Pelanggan',
-      testimoni: `"${formData.get('pesan')}"`,
-      rating: parseInt(rating)
+    formData.append('action', 'submit_saran');
+
+    const btn = document.getElementById('btnKirim');
+    const originalText = btn.innerText;
+    btn.innerText = 'Mengirim...';
+    btn.disabled = true;
+
+    fetch('kontak.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            document.getElementById('saranSuccess').classList.remove('hidden');
+            document.getElementById('saranForm').classList.add('hidden');
+            resetSaranForm();
+        } else {
+            alert('Gagal: ' + (data.message || 'Terjadi kesalahan server'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan koneksi.');
+    })
+    .finally(() => {
+        btn.innerText = originalText;
+        btn.disabled = false;
     });
-    
-    saveTestimonials(testimonials);
-    displayTestimonials();
-    
-    document.getElementById('saranSuccess').classList.remove('hidden');
-    document.getElementById('saranForm').classList.add('hidden');
   }
 
   function hideSuccessMessage() {
     document.getElementById('saranSuccess').classList.add('hidden');
     document.getElementById('saranForm').classList.remove('hidden');
-    resetSaranForm();
+    location.reload(); // Reload untuk memuat testimoni baru
   }
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -355,7 +398,4 @@ require 'include_user/header.php';
   });
 </script>
 
-<?php 
-// Memanggil footer.php
-require 'include_user/footer.php'; 
-?>
+<?php require 'include_user/footer.php'; ?>

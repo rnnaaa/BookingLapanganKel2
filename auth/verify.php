@@ -43,7 +43,7 @@ $email = isset($_GET['email']) ? $_GET['email'] : '';
           <label for="otp">Masukkan Kode (6 digit)</label>
           <input type="text" name="otp" id="otp" class="form-control" 
                  pattern="[0-9]*" inputmode="numeric" maxlength="6" 
-                 placeholder="Contoh: 123456" autocomplete="one-time-code" required>
+                 placeholder="" autocomplete="one-time-code" required>
         </div>
 
         <div>
