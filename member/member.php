@@ -4,36 +4,31 @@ ob_start();
 session_start();
 date_default_timezone_set('Asia/Jakarta');
 
-// Matikan display error agar tidak merusak JSON response di AJAX
+// Matikan display error agar JSON tidak rusak
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 require '../config/database.php';
 
-// 2. Cek Login
-if (!isset($_SESSION['id_user'])) {
-    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-        ob_clean();
-        echo json_encode(['status' => 'error', 'message' => 'Sesi habis, silakan login ulang.']);
-        exit;
-    }
-    header("Location: ../auth/login.php");
-    exit;
-}
-
-$user_id = $_SESSION['id_user'];
-// PERBAIKAN 1: Berikan nilai default string kosong jika session nama tidak ada
+// 2. Cek Login (Diperbarui: Tidak langsung redirect, tapi simpan status)
+$is_logged_in = isset($_SESSION['id_user']);
+$user_id = $_SESSION['id_user'] ?? 0;
 $user_nama = $_SESSION['nama'] ?? ''; 
 
 // =======================================================================
 // API BACKEND (AJAX HANDLER)
 // =======================================================================
-// PERBAIKAN 2: Cek isset($_POST['action']) sebelum mengaksesnya
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
-    ob_clean();
+    ob_clean(); 
     header('Content-Type: application/json');
     
+    // Proteksi API: Hanya user login yang bisa POST data
+    if (!$is_logged_in) {
+        echo json_encode(['status' => 'error', 'message' => 'Akses ditolak. Silakan login terlebih dahulu.']);
+        exit;
+    }
+
     try {
         // A. AMBIL SLOT TERSEDIA
         if ($_POST['action'] === 'get_slots') {
@@ -45,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             while ($w = mysqli_fetch_assoc($q_waktu)) {
                 $status = 'tersedia';
+                // Cek tabrakan jadwal
                 $q_cek = "SELECT 1 FROM jadwal_detail jd
                           LEFT JOIN booking b ON jd.id_booking = b.id_booking
                           JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian
@@ -71,113 +67,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // B. PROSES SUBMIT MEMBER
         if ($_POST['action'] === 'submit_member') {
-        try {
-            $id_lapangan = $_POST['id_lapangan'];
-            $paket_bulan = (int)$_POST['paket_bulan'];
-            $total_bayar = (float)$_POST['total_bayar'];
-            $metode = $_POST['metode_pembayaran'];
-            $selected_slots = json_decode($_POST['selected_slots'], true);
-
-            if (!$selected_slots) throw new Exception("Tidak ada jadwal yang dipilih.");
-
-            // Upload Bukti
-            $bukti = null;
-            $uploadDir = __DIR__ . '/../uploads/bukti_pembayaran/';
-            
-            if (!is_dir($uploadDir)) {
-                if (!mkdir($uploadDir, 0755, true)) {
-                    throw new Exception("Gagal membuat folder penyimpanan.");
-                }
-            }
-
-            if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === 0) {
-                $fileInfo = pathinfo($_FILES['bukti_transfer']['name']);
-                $ext = strtolower($fileInfo['extension']);
-                
-                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
-                if (!in_array($ext, $allowed)) {
-                    throw new Exception("Format file tidak diizinkan. Gunakan JPG, PNG, atau PDF.");
-                }
-
-                $bukti = "member_" . $user_id . "_" . time() . "." . $ext;
-                $targetFile = $uploadDir . $bukti;
-
-                if (!move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $targetFile)) {
-                    throw new Exception("Gagal mengupload file.");
-                }
-            } else {
-                throw new Exception("Bukti transfer wajib diupload.");
-            }
-
-            // Sort Tanggal
-            usort($selected_slots, function($a, $b) {
-                return strtotime($a['tanggal']) - strtotime($b['tanggal']);
-            });
-            $tgl_mulai = $selected_slots[0]['tanggal'];
-            $tgl_akhir = end($selected_slots)['tanggal'];
-
             mysqli_begin_transaction($conn);
 
-            // Insert Member
-            $stmt_m = $conn->prepare("INSERT INTO member (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, bukti_pembayaran, method, total_bayar, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
-            $stmt_m->bind_param("iiissssd", $user_id, $id_lapangan, $paket_bulan, $tgl_mulai, $tgl_akhir, $bukti, $metode, $total_bayar);
-            
-            if (!$stmt_m->execute()) throw new Exception("Gagal menyimpan data member.");
-            $id_member = $conn->insert_id;
-
-            // Insert Booking Dummy
-            $stmt_b = $conn->prepare("INSERT INTO booking (id_user, id_lapangan, tipe_booking, tanggal, status, total_amount, payment_status, payment_method) VALUES (?, ?, 'member', ?, 'disetujui', ?, 'lunas', ?)");
-            $stmt_b->bind_param("iisds", $user_id, $id_lapangan, $tgl_mulai, $total_bayar, $metode);
-            $stmt_b->execute();
-            $id_booking_dummy = $conn->insert_id;
-
-            // Ambil Harga
-            $q_lap = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHERE id_lapangan = '$id_lapangan'");
-            $hrg = mysqli_fetch_assoc($q_lap)['harga_per_jam_member'];
-
-            // Insert Detail
-            $stmt_dm = $conn->prepare("INSERT INTO member_jadwal (id_member, id_lapangan, tanggal_booking, jam_mulai, jam_selesai, harga_per_jam_member, status) VALUES (?, ?, ?, ?, ?, ?, 'aktif')");
-
-            foreach ($selected_slots as $slot) {
-                $jam_parts = explode(' - ', $slot['jam']);
+            try {
+                $id_lapangan = $_POST['id_lapangan'];
+                $paket_bulan = (int)$_POST['paket_bulan'];
+                $total_bayar = (float)$_POST['total_bayar'];
+                $metode_input = $_POST['metode_pembayaran']; 
                 
-                // Simpan Member Jadwal
-                $stmt_dm->bind_param("iissssd", $id_member, $id_lapangan, $slot['tanggal'], $jam_parts[0], $jam_parts[1], $hrg);
-                $stmt_dm->execute();
+                $selected_slots = json_decode($_POST['selected_slots'], true);
 
-                // Kunci Slot Utama
-                $cek_h = mysqli_query($conn, "SELECT id_jadwal_harian FROM jadwal_harian WHERE id_lapangan='$id_lapangan' AND tanggal='{$slot['tanggal']}'");
-                if (mysqli_num_rows($cek_h) == 0) {
-                    mysqli_query($conn, "INSERT INTO jadwal_harian (id_lapangan, tanggal, hari) VALUES ('$id_lapangan', '{$slot['tanggal']}', DAYNAME('{$slot['tanggal']}'))");
-                    $id_harian = $conn->insert_id;
+                if (!$selected_slots) throw new Exception("Tidak ada jadwal yang dipilih.");
+
+                // 1. Mapping Metode Pembayaran
+                $metode_db = 'bank_transfer'; 
+                if ($metode_input === 'qris') $metode_db = 'qris';
+                elseif ($metode_input === 'tunai') $metode_db = 'tunai';
+
+                // 2. Upload Bukti Pembayaran
+                $bukti = null;
+                $uploadDir = __DIR__ . '/../uploads/bukti_pembayaran/';
+                
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+                if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === 0) {
+                    $fileInfo = pathinfo($_FILES['bukti_transfer']['name']);
+                    $ext = strtolower($fileInfo['extension']);
+                    $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+                    
+                    if (!in_array($ext, $allowed)) throw new Exception("Format file harus JPG, PNG, atau PDF.");
+
+                    $bukti = "member_" . $user_id . "_" . time() . "." . $ext;
+                    $targetFile = $uploadDir . $bukti;
+
+                    if (!move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $targetFile)) {
+                        throw new Exception("Gagal mengupload file.");
+                    }
                 } else {
-                    $id_harian = mysqli_fetch_assoc($cek_h)['id_jadwal_harian'];
+                    throw new Exception("Bukti transfer wajib diupload.");
                 }
 
-                $cek_d = mysqli_query($conn, "SELECT id_detail FROM jadwal_detail WHERE id_jadwal_harian='$id_harian' AND id_jadwal_waktu='{$slot['id_waktu']}'");
+                // 3. Hitung Tanggal
+                usort($selected_slots, function($a, $b) {
+                    return strtotime($a['tanggal']) - strtotime($b['tanggal']);
+                });
+                $tgl_mulai = $selected_slots[0]['tanggal'];
+                $tgl_akhir = end($selected_slots)['tanggal'];
+
+                // 4. Insert MEMBER
+                $stmt_m = $conn->prepare("INSERT INTO member (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, bukti_pembayaran, method, total_bayar, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
+                $stmt_m->bind_param("iiissssd", $user_id, $id_lapangan, $paket_bulan, $tgl_mulai, $tgl_akhir, $bukti, $metode_db, $total_bayar);
+                if (!$stmt_m->execute()) throw new Exception("Gagal simpan member: " . $stmt_m->error);
+                $id_member = $conn->insert_id;
+
+                // --- UPDATE ROLE USER MENJADI 'MEMBER' ---
+                // Sesuai permintaan: Ubah role di tabel users
+                $stmt_role = $conn->prepare("UPDATE users SET role = 'member' WHERE id_user = ?");
+                $stmt_role->bind_param("i", $user_id);
+                $stmt_role->execute();
                 
-                if(mysqli_num_rows($cek_d) > 0) {
-                    mysqli_query($conn, "UPDATE jadwal_detail SET status='dibooking', id_booking='$id_booking_dummy' WHERE id_jadwal_harian='$id_harian' AND id_jadwal_waktu='{$slot['id_waktu']}'");
-                } else {
-                    mysqli_query($conn, "INSERT INTO jadwal_detail (id_jadwal_harian, id_jadwal_waktu, status, id_booking) VALUES ('$id_harian', '{$slot['id_waktu']}', 'dibooking', '$id_booking_dummy')");
+                // Update session role juga agar langsung efek tanpa logout
+                $_SESSION['role'] = 'member'; 
+
+                // 5. Insert BOOKING Dummy
+                $stmt_b = $conn->prepare("INSERT INTO booking (id_user, id_lapangan, tipe_booking, tanggal, status, total_amount, payment_status, payment_method) VALUES (?, ?, 'member', ?, 'disetujui', ?, 'lunas', ?)");
+                $stmt_b->bind_param("iisds", $user_id, $id_lapangan, $tgl_mulai, $total_bayar, $metode_input);
+                $stmt_b->execute();
+                $id_booking_dummy = $conn->insert_id;
+
+                // 6. Ambil Harga & Insert Detail Jadwal
+                $q_lap = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHERE id_lapangan = '$id_lapangan'");
+                $hrg = mysqli_fetch_assoc($q_lap)['harga_per_jam_member'];
+
+                $stmt_dm = $conn->prepare("INSERT INTO member_jadwal (id_member, id_lapangan, tanggal_booking, jam_mulai, jam_selesai, harga_per_jam_member, status) VALUES (?, ?, ?, ?, ?, ?, 'aktif')");
+                
+                $daysMap = ['Sunday' => 'Minggu', 'Monday' => 'Senin', 'Tuesday' => 'Selasa', 'Wednesday' => 'Rabu', 'Thursday' => 'Kamis', 'Friday' => 'Jumat', 'Saturday' => 'Sabtu'];
+
+                foreach ($selected_slots as $slot) {
+                    $jam_parts = explode(' - ', $slot['jam']);
+                    
+                    // iisssd (6 param) - FIX BUG SEBELUMNYA
+                    $stmt_dm->bind_param("iisssd", $id_member, $id_lapangan, $slot['tanggal'], $jam_parts[0], $jam_parts[1], $hrg);
+                    if (!$stmt_dm->execute()) throw new Exception("Gagal simpan detail.");
+
+                    // Kunci Slot
+                    $cek_h = mysqli_query($conn, "SELECT id_jadwal_harian FROM jadwal_harian WHERE id_lapangan='$id_lapangan' AND tanggal='{$slot['tanggal']}'");
+                    
+                    if (mysqli_num_rows($cek_h) == 0) {
+                        $dayEng = date('l', strtotime($slot['tanggal']));
+                        $hariIndo = $daysMap[$dayEng];
+                        $stmt_h = $conn->prepare("INSERT INTO jadwal_harian (id_lapangan, tanggal, hari) VALUES (?, ?, ?)");
+                        $stmt_h->bind_param("iss", $id_lapangan, $slot['tanggal'], $hariIndo);
+                        $stmt_h->execute();
+                        $id_harian = $conn->insert_id;
+                    } else {
+                        $id_harian = mysqli_fetch_assoc($cek_h)['id_jadwal_harian'];
+                    }
+
+                    $cek_d = mysqli_query($conn, "SELECT id_detail FROM jadwal_detail WHERE id_jadwal_harian='$id_harian' AND id_jadwal_waktu='{$slot['id_waktu']}'");
+                    
+                    if(mysqli_num_rows($cek_d) > 0) {
+                        mysqli_query($conn, "UPDATE jadwal_detail SET status='dibooking', id_booking='$id_booking_dummy' WHERE id_jadwal_harian='$id_harian' AND id_jadwal_waktu='{$slot['id_waktu']}'");
+                    } else {
+                        mysqli_query($conn, "INSERT INTO jadwal_detail (id_jadwal_harian, id_jadwal_waktu, status, id_booking) VALUES ('$id_harian', '{$slot['id_waktu']}', 'dibooking', '$id_booking_dummy')");
+                    }
                 }
+
+                mysqli_commit($conn);
+                echo json_encode(['status'=>'success', 'message' => 'Pendaftaran berhasil! Anda sekarang adalah Member.']);
+            } catch (Throwable $e) { 
+                mysqli_rollback($conn);
+                echo json_encode(['status'=>'error', 'message'=> 'Terjadi Kesalahan: ' . $e->getMessage()]);
             }
-
-            mysqli_commit($conn);
-            echo json_encode(['status'=>'success', 'message' => 'Pendaftaran berhasil!']);
-        } catch (Exception $e) {
-            mysqli_rollback($conn);
-            echo json_encode(['status'=>'error', 'message'=> $e->getMessage()]);
+            exit;
         }
-        exit;
-    }
     
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         ob_clean();
-        echo json_encode(['status'=>'error', 'message'=> $e->getMessage()]);
+        echo json_encode(['status'=>'error', 'message'=> 'System Error: ' . $e->getMessage()]);
         exit;
     }
-
 }
 
 ob_end_flush(); 
@@ -195,13 +204,11 @@ while($r = mysqli_fetch_assoc($q)){ $lapangans[] = $r; }
     .step-item.active { opacity: 1; font-weight: bold; color: #0b63d6; }
     .step-circle { width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #64748b; transition: all 0.3s; }
     .step-item.active .step-circle { background: #0b63d6; color: white; box-shadow: 0 4px 10px rgba(11, 99, 214, 0.3); }
-
     .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
     .slot-btn { padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.2s; background: white; font-size: 0.9rem; }
     .slot-btn:hover:not(.disabled) { border-color: #0b63d6; background: #eff6ff; }
     .slot-btn.selected { background: #0b63d6; color: white; border-color: #0b63d6; }
     .slot-btn.disabled { background: #f1f5f9; color: #cbd5e1; cursor: not-allowed; border-color: #f1f5f9; }
-
     .selected-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0; font-size: 0.9rem; }
     .review-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     .review-table th, .review-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
@@ -374,6 +381,9 @@ while($r = mysqli_fetch_assoc($q)){ $lapangans[] = $r; }
 </main>
 
 <script>
+    // Variabel global dari PHP ke JS untuk cek login
+    const isLoggedIn = <?= json_encode($is_logged_in) ?>;
+    
     let currentStep = 1;
     let selectedSlots = []; 
     let maxQuota = 0;
@@ -389,6 +399,24 @@ while($r = mysqli_fetch_assoc($q)){ $lapangans[] = $r; }
     }
 
     function nextStep(step) {
+        // --- LOGIC GATE: CEK LOGIN SAAT MAU KE STEP 2 ---
+        if (step === 2 && !isLoggedIn) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Login Diperlukan',
+                text: 'Silakan login atau daftar untuk melanjutkan pendaftaran member.',
+                showCancelButton: true,
+                confirmButtonText: 'Login / Daftar',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#0b63d6'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = '../auth/login.php';
+                }
+            });
+            return; // Stop proses
+        }
+
         if (step === 2) {
             const paketEl = document.querySelector('input[name="paket"]:checked');
             const lapEl = document.getElementById('inputLapangan');
@@ -492,7 +520,7 @@ while($r = mysqli_fetch_assoc($q)){ $lapangans[] = $r; }
             btnTo3.classList.add('opacity-50', 'cursor-not-allowed');
         }
 
-        if (selectedSlots.length === 0) listEl.innerHTML = '<p class="text-xs text-slate-400 text-center mt-10">Belum ada jadwal.</p>';
+        if (selectedSlots.length === 0) listEl.innerHTML = '<p class="text-xs text-slate-400 text-center mt-10">Belum ada jadwal dipilih.</p>';
         else {
             selectedSlots.sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
             listEl.innerHTML = selectedSlots.map((s, i) => `<div class="selected-item"><div><div class="text-xs font-bold text-slate-700">${formatDate(s.tanggal)}</div><div class="text-xs text-slate-500">${s.jam}</div></div><button onclick="removeSlot(${i})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button></div>`).join('');
@@ -546,10 +574,20 @@ while($r = mysqli_fetch_assoc($q)){ $lapangans[] = $r; }
         fetch('member.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(data => {
-            if (data.status === 'success') Swal.fire('Berhasil!', 'Pendaftaran berhasil.', 'success').then(() => window.location.href = '../DashPengguna.php');
-            else { Swal.fire('Gagal', data.message, 'error'); btn.disabled = false; btn.innerHTML = 'Konfirmasi Pembayaran'; }
+            if (data.status === 'success') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil!',
+                    text: data.message,
+                    confirmButtonColor: '#0b63d6'
+                }).then(() => window.location.href = '../DashPengguna.php');
+            } else { 
+                Swal.fire('Gagal', data.message, 'error'); 
+                btn.disabled = false; 
+                btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Konfirmasi Pembayaran'; 
+            }
         })
-        .catch(err => { console.error(err); Swal.fire('Error', 'Kesalahan koneksi.', 'error'); btn.disabled = false; btn.innerHTML = 'Konfirmasi Pembayaran'; });
+        .catch(err => { console.error(err); Swal.fire('Error', 'Kesalahan koneksi.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Konfirmasi Pembayaran'; });
     }
 
     function formatDate(dateString) { return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); }
