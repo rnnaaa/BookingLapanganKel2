@@ -37,170 +37,102 @@ $nama_pemesan = trim($_POST['nama_pemesan'] ?? $_SESSION['nama']);
 // 2. CEK STATUS BOOKING (HOLD)
 // =================================================================
 
-$cek_sql = "SELECT total_amount FROM booking 
-            WHERE id_booking = ? AND status = 'hold' AND expired_at > NOW() 
-            LIMIT 1";
+$cek_sql = "SELECT status, total_amount FROM booking WHERE id_booking = ?";
 $stmt_cek = $conn->prepare($cek_sql);
 $stmt_cek->bind_param("i", $temp_booking_id);
 $stmt_cek->execute();
-$result_cek = $stmt_cek->get_result();
+$res_cek = $stmt_cek->get_result();
+$row_cek = $res_cek->fetch_assoc();
 
-if ($result_cek->num_rows === 0) {
-    unset($_SESSION['temp_booking_id']);
-    unset($_SESSION['booking_expired_at']);
-    $_SESSION['booking_error'] = "Waktu booking Anda telah habis. Silakan ulangi pesanan.";
+if (!$row_cek || $row_cek['status'] !== 'hold') {
+    $_SESSION['booking_error'] = "Maaf, sesi booking Anda sudah habis/kadaluarsa.";
     header('Location: booking.php');
     exit;
 }
 
 // =================================================================
-// 3. HITUNG ULANG TOTAL (BERDASARKAN SESSION TERBARU)
+// 3. PROSES UPLOAD BUKTI (DIPERBAIKI: PATH ABSOLUT & AUTO CREATE FOLDER)
 // =================================================================
 
-// PERBAIKAN: Hitung sewa dari SESSION, bukan DB.
-// Karena user mungkin menghapus item di halaman payment.php
-$items_to_book = $_SESSION['keranjang'] ?? [];
-if (empty($items_to_book)) {
-    header('Location: booking.php');
-    exit;
+$bukti_baru = null;
+
+// Tentukan folder tujuan menggunakan __DIR__ (Path Absolut) agar aman
+// __DIR__ adalah folder tempat file ini berada (BookingPengguna)
+// Kita naik satu level (..) lalu masuk ke uploads/bukti
+$target_dir = __DIR__ . '/../uploads/bukti_pembayaran/';
+
+// Cek apakah folder tujuan ada, jika tidak, buat foldernya!
+if (!is_dir($target_dir)) {
+    mkdir($target_dir, 0755, true);
 }
 
-$total_biaya_sewa = 0;
-foreach ($items_to_book as $item) {
-    $total_biaya_sewa += (float)$item['harga'];
-}
-
-// Hitung produk
-$total_biaya_produk = 0;
-$produk_tambahan = $_SESSION['produk_tambahan'] ?? [];
-if (!empty($produk_tambahan)) {
-    foreach ($produk_tambahan as $harga) {
-        $total_biaya_produk += (float)$harga;
-    }
-}
-
-$total_keseluruhan = $total_biaya_sewa + $total_biaya_produk;
-
-// Tentukan DP / Lunas
-$sisa_bayar = 0.00;
-$dp_amount = 0.00;
-$tipe_pembayaran_db = 'Pelunasan';
-$payment_status_db = 'menunggu_verifikasi';
-
-if ($payment_type_post === 'dp') {
-    $amount_to_pay_now = $total_keseluruhan / 2;
-    $sisa_bayar = $total_keseluruhan - $amount_to_pay_now;
-    $dp_amount = $amount_to_pay_now;
-    $tipe_pembayaran_db = 'DP';
-} else {
-    $amount_to_pay_now = $total_keseluruhan;
-    $sisa_bayar = 0.00;
-    $dp_amount = 0.00;
-    $tipe_pembayaran_db = 'Pelunasan';
-}
-
-// Validasi
-if (abs((float)$payment_amount_post - $amount_to_pay_now) > 1) {
-    $_SESSION['booking_error'] = "Total pembayaran tidak cocok. Harap ulangi.";
-    header('Location: ' . $_SERVER['HTTP_REFERER']);
-    exit;
-}
-
-// =================================================================
-// 4. UPLOAD BUKTI
-// =================================================================
-$bukti_file_name = null;
-
-if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
-    $file = $_FILES['bukti_pembayaran'];
-    $upload_dir = '../uploads/bukti_pembayaran/';
-    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-
-    $max_size = 5 * 1024 * 1024; 
-    $allowed_types = ['image/jpeg', 'image/png', 'application/pdf'];
+if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === 0) {
+    $ext = pathinfo($_FILES['bukti_pembayaran']['name'], PATHINFO_EXTENSION);
+    // Nama file unik
+    $bukti_baru = "bukti_" . $temp_booking_id . "_" . time() . "." . $ext;
     
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime_type = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
-
-    if ($file['size'] > $max_size || !in_array($mime_type, $allowed_types)) {
-        $_SESSION['booking_error'] = "File tidak valid (Max 5MB, JPG/PNG/PDF).";
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit;
-    }
-
-    $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $bukti_file_name = 'bukti_' . $temp_booking_id . '_' . time() . '.' . $file_extension;
-    $upload_path = $upload_dir . $bukti_file_name;
-
-    if (!move_uploaded_file($file['tmp_name'], $upload_path)) {
-        $_SESSION['booking_error'] = "Gagal mengupload file bukti.";
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
+    // Pindahkan file ke folder tujuan
+    if (!move_uploaded_file($_FILES['bukti_pembayaran']['tmp_name'], $target_dir . $bukti_baru)) {
+        $_SESSION['booking_error'] = "Gagal menyimpan file ke server. Cek izin folder uploads.";
+        header('Location: verifikasi_payment.php'); 
         exit;
     }
 } else {
-    $_SESSION['booking_error'] = "Anda wajib mengupload bukti pembayaran.";
-    header('Location: ' . $_SERVER['HTTP_REFERER']);
+    $_SESSION['booking_error'] = "Bukti pembayaran wajib diupload.";
+    header('Location: verifikasi_payment.php');
     exit;
 }
 
 // =================================================================
-// 5. UPDATE DATABASE
+// 4. UPDATE DATABASE (FINALISASI)
 // =================================================================
 
 mysqli_begin_transaction($conn);
 
 try {
-    // 1. Update Tabel BOOKING
-    $sql_update = "UPDATE booking SET 
-                   status = 'menunggu', 
-                   payment_status = ?, 
-                   payment_method = ?,
-                   dp_amount = ?,
-                   total_amount = ?,
-                   remaining_amount = ?,
-                   expired_at = NULL
-                   WHERE id_booking = ?";
+    // 1. Insert ke Tabel Pembayaran
+    $sql_bayar = "INSERT INTO pembayaran (booking_id, tipe, bukti_pembayaran, amount, method, status_verifikasi, verified_by) 
+                  VALUES (?, ?, ?, ?, ?, 'menunggu', NULL)";
+    $tipe_db = ($payment_type_post === 'lunas') ? 'Pelunasan' : 'DP';
     
-    $stmt_up = $conn->prepare($sql_update);
-    $stmt_up->bind_param("ssdddi", 
-        $payment_status_db, 
-        $metode_pembayaran_post, 
-        $dp_amount, 
-        $total_keseluruhan, 
-        $sisa_bayar, 
-        $temp_booking_id
-    );
-    $stmt_up->execute();
+    $stmt_p = $conn->prepare($sql_bayar);
+    // s = string (bukti_baru), d = double (amount)
+    $stmt_p->bind_param("issds", $temp_booking_id, $tipe_db, $bukti_baru, $payment_amount_post, $metode_pembayaran_post);
+    $stmt_p->execute();
 
-    // 2. Insert Tabel PEMBAYARAN
-    $sql_pay = "INSERT INTO pembayaran (booking_id, tipe, bukti_pembayaran, amount, method, status_verifikasi, tanggal_upload) 
-                VALUES (?, ?, ?, ?, ?, 'menunggu', NOW())";
-    $stmt_pay = $conn->prepare($sql_pay);
-    $stmt_pay->bind_param("issds", 
-        $temp_booking_id, 
-        $tipe_pembayaran_db, 
-        $bukti_file_name, 
-        $amount_to_pay_now, 
-        $metode_pembayaran_post
-    );
-    $stmt_pay->execute();
+    // 2. Update Status Booking Utama -> 'menunggu'
+    $status_bayar = 'menunggu_verifikasi';
+    $sql_update = "UPDATE booking SET status = 'menunggu', payment_status = ?, payment_method = ? WHERE id_booking = ?";
+    $stmt_u = $conn->prepare($sql_update);
+    $stmt_u->bind_param("ssi", $status_bayar, $metode_pembayaran_post, $temp_booking_id);
+    $stmt_u->execute();
 
-    // 3. Update Status Slot Jadwal (Hanya untuk item yang ADA DI SESSION)
-    // Item 'hold' yang dihapus dari session akan tetap 'hold' dan expired sendiri (tidak jadi 'dibooking')
-    $sql_slot = "UPDATE jadwal_detail SET status = 'dibooking' 
-                 WHERE id_booking = ? AND id_jadwal_waktu = ?";
+    // 3. Pastikan Slot Jadwal Tetap Aman (Status 'dibooking')
+    $sql_slot = "UPDATE jadwal_detail SET status = 'dibooking' WHERE id_booking = ?";
     $stmt_slot = $conn->prepare($sql_slot);
-    
-    foreach ($items_to_book as $item) {
-        $stmt_slot->bind_param("ii", $temp_booking_id, $item['id_jadwal_waktu']);
-        $stmt_slot->execute();
-    }
+    $stmt_slot->bind_param("i", $temp_booking_id);
+    $stmt_slot->execute();
 
-    // 4. Hapus Detail Booking yang TIDAK ada di Session (Pembersihan Data)
-    // Kita perlu menghapus row di detail_booking yang id_jadwal_waktu-nya TIDAK ada di session
-    // Ini opsional tapi bagus agar database bersih dari item yang dibatalkan saat checkout
-    // (Untuk sekarang, biarkan saja, item detail_booking yang tidak jadi dibayar tidak masalah)
+    // === SIMPAN INFO PRODUK KE TABEL BOOKING (KOLOM info_produk) ===
+    if (isset($_SESSION['produk_tambahan']) && !empty($_SESSION['produk_tambahan'])) {
+        $total_produk_db = 0;
+        $list_produk_str = []; 
+
+        foreach ($_SESSION['produk_tambahan'] as $id_prod => $item) {
+            $harga = $item['harga'];
+            $nama_produk = $item['nama'];
+            $total_produk_db += $harga;
+            $list_produk_str[] = "$nama_produk (Rp " . number_format($harga, 0, ',', '.') . ")";
+        }
+
+        $info_produk_text = implode(", ", $list_produk_str);
+
+        $update_total = "UPDATE booking SET total_amount = total_amount + ?, info_produk = ? WHERE id_booking = ?";
+        $stmt_ub = $conn->prepare($update_total);
+        $stmt_ub->bind_param("dsi", $total_produk_db, $info_produk_text, $temp_booking_id);
+        $stmt_ub->execute();
+    }
+    // ===================================================================
 
     mysqli_commit($conn);
     
@@ -209,6 +141,7 @@ try {
     unset($_SESSION['produk_tambahan']);
     unset($_SESSION['temp_booking_id']);
     unset($_SESSION['booking_expired_at']);
+    unset($_SESSION['payment_temp']); 
 
     $_SESSION['booking_success'] = "Pembayaran berhasil dikirim! Booking ID #$temp_booking_id sedang menunggu verifikasi Admin.";
     header("Location: ../riwayat/riwayat.php");
@@ -216,10 +149,8 @@ try {
 
 } catch (Exception $e) {
     mysqli_rollback($conn);
-    if ($bukti_file_name && file_exists($upload_path)) unlink($upload_path);
-
     $_SESSION['booking_error'] = "Terjadi kesalahan sistem: " . $e->getMessage();
-    header('Location: ' . $_SERVER['HTTP_REFERER']);
+    header("Location: booking.php");
     exit;
 }
 ?>

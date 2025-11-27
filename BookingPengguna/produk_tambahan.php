@@ -18,7 +18,6 @@ if (!isset($_SESSION['temp_booking_id']) || !isset($_SESSION['booking_expired_at
 $expired_time = strtotime($_SESSION['booking_expired_at']);
 $remaining_seconds = $expired_time - time();
 
-// UPDATE PHP: Redirect biasa jika expired server-side
 if ($remaining_seconds <= 0) {
     header("Location: cancel_booking.php");
     exit;
@@ -36,13 +35,13 @@ foreach ($items_to_pay as $item) {
     $total_biaya_sewa += (float)$item['harga'];
 }
 
-$products = [
-    ['id' => 'cock_12', 'nama' => 'Shuttlecock (12k)', 'harga' => 12000],
-    ['id' => 'cock_15', 'nama' => 'Shuttlecock (15k)', 'harga' => 15000],
-    ['id' => 'cock_20', 'nama' => 'Shuttlecock (20k)', 'harga' => 20000],
-    ['id' => 'air_mineral', 'nama' => 'Air Mineral (5k)', 'harga' => 5000],
-    ['id' => 'sewa_raket', 'nama' => 'Sewa Raket (10k)', 'harga' => 10000],
-];
+// Ambil Produk dari DB
+$products = [];
+$query_produk = "SELECT * FROM produk WHERE status = 'aktif' ORDER BY kategori ASC, nama_produk ASC";
+$result_produk = mysqli_query($conn, $query_produk);
+while ($row = mysqli_fetch_assoc($result_produk)) {
+    $products[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -74,7 +73,7 @@ $products = [
 
 <body class="bg-softGray text-slate-900 antialiased">
 
-<header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
+ <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
       <div class="max-w-5xl mx-auto px-4">
         <nav class="flex items-center justify-between h-20">
           <a href="#" class="flex items-center gap-4 pointer-events-none">
@@ -102,7 +101,7 @@ $products = [
 
   <form id="productForm" action="payment.php?cart=1&from_products=1" method="POST">
     <main class="max-w-3xl mx-auto px-4 py-8">
-      <div class="flex flex-col gap-5">
+       <div class="flex flex-col gap-5">
         <div class="card flex items-center gap-4">
             <div class="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center">
                 <i class="fa-solid fa-box-open text-primary text-xl"></i>
@@ -114,32 +113,38 @@ $products = [
         </div>
 
         <div class="card">
-            <h3 class="font-poppins font-medium text-base mb-4">Kategori</h3>
-            <div class="w-full bg-primary-light border-b-2 border-primary text-primary font-semibold text-sm p-3 rounded-t-lg">
-                Perlengkapan & Minuman
-            </div>
-            <div class="p-4 border border-t-0 rounded-b-lg border-gray-200">
-                <h4 class="font-semibold text-slate-700 mb-3">Varian</h4>
-                <div class="space-y-3">
-                    <?php foreach ($products as $product): ?>
-                    <label for="<?= $product['id'] ?>" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                        <div>
-                            <div class="font-medium text-sm"><?= htmlspecialchars($product['nama']) ?></div>
-                            <div class="text-xs text-slate-500">Harga satuan</div>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="font-semibold text-sm text-primary">Rp <?= number_format($product['harga'], 0, ',', '.') ?></span>
-                            <input type="checkbox" 
-                                   id="<?= $product['id'] ?>" 
-                                   name="produk[<?= htmlspecialchars($product['nama']) ?>]" 
-                                   value="<?= $product['harga'] ?>"
-                                   class="h-5 w-5 text-primary rounded focus:ring-primary product-checkbox"
-                                   data-harga="<?= $product['harga'] ?>">
-                        </div>
-                    </label>
-                    <?php endforeach; ?>
+            <h3 class="font-poppins font-medium text-base mb-4">Daftar Produk</h3>
+            
+            <?php if(empty($products)): ?>
+                <p class="text-sm text-slate-500 text-center py-4">Tidak ada produk tambahan yang tersedia saat ini.</p>
+            <?php else: ?>
+                <div class="w-full bg-primary-light border-b-2 border-primary text-primary font-semibold text-sm p-3 rounded-t-lg">
+                    Perlengkapan & Minuman
                 </div>
-            </div>
+                <div class="p-4 border border-t-0 rounded-b-lg border-gray-200">
+                    <h4 class="font-semibold text-slate-700 mb-3">Pilih Item</h4>
+                    <div class="space-y-3">
+                        <?php foreach ($products as $product): ?>
+                        <label for="prod_<?= $product['id_produk'] ?>" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <div>
+                                <div class="font-medium text-sm"><?= htmlspecialchars($product['nama_produk']) ?></div>
+                                <div class="text-xs text-slate-500"><?= htmlspecialchars($product['kategori']) ?></div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="font-semibold text-sm text-primary">Rp <?= number_format($product['harga'], 0, ',', '.') ?></span>
+                                
+                                <input type="checkbox" 
+                                       id="prod_<?= $product['id_produk'] ?>" 
+                                       name="produk[<?= $product['id_produk'] ?>]" 
+                                       value="<?= $product['harga'] . '|' . htmlspecialchars($product['nama_produk']) ?>"
+                                       class="h-5 w-5 text-primary rounded focus:ring-primary product-checkbox"
+                                       data-harga="<?= $product['harga'] ?>">
+                            </div>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="card">
@@ -172,7 +177,7 @@ $products = [
     </footer>
   </form> 
 
-<script>
+  <script>
     let isSafeExit = false;
     let timeLeft = <?= $remaining_seconds ?>;
 
@@ -268,7 +273,7 @@ $products = [
             }
         }, 1000);
 
-        // --- LOGIKA PRODUK ---
+        // --- LOGIKA UI PRODUK ---
         const baseTotal = <?= $total_biaya_sewa ?>;
         let productTotal = 0;
         const totalDisplay = document.getElementById('total-display');
@@ -310,16 +315,13 @@ $products = [
 
         // Tombol Lanjut / Lewati
         actionButton.addEventListener('click', function(e) {
-            // Set Safe Exit agar tidak dicegat SweetAlert/Native Alert saat pindah halaman
             isSafeExit = true;
             window.removeEventListener('beforeunload', handleBeforeUnload);
 
             if (actionButton.getAttribute('type') === 'button') {
-                // Jika tombol "Lewati" (Button biasa -> Pindah manual)
                 e.preventDefault();
                 window.location.href = "payment.php?cart=1&from_products=1";
             }
-            // Jika "Lanjutkan" (Submit Form), biarkan form submit
         });
         
         document.getElementById('productForm').addEventListener('submit', function() {

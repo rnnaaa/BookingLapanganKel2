@@ -1,4 +1,39 @@
-<?php include __DIR__ . '/include_user/header.php'; ?>
+<?php 
+session_start();
+require 'config/database.php'; // Koneksi Database Wajib
+include __DIR__ . '/include_user/header.php'; 
+
+// ============================================================
+// LOGIKA BACKEND: AMBIL 3 TESTIMONI TERBARU
+// ============================================================
+$testimonials = [];
+// Limit 3 saja untuk halaman depan
+$query = "SELECT * FROM saran ORDER BY created_at DESC LIMIT 3"; 
+$result = mysqli_query($conn, $query);
+
+if ($result) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        // Mapping kategori ke 'Peran' (Sama seperti kontak.php)
+        $roleMap = [
+            'fasilitas' => 'Member', 
+            'pelayanan' => 'Pelanggan', 
+            'booking' => 'User App', 
+            'harga' => 'Member', 
+            'lainnya' => 'Pengunjung'
+        ];
+        
+        $displayName = ($row['is_anonim'] == 1) ? 'Pengguna' : htmlspecialchars($row['nama']);
+        $displayRole = $roleMap[$row['kategori']] ?? 'Pelanggan';
+
+        $testimonials[] = [
+            'nama' => $displayName,
+            'peran' => $displayRole,
+            'testimoni' => htmlspecialchars($row['pesan']),
+            'rating' => (int)$row['rating']
+        ];
+    }
+}
+?>
 
 <style>
     /* STYLE KONSISTEN */
@@ -82,7 +117,7 @@
 
             <div class="lg:w-6/12 relative" data-aos="fade-left">
                 <div class="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20 transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                    <img src="assets/images/semuaLP.jpg" alt="Rush Badminton" class="w-full h-[450px] object-cover hover:scale-105 transition-transform duration-700" />
+                    <img src="assets/images/semuaLP.jpg" alt="SportField Arena" class="w-full h-[450px] object-cover hover:scale-105 transition-transform duration-700" />
                     <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                     <div class="absolute bottom-6 left-6 text-white">
                         <div class="flex items-center gap-2 mb-1">
@@ -90,10 +125,9 @@
                             <span class="flex text-yellow-400 text-sm">★★★★★</span>
                         </div>
                         <h3 class="text-xl font-bold">4 Lapangan Standard Internasional</h3>
-                        <p class="text-sm text-white/80">Badminton</p>
+                        <p class="text-sm text-white/80">Futsal • Badminton • Basket</p>
                     </div>
                 </div>
-                
                 <div class="absolute -top-6 -right-6 bg-white p-4 rounded-2xl shadow-xl animate-float hidden md:block">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600"><i class="fa-solid fa-users"></i></div>
@@ -109,7 +143,7 @@
 
     <section id="lapangan" class="max-w-7xl mx-auto px-4 py-24">
         <div class="text-center mb-16" data-aos="fade-up">
-            <span class="text-primary font-bold tracking-wider uppercase text-sm">Pilihan Lapangan</span>
+            <span class="text-primary font-bold tracking-wider uppercase text-sm">Pilihan Arena</span>
             <h2 class="text-4xl font-poppins font-bold text-slate-800 mt-2 mb-4">Lapangan Kami</h2>
             <p class="text-lg text-slate-600 max-w-2xl mx-auto">Pilih lapangan favorit Anda dengan fasilitas terbaik</p>
         </div>
@@ -120,14 +154,14 @@
                     <img src="assets/images/lapangan1.jpg" alt="Futsal A" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div class="absolute top-4 right-4 bg-yellow-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full shadow-md">Best Seller</div>
                     <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm">
-                        <span class="text-primary font-bold text-sm">Rp 150.000</span> <span class="text-xs text-slate-500">/ jam</span>
+                        <span class="text-primary font-bold text-sm">Rp 30.000</span> <span class="text-xs text-slate-500">/ jam</span>
                     </div>
                 </div>
                 <div class="p-6">
-                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Futsal A - Sintetis Premium</h3>
-                    <p class="text-slate-500 text-sm mb-4 line-clamp-2">Rumput sintetis terbaik dengan sistem drainase modern.</p>
+                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Lapangan A (Matras)</h3>
+                    <p class="text-slate-500 text-sm mb-4 line-clamp-2">Karpet standar BWF dengan pencahayaan anti-glare.</p>
                     <div class="flex flex-wrap gap-2">
-                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">⚽ Futsal</span>
+                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏸 Badminton</span>
                         <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">💡 LED</span>
                     </div>
                 </div>
@@ -137,14 +171,14 @@
                 <div class="relative h-60 overflow-hidden">
                     <img src="assets/images/lapangan2.jpg" alt="Futsal B" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm">
-                        <span class="text-primary font-bold text-sm">Rp 120.000</span> <span class="text-xs text-slate-500">/ jam</span>
+                        <span class="text-primary font-bold text-sm">Rp 30.000</span> <span class="text-xs text-slate-500">/ jam</span>
                     </div>
                 </div>
                 <div class="p-6">
-                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Futsal B - Vinyl Anti Slip</h3>
+                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Lapangan B (Sintetis)</h3>
                     <p class="text-slate-500 text-sm mb-4 line-clamp-2">Lantai vinyl profesional anti-slip untuk performa maksimal.</p>
                     <div class="flex flex-wrap gap-2">
-                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">⚽ Futsal</span>
+                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏸 Badminton</span>
                         <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">✨ Vinyl</span>
                     </div>
                 </div>
@@ -154,32 +188,15 @@
                 <div class="relative h-60 overflow-hidden">
                     <img src="assets/images/lapangan3.jpg" alt="Badminton" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm">
-                        <span class="text-primary font-bold text-sm">Rp 80.000</span> <span class="text-xs text-slate-500">/ jam</span>
+                        <span class="text-primary font-bold text-sm">Rp 30.000</span> <span class="text-xs text-slate-500">/ jam</span>
                     </div>
                 </div>
                 <div class="p-6">
-                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Badminton - International</h3>
+                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Lapangan C (Vynil)</h3>
                     <p class="text-slate-500 text-sm mb-4 line-clamp-2">Karpet standar BWF dengan pencahayaan anti-glare.</p>
                     <div class="flex flex-wrap gap-2">
-                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏸 Badmin</span>
+                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏸 Badminton</span>
                         <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏆 BWF</span>
-                    </div>
-                </div>
-            </article>
-
-            <article class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover-lift group" data-aos="fade-up" data-aos-delay="400">
-                <div class="relative h-60 overflow-hidden">
-                    <img src="assets/images/lapangan4.jpg" alt="Basket" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm">
-                        <span class="text-primary font-bold text-sm">Rp 200.000</span> <span class="text-xs text-slate-500">/ jam</span>
-                    </div>
-                </div>
-                <div class="p-6">
-                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Basket - Full Court</h3>
-                    <p class="text-slate-500 text-sm mb-4 line-clamp-2">Lapangan basket indoor full court dengan ring hidrolik.</p>
-                    <div class="flex flex-wrap gap-2">
-                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏀 Basket</span>
-                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🔊 Sound</span>
                     </div>
                 </div>
             </article>
@@ -204,13 +221,13 @@
                             <p class="text-white/80 text-sm">Prioritas Sabtu-Minggu</p>
                         </div>
                     </div>
-                    <div class="text-3xl font-bold mb-6">Rp 150rb <span class="text-sm font-normal text-white/70">/bulan</span></div>
+                    <div class="text-3xl font-bold mb-6">Rp 25rb <span class="text-sm font-normal text-white/70">/Jam</span></div>
                     <ul class="space-y-3 mb-8 text-sm text-white/90">
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-yellow-300"></i> Booking H-7</li>
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-yellow-300"></i> Diskon 15% Event</li>
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-yellow-300"></i> Bonus 2 Jam/Bulan</li>
                     </ul>
-                    <button class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-primaryDark font-bold rounded-xl transition-colors shadow-lg" onclick="handleBookingClick('Membership', 150000)">Daftar Member</button>
+                    <button class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-primaryDark font-bold rounded-xl transition-colors shadow-lg" onclick="window.location.href='member.php'">Daftar Member</button>
                 </div>
 
                 <div class="p-8 bg-white rounded-3xl shadow-soft border border-slate-100 hover-lift">
@@ -226,7 +243,7 @@
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-green-500"></i> Free Konsumsi Panitia</li>
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-green-500"></i> Dokumentasi Foto</li>
                     </ul>
-                    <button class="w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 transition-all" onclick="contactAdmin()">Hubungi Admin</button>
+                    <button class="w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 transition-all" onclick="window.location.href='kontak.php'">Hubungi Admin</button>
                 </div>
 
                 <div class="p-8 bg-white rounded-3xl shadow-soft border border-slate-100 hover-lift">
@@ -242,7 +259,7 @@
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-green-500"></i> Harga Weekday Murah</li>
                         <li class="flex items-center gap-3"><i class="fa-solid fa-check text-green-500"></i> Fasilitas Shower Gratis</li>
                     </ul>
-                    <button class="w-full py-3 bg-white hover:bg-slate-50 text-primary border-2 border-primary font-bold rounded-xl transition-all" onclick="openWhatsApp()">Booking via WA</button>
+                    <button class="w-full py-3 bg-white hover:bg-slate-50 text-primary border-2 border-primary font-bold rounded-xl transition-all" onclick="window.location.href='BookingPengguna/booking.php'">Booking Sekarang</button>
                 </div>
             </div>
         </div>
@@ -285,7 +302,7 @@
             <div class="flex flex-col lg:flex-row gap-12 items-start">
                 <div class="lg:w-1/3">
                     <span class="text-primary font-bold text-sm uppercase tracking-wider">Lokasi Kami</span>
-                    <h2 class="text-3xl font-poppins font-bold text-slate-800 mt-2 mb-6">Kunjungi Rush Badminton</h2>
+                    <h2 class="text-3xl font-poppins font-bold text-slate-800 mt-2 mb-6">Kunjungi Arena</h2>
                     
                     <div class="bg-white p-6 rounded-2xl shadow-sm mb-6">
                         <div class="flex gap-4">
@@ -301,21 +318,21 @@
                         </div>
                     </div>
                     
-                    <a href="https://www.google.com/maps/search/?api=1&query=RUSH+BADMINTON+JEMBER" target="_blank" class="w-full block text-center bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold py-3 rounded-xl transition-colors">
+                    <a href="https://maps.app.goo.gl/EmggepYvmq8e5FF88" target="_blank" class="w-full block text-center bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold py-3 rounded-xl transition-colors">
                         Buka Google Maps
                     </a>
                 </div>
 
                 <div class="lg:w-2/3 w-full h-96 bg-slate-200 rounded-3xl overflow-hidden shadow-lg border-4 border-white">
-                <iframe 
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.317075287345!2d113.7079392747652!3d-8.165585099999999!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dd695aa99d14409%3A0x3c5639c7bcdde6cd!2sRUSH%20Badminton%20Academy!5e0!3m2!1sid!2sid!4v1710000000000!5m2!1sid!2sid" 
-                    width="100%" 
-                    height="100%" 
-                    style="border:0;" 
-                    allowfullscreen="" 
-                    loading="lazy" 
-                    referrerpolicy="no-referrer-when-downgrade">
-                </iframe>
+                     <iframe 
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.317075287345!2d113.7079392747652!3d-8.165585099999999!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dd695aa99d14409%3A0x3c5639c7bcdde6cd!2sRUSH%20Badminton%20Academy!5e0!3m2!1sid!2sid!4v1710000000000!5m2!1sid!2sid" 
+                        width="100%" 
+                        height="100%" 
+                        style="border:0;" 
+                        allowfullscreen="" 
+                        loading="lazy" 
+                        referrerpolicy="no-referrer-when-downgrade">
+                    </iframe>
                 </div>
             </div>
         </div>
@@ -325,12 +342,11 @@
         <div class="max-w-7xl mx-auto px-4">
             <div class="text-center mb-12">
                 <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Kata Mereka</h2>
-                <p class="text-lg text-slate-600">Pengalaman pengguna setia Rush Badminton</p>
+                <p class="text-lg text-slate-600">Pengalaman pengguna setia SportField</p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-8" id="testimoniContainer">
-                <div class="col-span-3 text-center text-slate-400">Memuat testimoni...</div>
-            </div>
+                </div>
         </div>
     </section>
 
@@ -369,49 +385,28 @@
 </main>
 
 <script>
-    // Smooth Scroll Script
-    function scrollToSection(id) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
-        }
-    }
+    // DATA DARI PHP
+    const dbTestimonials = <?= json_encode($testimonials) ?>;
 
-    // === LOGIC TESTIMONI (Sama seperti kontak.php) ===
     document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('testimoniContainer');
         
-        // Data default jika belum ada di localStorage
-        const defaultTestimonials = [
-            { nama: 'Ahmad Rizki', peran: 'Pengguna Fasilitas', testimoni: '"Lapangan futsal berkualitas dengan harga terjangkau. Adminnya ramah dan responsif!"', rating: 5 },
-            { nama: 'Sari Dewi', peran: 'Pelanggan Booking', testimoni: '"Proses booking mudah dan cepat. Fasilitas lengkap dan bersih. Recommended banget!"', rating: 4 },
-            { nama: 'Budi Santoso', peran: 'Pengguna Promo', testimoni: '"Promo weekend-nya worth it! Lapangan basketnya luas dan nyaman untuk latihan tim."', rating: 5 }
-        ];
-
-        // Cek LocalStorage, kalau kosong pake default
-        let stored = localStorage.getItem('sportfieldTestimonials');
-        let testimonials = stored ? JSON.parse(stored) : defaultTestimonials;
-
-        // Render
         if (container) {
-            if (testimonials.length === 0) {
-                container.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-500">Belum ada testimoni.</div>`;
+            if (dbTestimonials.length === 0) {
+                container.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-500">Belum ada testimoni. Jadilah yang pertama memberikan ulasan!</div>`;
             } else {
-                // Ambil 3 terbaru saja untuk halaman depan
-                const recentTestimonials = testimonials.slice(0, 3);
-                
-                container.innerHTML = recentTestimonials.map(t => `
+                container.innerHTML = dbTestimonials.map(t => `
                   <div class="bg-slate-50 p-8 rounded-2xl shadow-soft hover:shadow-lift hover:scale-105 transform transition duration-300">
                     <div class="flex items-center gap-3 mb-4">
                       <div class="w-12 h-12 bg-gradient-to-r from-primary to-primaryDark rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
-                        ${t.nama.charAt(0)}
+                        ${t.nama.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div class="font-bold text-slate-800">${t.nama}</div>
                         <div class="text-xs text-slate-500 font-medium uppercase tracking-wide">${t.peran}</div>
                       </div>
                     </div>
-                    <p class="text-slate-600 text-sm italic mb-4 leading-relaxed">${t.testimoni}</p>
+                    <p class="text-slate-600 text-sm italic mb-4 leading-relaxed">"${t.testimoni}"</p>
                     <div class="flex text-yellow-400 text-sm">
                       ${'★'.repeat(t.rating)}${t.rating < 5 ? '☆'.repeat(5 - t.rating) : ''}
                     </div>

@@ -30,6 +30,7 @@ if ($remaining_seconds <= 0) {
     unset($_SESSION['booking_expired_at']);
     unset($_SESSION['keranjang']);
     unset($_SESSION['produk_tambahan']);
+    unset($_SESSION['payment_temp']); // Hapus data temp
     
     echo '<!DOCTYPE html><html><head>
             <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -49,19 +50,35 @@ if ($remaining_seconds <= 0) {
     exit;
 }
 
-// 3. Validasi Data POST
-if (!isset($_POST['metode_pembayaran']) || !isset($_POST['payment_type']) || !isset($_POST['payment_amount'])) {
+// ========================================================
+// 3. VALIDASI DATA PEMBAYARAN (SESSION BASED)
+// ========================================================
+
+// Jika ada POST baru dari halaman payment.php, simpan ke session
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['metode_pembayaran'])) {
+    $_SESSION['payment_temp'] = [
+        'metode' => $_POST['metode_pembayaran'],
+        'type'   => $_POST['payment_type'],
+        'amount' => (float)$_POST['payment_amount']
+    ];
+}
+
+// Ambil data dari Session (agar tahan refresh/redirect error)
+$payment_data = $_SESSION['payment_temp'] ?? null;
+
+// Jika tidak ada data sama sekali, lempar balik ke payment.php
+if (!$payment_data) {
     header("Location: payment.php?cart=1"); 
     exit;
 }
 
-$metode_pembayaran = $_POST['metode_pembayaran'];
-$payment_type = $_POST['payment_type'];
-$payment_amount = (float)$_POST['payment_amount'];
+$metode_pembayaran = $payment_data['metode'];
+$payment_type      = $payment_data['type'];
+$payment_amount    = $payment_data['amount'];
+
 
 // 4. Hitung Ulang Total (Keamanan)
 $items_to_pay = $_SESSION['keranjang'] ?? [];
-
 if (empty($items_to_pay)) {
     header("Location: booking.php");
     exit;
@@ -74,20 +91,24 @@ foreach ($items_to_pay as $item) {
 
 $total_biaya_produk = 0;
 if (isset($_SESSION['produk_tambahan']) && is_array($_SESSION['produk_tambahan'])) {
-    foreach ($_SESSION['produk_tambahan'] as $nama => $harga) {
-        $total_biaya_produk += (float)$harga;
+    foreach ($_SESSION['produk_tambahan'] as $id => $item) {
+        $total_biaya_produk += (float)$item['harga'];
     }
 }
 
 $total_biaya += $total_biaya_produk;
 
+// Validasi jumlah bayar
 if ($payment_type === 'lunas') {
     $expected_amount = $total_biaya;
 } else { 
     $expected_amount = $total_biaya / 2;
 }
 
+// Toleransi perbedaan floating point kecil
 if (abs($payment_amount - $expected_amount) > 1) {
+    // Jika amount dimanipulasi, reset dan kembalikan
+    unset($_SESSION['payment_temp']);
     header("Location: payment.php?cart=1");
     exit;
 }
@@ -166,6 +187,13 @@ $form_action = "proses_pembayaran.php";
   <main class="max-w-4xl mx-auto px-4 py-8">
     <div class="card shadow-lg">
         <div class="modal-body">
+            <?php if(isset($_GET['error'])): ?>
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-sm">
+                    <strong class="font-bold">Gagal!</strong>
+                    <span class="block sm:inline"><?= htmlspecialchars($_GET['error']) ?></span>
+                </div>
+            <?php endif; ?>
+
             <form id="verifyForm" action="<?= $form_action ?>" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="submit_payment">
                 <input type="hidden" name="metode_pembayaran_hidden" value="<?= htmlspecialchars($metode_pembayaran) ?>">
@@ -234,19 +262,20 @@ $form_action = "proses_pembayaran.php";
                             
                             <input type="file" id="bukti_pembayaran" name="bukti_pembayaran" class="hidden" accept="image/jpeg,image/png,application/pdf">
 
-                            <label for="bukti_pembayaran" id="upload-trigger" class="flex items-center gap-3 w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-slate-500 cursor-pointer hover:bg-white hover:border-primary transition-all">
+                            <label for="bukti_pembayaran" id="upload-trigger" 
+                                class="flex items-center gap-4 w-full px-5 py-4 border-2 border-dashed border-gray-300 rounded-xl bg-slate-50 text-slate-500 cursor-pointer hover:bg-white hover:border-primary hover:text-primary transition-all duration-300">
                                 <i class="fa-solid fa-paperclip text-lg"></i>
                                 <span class="text-sm font-medium truncate">Klik untuk pilih file (JPG, PNG, PDF)</span>
                             </label>
 
-                            <div id="preview-container" class="hidden items-center gap-3 w-full p-3 border border-primary/30 bg-primary-light/20 rounded-lg mt-2">
-                                <img id="file-thumb" src="" alt="Preview" class="w-12 h-12 object-cover rounded-md border border-gray-200 bg-white">
+                            <div id="preview-container" class="hidden items-center gap-3 w-full p-3 border border-primary/30 bg-primary-light/20 rounded-xl mt-2 animate-fade-in-up">
+                                <img id="file-thumb" src="" alt="Preview" class="w-12 h-12 object-cover rounded-lg border border-gray-200 bg-white shadow-sm">
                                 <div class="flex-1 min-w-0">
-                                    <p id="file-name" class="text-sm font-semibold text-primary truncate"></p>
-                                    <p id="file-size" class="text-xs text-slate-500"></p>
+                                    <p id="file-name" class="text-sm font-bold text-primary truncate"></p>
+                                    <p id="file-size" class="text-xs text-slate-500 font-medium"></p>
                                 </div>
-                                <button type="button" id="remove-file" class="text-slate-400 hover:text-red-500 p-2 transition-colors" title="Hapus file">
-                                    <i class="fa-solid fa-xmark"></i>
+                                <button type="button" id="remove-file" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Hapus file">
+                                    <i class="fa-solid fa-xmark text-lg"></i>
                                 </button>
                             </div>
                         </div>
@@ -267,11 +296,10 @@ $form_action = "proses_pembayaran.php";
     © 2025 Rush Academy — All rights reserved
   </footer>
 
-<script>
+  <script>
     let isSafeExit = false;
     let timeLeft = <?= $remaining_seconds ?>;
 
-    // --- 1. FUNGSI BATAL MANUAL (TOMBOL DI HEADER) ---
     function triggerManualCancel() {
         Swal.fire({
             title: 'Batalkan Booking?',
@@ -284,66 +312,26 @@ $form_action = "proses_pembayaran.php";
             cancelButtonText: 'Kembali'
         }).then((result) => {
             if (result.isConfirmed) {
-                exitPage();
+                isSafeExit = true;
+                window.removeEventListener('beforeunload', handleBeforeUnload);
+                navigator.sendBeacon('cancel_booking.php');
+                window.location.href = 'booking.php';
             }
         });
     }
 
-    // --- 2. FUNGSI KELUAR HALAMAN & BERSIHKAN SLOT ---
-    function exitPage() {
-        isSafeExit = true;
-        // Matikan listener agar tidak konflik
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        // Kirim sinyal hapus booking ke server
-        navigator.sendBeacon('cancel_booking.php?ajax=1');
-        // Pindah halaman
-        window.location.href = 'booking.php';
-    }
-
-    // --- 3. INTERCEPSI TOMBOL BACK (SWEETALERT UNTUK BACK BUTTON) ---
-    // Kita memanipulasi history browser agar saat back ditekan, event ini tertangkap
-    history.pushState(null, null, location.href);
-    window.onpopstate = function () {
-        if (isSafeExit) return;
-
-        // Masukkan lagi state ke history agar user tidak langsung 'lolos' ke halaman sebelumnya
-        history.pushState(null, null, location.href);
-
-        Swal.fire({
-            title: 'Yakin ingin kembali?',
-            text: "Proses pembayaran belum selesai. Booking Anda akan dibatalkan.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, Keluar',
-            cancelButtonText: 'Lanjut Bayar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                exitPage();
-            }
-        });
-    };
-
-    // --- 4. INTERCEPSI TUTUP TAB / REFRESH (NATIVE BROWSER) ---
-    // Browser TIDAK MENGIZINKAN SweetAlert di sini. Hanya teks default browser.
     const handleBeforeUnload = (e) => {
         if (isSafeExit || timeLeft <= 0) return;
         e.preventDefault();
-        e.returnValue = ''; // Memunculkan dialog konfirmasi bawaan browser
+        e.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    // Backup: Jika user memaksa tutup tab, kirim sinyal cancel di background
     window.addEventListener('pagehide', function () {
-        if (!isSafeExit) navigator.sendBeacon('cancel_booking.php?ajax=1');
+        if (!isSafeExit) navigator.sendBeacon('cancel_booking.php');
     });
 
-
-    // === DOM LOADED ===
     document.addEventListener('DOMContentLoaded', function() {
         
-        // --- LOGIKA TIMER ---
         const timerElem = document.getElementById('countdown-timer');
         const timerContainer = document.getElementById('timer-container');
 
@@ -367,8 +355,6 @@ $form_action = "proses_pembayaran.php";
                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                 const s = (timeLeft % 60).toString().padStart(2, '0');
                 timerElem.innerText = `${m}:${s}`;
-                
-                // Efek visual jika waktu < 1 menit
                 if (timeLeft < 60) {
                   timerContainer.classList.remove('bg-indigo-600');
                   timerContainer.classList.add('bg-red-600', 'animate-pulse');
@@ -377,7 +363,7 @@ $form_action = "proses_pembayaran.php";
             }
         }, 1000);
 
-        // --- LOGIKA FILE UPLOAD ---
+        // LOGIKA FILE UPLOAD
         const fileInput = document.getElementById('bukti_pembayaran');
         const uploadTrigger = document.getElementById('upload-trigger');
         const previewContainer = document.getElementById('preview-container');
@@ -390,20 +376,30 @@ $form_action = "proses_pembayaran.php";
             const file = this.files[0];
             if (file) {
                 if (file.size > 5 * 1024 * 1024) {
-                    Swal.fire({ icon: 'error', title: 'File Terlalu Besar', text: 'Maksimal ukuran file adalah 5MB.', confirmButtonColor: '#0b63d6' });
-                    this.value = ''; return;
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'File Terlalu Besar',
+                        text: 'Maksimal ukuran file adalah 5MB.',
+                        confirmButtonColor: '#0b63d6'
+                    });
+                    this.value = ''; 
+                    return;
                 }
+
                 fileName.textContent = file.name;
-                fileSize.textContent = (file.size / 1024 < 1024) ? (file.size / 1024).toFixed(1) + ' KB' : (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                fileSize.textContent = (file.size / 1024 < 1024) ? 
+                    (file.size / 1024).toFixed(1) + ' KB' : 
+                    (file.size / (1024 * 1024)).toFixed(2) + ' MB';
                 
                 if (file.type.startsWith('image/')) {
                     const reader = new FileReader();
                     reader.onload = (e) => fileThumb.src = e.target.result;
                     reader.readAsDataURL(file);
                 } else {
-                    fileThumb.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="%230b63d6" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>'; 
+                    fileThumb.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="%2394a3b8" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>'; 
                     fileThumb.classList.add('p-2'); 
                 }
+
                 uploadTrigger.classList.add('hidden');
                 previewContainer.classList.remove('hidden');
                 previewContainer.classList.add('flex');
@@ -414,21 +410,28 @@ $form_action = "proses_pembayaran.php";
             fileInput.value = ''; 
             fileThumb.src = ''; 
             fileThumb.classList.remove('p-2'); 
+
             uploadTrigger.classList.remove('hidden');
             previewContainer.classList.add('hidden');
             previewContainer.classList.remove('flex');
         });
 
-        // --- VALIDASI SUBMIT ---
         const verifyForm = document.getElementById('verifyForm');
         verifyForm.addEventListener('submit', function(e) {
             if (fileInput.files.length === 0) {
                 e.preventDefault();
-                Swal.fire({ icon: 'warning', title: 'Bukti Belum Diupload', text: 'Silakan pilih file bukti pembayaran terlebih dahulu.', confirmButtonColor: '#0b63d6' });
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Bukti Belum Diupload',
+                    text: 'Silakan pilih file bukti pembayaran terlebih dahulu.',
+                    confirmButtonColor: '#0b63d6'
+                });
                 return;
             }
-            isSafeExit = true; // Izinkan pindah halaman karena sukses submit
+
+            isSafeExit = true;
             window.removeEventListener('beforeunload', handleBeforeUnload);
+            
             const btn = document.getElementById('btnSubmit');
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...';

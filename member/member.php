@@ -1,757 +1,558 @@
 <?php
-declare(strict_types=1);
+// 1. BUFFERING & SESSION
+ob_start(); 
 session_start();
+date_default_timezone_set('Asia/Jakarta');
 
-/*
- member.php (final revised)
- - MySQL (PDO). Sesuaikan DB config di bawah.
- - Endpoints:
-   GET  ?action=availability&lapangan={id}&ym={YYYY-MM}  -> JSON booked slots
-   POST ?action=submit_member   -> proses pendaftaran + insert member & jadwal
-*/
+// Matikan display error agar tidak merusak JSON response di AJAX
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
 
-// ---------------- DB CONFIG - EDIT INI SESUAI SERVERMU ----------------
-$DB_HOST = '127.0.0.1';
-$DB_NAME = 'bookinglapanganb2';
-$DB_USER = 'root';
-$DB_PASS = '';
-$DB_CHAR = 'utf8mb4';
-// ----------------------------------------------------------------------
+require '../config/database.php';
 
-/* ---------- Utility / DB ---------- */
-class DB {
-    private PDO $pdo;
-    public function __construct($host, $db, $user, $pass, $charset='utf8mb4') {
-        $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-        $opt = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ];
-        $this->pdo = new PDO($dsn, $user, $pass, $opt);
+// 2. Cek Login
+if (!isset($_SESSION['id_user'])) {
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        ob_clean();
+        echo json_encode(['status' => 'error', 'message' => 'Sesi habis, silakan login ulang.']);
+        exit;
     }
-    public function pdo(): PDO { return $this->pdo; }
+    header("Location: ../auth/login.php");
+    exit;
 }
 
-function ensureStatusEnumHasPending(PDO $pdo) {
-    // optional helper: attempt to ALTER if missing (best to run manually)
-    // We'll not auto-alter here to avoid permission issues.
-}
+$user_id = $_SESSION['id_user'];
+// PERBAIKAN 1: Berikan nilai default string kosong jika session nama tidak ada
+$user_nama = $_SESSION['nama'] ?? ''; 
 
-/* week helpers */
-function getWeekCountOfMonth(int $year, int $month): int {
-    $first = new DateTimeImmutable("$year-$month-01");
-    $last = $first->modify('last day of this month');
-    $startWeekday = (int)$first->format('w'); // 0..6
-    $days = (int)$last->format('d');
-    return (int)ceil(($startWeekday + $days) / 7);
-}
-
-function getWeekIndexInMonthFromDate(string $ymd): int {
-    $d = new DateTimeImmutable($ymd);
-    $first = $d->modify('first day of this month');
-    $offset = (int)$first->format('w');
-    return (int)floor(((int)$d->format('d') + $offset - 1) / 7);
-}
-
-function rupiah(int $n): string { return 'Rp ' . number_format($n,0,',','.'); }
-
-/* ---------- Service ---------- */
-class MemberService {
-    private PDO $pdo;
-    private string $uploadDir;
-    private array $prices = [1=>100000,2=>200000,3=>300000];
-
-    public function __construct(PDO $pdo, string $uploadDir) {
-        $this->pdo = $pdo;
-        $this->uploadDir = rtrim($uploadDir, '/');
-        if (!is_dir($this->uploadDir)) @mkdir($this->uploadDir, 0755, true);
-    }
-
-    /**
-     * Check availability for a given lapangan + year-month.
-     * Returns array: [ 'YYYY-MM-DD' => ['HH:MM','HH:MM', ...], ... ]
-     */
-    public function getBookedSlotsForMonth(int $lapanganId, string $ym): array {
-        // expects $ym = "YYYY-MM"
-        [$y,$m] = explode('-', $ym);
-        $start = "$ym-01";
-        $end = (new DateTimeImmutable($start))->modify('last day of this month')->format('Y-m-d');
-
-        $sql = "SELECT tanggal_booking, jam_mulai FROM member_jadwal
-                WHERE id_lapangan = :lapangan
-                AND tanggal_booking BETWEEN :start AND :end
-                AND status IN ('pending','aktif')";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':lapangan'=>$lapanganId, ':start'=>$start, ':end'=>$end]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $res = [];
-        foreach ($rows as $r) {
-            $d = $r['tanggal_booking'];
-            $t = substr($r['jam_mulai'],0,5);
-            if (!isset($res[$d])) $res[$d] = [];
-            $res[$d][] = $t;
-        }
-        return $res;
-    }
-
-    /**
-     * Submit member + jadwal (REVISED FOR FLEXIBLE SYSTEM)
-     * Sistem fleksibel: minimal 2 tanggal per bulan, bebas minggu ke berapa
-     * Minggu ke-5 opsional
-     */
-    public function store(array $input, array $files): array {
-        $errors = [];
-
-        $name = trim((string)($input['name'] ?? ''));
-        $emailRaw = trim((string)($input['email'] ?? ''));
-        if ($emailRaw !== '' && strpos($emailRaw, '@') === false) $emailRaw .= '@gmail.com';
-        $email = $emailRaw;
-        $paket = (int)($input['paket'] ?? 0);
-        $start_month = trim((string)($input['start_month'] ?? '')); // YYYY-MM
-        $court = (int)($input['court'] ?? 0);
-        $selected_dates_raw = $input['selected_dates'] ?? '[]';
-        $selected_dates = json_decode((string)$selected_dates_raw, true);
-        $payment_method = trim((string)($input['payment_method'] ?? ''));
-        $bank_from_name = trim((string)($input['bank_from_name'] ?? ''));
-        $bank_from_number = trim((string)($input['bank_from_number'] ?? ''));
-        $transfer_amount = trim((string)($input['transfer_amount'] ?? ''));
-
-        // basic validations
-        if ($name === '') $errors[] = 'Nama wajib diisi.';
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Email wajib dan harus valid.';
-        if (!in_array($paket, [1,2,3])) $errors[] = 'Pilih paket yang valid.';
-        if ($start_month === '' || !preg_match('/^\d{4}-\d{2}$/', $start_month)) $errors[] = 'Pilih bulan mulai (format YYYY-MM).';
-        if (!is_array($selected_dates) || empty($selected_dates)) $errors[] = 'Pilih minimal 2 tanggal per bulan.';
-        if (empty($court)) $errors[] = 'Pilih lapangan.';
-        if (!in_array($payment_method, ['qris','bca','mandiri'])) $errors[] = 'Pilih metode pembayaran.';
-        if ($transfer_amount === '' || !preg_match('/^\d+$/', $transfer_amount)) $errors[] = 'Nominal harus angka.';
-        if ($bank_from_number !== '' && !preg_match('/^\d+$/', $bank_from_number)) $errors[] = 'Nomor rekening harus angka.';
-
-        // parse selected_dates into normalized array of ['date'=>'YYYY-MM-DD','time'=>'HH:MM']
-        $parsedSlots = [];
-        foreach ($selected_dates as $item) {
-            if (is_string($item)) {
-                // accept "YYYY-MM-DD HH:MM" or "YYYY-MM-DD"
-                $parts = preg_split('/\s+/', trim($item));
-                $date = $parts[0] ?? '';
-                $time = $parts[1] ?? null;
-                if ($time === null) $time = '18:00'; // default 18:00 if not provided
-            } elseif (is_array($item)) {
-                $date = $item['date'] ?? '';
-                $time = $item['time'] ?? '18:00';
-            } else {
-                continue;
-            }
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) { $errors[] = "Format tanggal tidak valid: $date"; continue; }
-            if (!preg_match('/^\d{2}:\d{2}$/', $time)) { $errors[] = "Format jam tidak valid: $time"; continue; }
-            $parsedSlots[] = ['date'=>$date, 'time'=>$time];
-        }
-
-        if (!empty($errors)) return ['success'=>false, 'errors'=>$errors];
-
-        // REVISI: Validasi sistem fleksibel - minimal 2 tanggal per bulan
-        [$y0,$m0] = explode('-', $start_month);
-        $y0 = (int)$y0; $m0 = (int)$m0;
-        $monthsCount = max(1, $paket);
-        
-        for ($i=0;$i<$monthsCount;$i++) {
-            $inspect = (new DateTimeImmutable("$y0-$m0-01"))->modify("+$i month");
-            $year = (int)$inspect->format('Y');
-            $month = (int)$inspect->format('n');
-            $monthName = $inspect->format('F Y');
-
-            // Hitung berapa tanggal yang dipilih untuk bulan ini
-            $datesInMonth = [];
-            foreach ($parsedSlots as $ps) {
-                $d = $ps['date'];
-                $dt = strtotime($d);
-                if ($dt === false) continue;
-                if (date('Y-m', $dt) === sprintf('%04d-%02d', $year, $month)) {
-                    $datesInMonth[] = $d;
+// =======================================================================
+// API BACKEND (AJAX HANDLER)
+// =======================================================================
+// PERBAIKAN 2: Cek isset($_POST['action']) sebelum mengaksesnya
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    try {
+        // A. AMBIL SLOT TERSEDIA
+        if ($_POST['action'] === 'get_slots') {
+            $id_lapangan = $_POST['id_lapangan'] ?? 0;
+            $tanggal = $_POST['tanggal'] ?? date('Y-m-d');
+            
+            $slots = [];
+            $q_waktu = mysqli_query($conn, "SELECT * FROM jadwal_waktu WHERE id_lapangan = '$id_lapangan' ORDER BY jam_mulai ASC");
+            
+            while ($w = mysqli_fetch_assoc($q_waktu)) {
+                $status = 'tersedia';
+                $q_cek = "SELECT 1 FROM jadwal_detail jd
+                          LEFT JOIN booking b ON jd.id_booking = b.id_booking
+                          JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian
+                          WHERE jd.id_jadwal_waktu = '{$w['id_jadwal_waktu']}' 
+                          AND jh.tanggal = '$tanggal' 
+                          AND jh.id_lapangan = '$id_lapangan'
+                          AND (jd.status = 'dibooking' OR (b.status IN ('menunggu', 'disetujui', 'hold') AND b.status IS NOT NULL))
+                          LIMIT 1";
+                
+                if (mysqli_num_rows(mysqli_query($conn, $q_cek)) > 0) {
+                    $status = 'dibooking';
                 }
+
+                $slots[] = [
+                    'id_waktu' => $w['id_jadwal_waktu'],
+                    'jam' => date('H:i', strtotime($w['jam_mulai'])) . ' - ' . date('H:i', strtotime($w['jam_selesai'])),
+                    'status' => $status
+                ];
             }
             
-            // REVISI: Minimal 2 tanggal per bulan
-            $selectedCount = count($datesInMonth);
-            if ($selectedCount < 2) {
-                $errors[] = "Tanggal belum lengkap untuk bulan $monthName (harus pilih minimal 2 tanggal, baru memilih $selectedCount).";
-            }
-        }
-
-        if (!empty($errors)) return ['success'=>false, 'errors'=>$errors];
-
-        // check availability for every parsed slot: same lapangan & same date & same jam must be free
-        $conflicts = [];
-        $checkStmt = $this->pdo->prepare("SELECT id_member_jadwal FROM member_jadwal
-            WHERE id_lapangan = :lap AND tanggal_booking = :tgl AND jam_mulai = :jm
-            AND status IN ('pending','aktif') LIMIT 1");
-        foreach ($parsedSlots as $ps) {
-            $checkStmt->execute([':lap'=>$court, ':tgl'=>$ps['date'], ':jm'=>$ps['time']]);
-            if ($checkStmt->fetch()) {
-                $conflicts[] = $ps['date'] . ' ' . $ps['time'];
-            }
-        }
-        if (!empty($conflicts)) {
-          return ['success'=>false, 'errors'=>['Beberapa slot sudah terisi: ' . implode(', ', $conflicts)]];
-        }
-
-        // handle file upload
-        $buktiPath = '';
-        if (isset($files['bukti']) && is_array($files['bukti']) && strlen($files['bukti']['tmp_name'] ?? '') > 0) {
-            $fn = basename($files['bukti']['name']);
-            $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION));
-            $allowed = ['jpg','jpeg','png','pdf'];
-            if (!in_array($ext, $allowed)) return ['success'=>false, 'errors'=>['Bukti transfer harus jpg/png/pdf.']];
-            $newName = uniqid('bukti_') . '.' . $ext;
-            $dest = $this->uploadDir . '/' . $newName;
-            if (!move_uploaded_file($files['bukti']['tmp_name'], $dest)) {
-                return ['success'=>false, 'errors'=>['Gagal menyimpan file bukti.']];
-            }
-            $buktiPath = 'uploads/' . $newName;
-        } else {
-            return ['success'=>false, 'errors'=>['Bukti transfer wajib di-upload.']];
-        }
-
-        // compute tanggal_berakhir: last day of last month in paket
-        $firstOfStart = new DateTimeImmutable("$y0-$m0-01");
-        $lastOfEnd = $firstOfStart->modify('+' . ($monthsCount - 1) . ' month')->modify('last day of this month');
-        $tanggal_mulai = $firstOfStart->format('Y-m-d');
-        $tanggal_berakhir = $lastOfEnd->format('Y-m-d');
-
-        // price
-        $price = $this->prices[$paket] ?? 0;
-
-        // Now insert: use transaction
-        try {
-            $this->pdo->beginTransaction();
-
-            // insert member
-            $stmt = $this->pdo->prepare("INSERT INTO member (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, bukti_pembayaran, method, total_bayar, status, created_at, updated_at)
-                VALUES (:id_user, :id_lap, :dur, :tgl_mulai, :tgl_akhir, :bukti, :method, :total, :st, :ca, :ua)");
-            // id_user may be null (guest). allow null.
-            $stmt->execute([
-                ':id_user' => $input['id_user'] ?? null,
-                ':id_lap' => $court,
-                ':dur' => $paket,
-                ':tgl_mulai' => $tanggal_mulai,
-                ':tgl_akhir' => $tanggal_berakhir,
-                ':bukti' => $buktiPath,
-                ':method' => $payment_method,
-                ':total' => (int)$transfer_amount,
-                ':st' => 'pending',
-                ':ca' => date('Y-m-d H:i:s'),
-                ':ua' => date('Y-m-d H:i:s'),
-            ]);
-            $memberId = (int)$this->pdo->lastInsertId();
-
-            // insert jadwal rows (one per parsedSlots)
-            $insJ = $this->pdo->prepare("INSERT INTO member_jadwal (id_member, id_lapangan, tanggal_booking, jam_mulai, jam_selesai, harga_per_jam_member, status, created_at, updated_at)
-                VALUES (:mid, :lap, :tgl, :jm, :js, :harga, :st, :ca, :ua)");
-            foreach ($parsedSlots as $ps) {
-                $jamMulai = $ps['time'];
-                // compute jam selesai = jam mulai + 1 hour
-                $dt = DateTime::createFromFormat('H:i', $jamMulai);
-                $dt->modify('+1 hour');
-                $jamSelesai = $dt->format('H:i:s');
-
-                $insJ->execute([
-                    ':mid' => $memberId,
-                    ':lap' => $court,
-                    ':tgl' => $ps['date'],
-                    ':jm' => $jamMulai,
-                    ':js' => $jamSelesai,
-                    ':harga' => 0.00,
-                    ':st' => 'pending',
-                    ':ca' => date('Y-m-d H:i:s'),
-                    ':ua' => date('Y-m-d H:i:s'),
-                ]);
-            }
-
-            $this->pdo->commit();
-            return ['success'=>true];
-        } catch (Exception $e) {
-            $this->pdo->rollBack();
-            return ['success'=>false, 'errors'=>['Database error: ' . $e->getMessage()]];
-        }
-    }
-}
-
-/* ---------- bootstrap ---------- */
-try {
-    $db = new DB($DB_HOST,$DB_NAME,$DB_USER,$DB_PASS,$DB_CHAR);
-    $pdo = $db->pdo();
-} catch (Exception $e) {
-    http_response_code(500);
-    die("DB Connection error: " . htmlspecialchars($e->getMessage()));
-}
-
-$service = new MemberService($pdo, __DIR__ . '/uploads');
-
-/* ---------- Simple router for AJAX endpoints ---------- */
-$action = $_REQUEST['action'] ?? null;
-
-// Endpoint untuk ambil data user dari session
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_user_data') {
-    header('Content-Type: application/json');
-    
-    $userData = [
-        'name' => '',
-        'email' => '',
-        'id' => null,
-    ];
-    
-    // Cek apakah user sudah login
-    if (!isset($_SESSION['id_user'])) {
-        echo json_encode(['success' => true, 'data' => $userData]); // User belum login
-        exit;
-    }
-    
-    $userData['id'] = $_SESSION['id_user'];
-    
-    // Ambil nama dari session (sudah disimpan saat login)
-    if (isset($_SESSION['nama'])) {
-        $userData['name'] = $_SESSION['nama'];
-    }
-    
-    // Ambil email dari database (tidak disimpan di session saat login)
-    try {
-        $stmt = $pdo->prepare("SELECT email FROM users WHERE id_user = :id LIMIT 1");
-        $stmt->execute([':id' => $_SESSION['id_user']]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($user && isset($user['email'])) {
-            $userData['email'] = $user['email'];
-        }
-    } catch (Exception $e) {
-        error_log("Error fetching email: " . $e->getMessage());
-    }
-    
-    echo json_encode(['success' => true, 'data' => $userData]);
-    exit;
-}
-
-// Endpoint untuk initialize booking timer (set start time di session)
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'init_booking_timer') {
-    header('Content-Type: application/json');
-    
-    if (!isset($_SESSION['id_user'])) {
-        echo json_encode(['success' => false, 'errors' => ['User belum login']]);
-        exit;
-    }
-    
-    // Set booking start time di session jika belum ada
-    if (!isset($_SESSION['booking_start_time'])) {
-        $_SESSION['booking_start_time'] = time();
-    }
-    
-    $startTime = $_SESSION['booking_start_time'];
-    $currentTime = time();
-    $secondsElapsed = $currentTime - $startTime;
-    $secondsRemaining = max(0, 1800 - $secondsElapsed); // 1800 detik = 30 menit
-    
-    echo json_encode([
-        'success' => true,
-        'start_time' => $startTime,
-        'current_time' => $currentTime,
-        'seconds_elapsed' => $secondsElapsed,
-        'seconds_remaining' => $secondsRemaining,
-        'is_expired' => $secondsRemaining <= 0
-    ]);
-    exit;
-}
-
-// Endpoint untuk check booking timer status
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'check_booking_timer') {
-    header('Content-Type: application/json');
-    
-    if (!isset($_SESSION['id_user'])) {
-        echo json_encode(['success' => false, 'errors' => ['User belum login']]);
-        exit;
-    }
-    
-    // Check booking start time
-    if (!isset($_SESSION['booking_start_time'])) {
-        echo json_encode(['success' => true, 'expired' => false, 'seconds_remaining' => 600]);
-        exit;
-    }
-    
-    $startTime = $_SESSION['booking_start_time'];
-    $currentTime = time();
-    $secondsElapsed = $currentTime - $startTime;
-    $secondsRemaining = max(0, 1800 - $secondsElapsed); // 1800 detik = 30 menit
-    $isExpired = $secondsRemaining <= 0;
-    
-    if ($isExpired) {
-        // Clear session booking timer
-        unset($_SESSION['booking_start_time']);
-    }
-    
-    echo json_encode([
-        'success' => true,
-        'expired' => $isExpired,
-        'seconds_remaining' => $secondsRemaining,
-        'seconds_elapsed' => $secondsElapsed
-    ]);
-    exit;
-}
-
-// Endpoint untuk clear/reset booking timer
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'clear_booking_timer') {
-    header('Content-Type: application/json');
-    
-    if (!isset($_SESSION['id_user'])) {
-        echo json_encode(['success' => false, 'errors' => ['User belum login']]);
-        exit;
-    }
-    
-    // Clear booking timer
-    unset($_SESSION['booking_start_time']);
-    
-    echo json_encode(['success' => true, 'message' => 'Booking timer cleared']);
-    exit;
-}
-
-// Endpoint untuk check booking expiry status
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'check_booking_expiry') {
-    header('Content-Type: application/json');
-    
-    // Ambil member_id dari parameter (atau dari session jika tersedia)
-    $memberId = isset($_GET['member_id']) ? (int)$_GET['member_id'] : null;
-    
-    if (!$memberId) {
-        echo json_encode(['success' => false, 'errors' => ['Member ID diperlukan']]);
-        exit;
-    }
-    
-    // Timeout dalam menit
-    $TIMEOUT_MINUTES = 10;
-    $expiredTime = date('Y-m-d H:i:s', strtotime("-$TIMEOUT_MINUTES minutes"));
-    
-    try {
-        // Query member_jadwal yang masih pending dan belum expired
-        $stmt = $pdo->prepare("SELECT id_member_jadwal, tanggal_booking, jam_mulai, created_at,
-                                  TIMESTAMPDIFF(SECOND, created_at, NOW()) as seconds_elapsed,
-                                  TIMESTAMPDIFF(SECOND, created_at, DATE_ADD(created_at, INTERVAL 10 MINUTE)) as seconds_remaining
-                               FROM member_jadwal
-                               WHERE id_member = :member_id
-                               AND status = 'pending'
-                               LIMIT 1");
-        $stmt->execute([':member_id' => $memberId]);
-        $booking = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$booking) {
-            echo json_encode(['success' => true, 'expired' => false, 'message' => 'Tidak ada booking pending']);
+            echo json_encode(['status' => 'success', 'slots' => $slots]);
             exit;
         }
-        
-        // Check apakah sudah expired
-        $isExpired = $booking['seconds_elapsed'] >= 1800; // 1800 detik = 30 menit
-        
-        if ($isExpired) {
-            // Hapus booking yang expired
-            $deleteStmt = $pdo->prepare("DELETE FROM member_jadwal WHERE id_member_jadwal = :id LIMIT 1");
-            $deleteStmt->execute([':id' => $booking['id_member_jadwal']]);
+
+        // B. PROSES SUBMIT MEMBER
+        if ($_POST['action'] === 'submit_member') {
+        try {
+            $id_lapangan = $_POST['id_lapangan'];
+            $paket_bulan = (int)$_POST['paket_bulan'];
+            $total_bayar = (float)$_POST['total_bayar'];
+            $metode = $_POST['metode_pembayaran'];
+            $selected_slots = json_decode($_POST['selected_slots'], true);
+
+            if (!$selected_slots) throw new Exception("Tidak ada jadwal yang dipilih.");
+
+            // Upload Bukti
+            $bukti = null;
+            $uploadDir = __DIR__ . '/../uploads/bukti_pembayaran/';
             
-            echo json_encode([
-                'success' => true,
-                'expired' => true,
-                'message' => 'Waktu Anda telah habis. Slot booking dirilis kembali.'
-            ]);
-        } else {
-            // Belum expired, return info sisa waktu
-            $secondsRemaining = max(0, 600 - $booking['seconds_elapsed']);
-            $minutesRemaining = intdiv($secondsRemaining, 60);
-            $secsRemaining = $secondsRemaining % 60;
+            if (!is_dir($uploadDir)) {
+                if (!mkdir($uploadDir, 0755, true)) {
+                    throw new Exception("Gagal membuat folder penyimpanan.");
+                }
+            }
+
+            if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === 0) {
+                $fileInfo = pathinfo($_FILES['bukti_transfer']['name']);
+                $ext = strtolower($fileInfo['extension']);
+                
+                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+                if (!in_array($ext, $allowed)) {
+                    throw new Exception("Format file tidak diizinkan. Gunakan JPG, PNG, atau PDF.");
+                }
+
+                $bukti = "member_" . $user_id . "_" . time() . "." . $ext;
+                $targetFile = $uploadDir . $bukti;
+
+                if (!move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $targetFile)) {
+                    throw new Exception("Gagal mengupload file.");
+                }
+            } else {
+                throw new Exception("Bukti transfer wajib diupload.");
+            }
+
+            // Sort Tanggal
+            usort($selected_slots, function($a, $b) {
+                return strtotime($a['tanggal']) - strtotime($b['tanggal']);
+            });
+            $tgl_mulai = $selected_slots[0]['tanggal'];
+            $tgl_akhir = end($selected_slots)['tanggal'];
+
+            mysqli_begin_transaction($conn);
+
+            // Insert Member
+            $stmt_m = $conn->prepare("INSERT INTO member (id_user, id_lapangan, durasi_bulan, tanggal_mulai, tanggal_berakhir, bukti_pembayaran, method, total_bayar, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
+            $stmt_m->bind_param("iiissssd", $user_id, $id_lapangan, $paket_bulan, $tgl_mulai, $tgl_akhir, $bukti, $metode, $total_bayar);
             
-            echo json_encode([
-                'success' => true,
-                'expired' => false,
-                'seconds_remaining' => $secondsRemaining,
-                'minutes_remaining' => $minutesRemaining,
-                'booking_id' => $booking['id_member_jadwal'],
-                'date' => $booking['tanggal_booking'],
-                'time' => $booking['jam_mulai'],
-                'message' => "Waktu tersisa: $minutesRemaining menit $secsRemaining detik"
-            ]);
+            if (!$stmt_m->execute()) throw new Exception("Gagal menyimpan data member.");
+            $id_member = $conn->insert_id;
+
+            // Insert Booking Dummy
+            $stmt_b = $conn->prepare("INSERT INTO booking (id_user, id_lapangan, tipe_booking, tanggal, status, total_amount, payment_status, payment_method) VALUES (?, ?, 'member', ?, 'disetujui', ?, 'lunas', ?)");
+            $stmt_b->bind_param("iisds", $user_id, $id_lapangan, $tgl_mulai, $total_bayar, $metode);
+            $stmt_b->execute();
+            $id_booking_dummy = $conn->insert_id;
+
+            // Ambil Harga
+            $q_lap = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHERE id_lapangan = '$id_lapangan'");
+            $hrg = mysqli_fetch_assoc($q_lap)['harga_per_jam_member'];
+
+            // Insert Detail
+            $stmt_dm = $conn->prepare("INSERT INTO member_jadwal (id_member, id_lapangan, tanggal_booking, jam_mulai, jam_selesai, harga_per_jam_member, status) VALUES (?, ?, ?, ?, ?, ?, 'aktif')");
+
+            foreach ($selected_slots as $slot) {
+                $jam_parts = explode(' - ', $slot['jam']);
+                
+                // Simpan Member Jadwal
+                $stmt_dm->bind_param("iissssd", $id_member, $id_lapangan, $slot['tanggal'], $jam_parts[0], $jam_parts[1], $hrg);
+                $stmt_dm->execute();
+
+                // Kunci Slot Utama
+                $cek_h = mysqli_query($conn, "SELECT id_jadwal_harian FROM jadwal_harian WHERE id_lapangan='$id_lapangan' AND tanggal='{$slot['tanggal']}'");
+                if (mysqli_num_rows($cek_h) == 0) {
+                    mysqli_query($conn, "INSERT INTO jadwal_harian (id_lapangan, tanggal, hari) VALUES ('$id_lapangan', '{$slot['tanggal']}', DAYNAME('{$slot['tanggal']}'))");
+                    $id_harian = $conn->insert_id;
+                } else {
+                    $id_harian = mysqli_fetch_assoc($cek_h)['id_jadwal_harian'];
+                }
+
+                $cek_d = mysqli_query($conn, "SELECT id_detail FROM jadwal_detail WHERE id_jadwal_harian='$id_harian' AND id_jadwal_waktu='{$slot['id_waktu']}'");
+                
+                if(mysqli_num_rows($cek_d) > 0) {
+                    mysqli_query($conn, "UPDATE jadwal_detail SET status='dibooking', id_booking='$id_booking_dummy' WHERE id_jadwal_harian='$id_harian' AND id_jadwal_waktu='{$slot['id_waktu']}'");
+                } else {
+                    mysqli_query($conn, "INSERT INTO jadwal_detail (id_jadwal_harian, id_jadwal_waktu, status, id_booking) VALUES ('$id_harian', '{$slot['id_waktu']}', 'dibooking', '$id_booking_dummy')");
+                }
+            }
+
+            mysqli_commit($conn);
+            echo json_encode(['status'=>'success', 'message' => 'Pendaftaran berhasil!']);
+        } catch (Exception $e) {
+            mysqli_rollback($conn);
+            echo json_encode(['status'=>'error', 'message'=> $e->getMessage()]);
         }
+        exit;
+    }
+    
     } catch (Exception $e) {
-        error_log("Error checking booking expiry: " . $e->getMessage());
-        echo json_encode(['success' => false, 'errors' => ['Gagal mengecek status booking']]);
-    }
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'availability') {
-    // GET params: lapangan, ym=YYYY-MM
-    $lap = isset($_GET['lapangan']) ? (int)$_GET['lapangan'] : 0;
-    $ym = $_GET['ym'] ?? null;
-    if (!$lap || !$ym || !preg_match('/^\d{4}-\d{2}$/', $ym)) {
-        header('Content-Type: application/json');
-        echo json_encode(['success'=>false,'errors'=>['Parameter tidak lengkap (lapangan, ym).']]);
+        ob_clean();
+        echo json_encode(['status'=>'error', 'message'=> $e->getMessage()]);
         exit;
     }
-    $data = $service->getBookedSlotsForMonth($lap, $ym);
-    header('Content-Type: application/json');
-    echo json_encode(['success'=>true,'booked'=>$data]);
-    exit;
+
 }
 
-/* ---------- Handle form submit ---------- */
-$errors = [];
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'submit_member')) {
-    $res = $service->store($_POST, $_FILES);
-    if (($res['success'] ?? false) === true) {
-        header('Location: riwayat.php?status=pending');
-        exit;
-    } else {
-        $errors = $res['errors'] ?? ['Terjadi kesalahan.'];
-    }
-}
+ob_end_flush(); 
 
-
-/* ---------- Frontend HTML (form + UI) ---------- */
+// 4. Ambil Data Lapangan
+$lapangans = [];
+$q = mysqli_query($conn, "SELECT * FROM lapangan WHERE status='aktif'");
+while($r = mysqli_fetch_assoc($q)){ $lapangans[] = $r; }
 ?>
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Member - Booking Lapangan Badminton</title>
-  <link rel="stylesheet" href="member.css?v=13">
-</head>
-<body>
-  <main class="page">
-    <header class="hero">
-      <div class="hero-inner">
-        <div class="hero-left">
-          <h1 class="title">Member Badminton Premium</h1>
-          <p class="subtitle">Prioritas booking, harga spesial, dan jadwal mingguan otomatis.</p>
-<div class="benefit-grid">
-    <div class="benefit-card">Harga tetap jelas</div>
-    <div class="benefit-card">Prioritas pemesanan</div>
-    <div class="side-by-side-container">
-        <div class="benefit-card">Hemat hingga 30%</div>
-        <div class="benefit-card">1x ubah jadwal/bulan</div>
+
+<?php require '../include_user/header.php'; ?>
+
+<style>
+    .step-item { display: flex; align-items: center; gap: 10px; opacity: 0.5; transition: all 0.3s; font-weight: 500; }
+    .step-item.active { opacity: 1; font-weight: bold; color: #0b63d6; }
+    .step-circle { width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #64748b; transition: all 0.3s; }
+    .step-item.active .step-circle { background: #0b63d6; color: white; box-shadow: 0 4px 10px rgba(11, 99, 214, 0.3); }
+
+    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
+    .slot-btn { padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.2s; background: white; font-size: 0.9rem; }
+    .slot-btn:hover:not(.disabled) { border-color: #0b63d6; background: #eff6ff; }
+    .slot-btn.selected { background: #0b63d6; color: white; border-color: #0b63d6; }
+    .slot-btn.disabled { background: #f1f5f9; color: #cbd5e1; cursor: not-allowed; border-color: #f1f5f9; }
+
+    .selected-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0; font-size: 0.9rem; }
+    .review-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .review-table th, .review-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    .review-table th { background: #f8fafc; color: #64748b; font-weight: 600; }
+    .upload-box { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .upload-box:hover { border-color: #0b63d6; background: #eff6ff; }
+</style>
+
+<main class="max-w-6xl mx-auto px-4 py-10">
+    
+    <div class="text-center mb-8">
+        <span class="text-primary font-bold tracking-wider uppercase text-sm bg-blue-50 px-3 py-1 rounded-full">Membership</span>
+        <h1 class="text-3xl md:text-4xl font-poppins font-bold text-slate-800 mt-3">Gabung Member</h1>
+        <p class="text-slate-500 mt-2">Main rutin, lebih hemat, slot terjamin.</p>
     </div>
-</div>
 
-          <div class="cta">
-            <button id="openFlowBtn" class="btn primary" type="button">Gabung Member Sekarang</button>
-          </div>
+    <div class="flex justify-center mb-10 overflow-x-auto">
+        <div class="flex items-center gap-4 min-w-max">
+            <div class="step-item active" id="step1-ind"><div class="step-circle">1</div> Paket</div>
+            <div class="w-8 h-0.5 bg-gray-200 rounded"></div>
+            <div class="step-item" id="step2-ind"><div class="step-circle">2</div> Jadwal</div>
+            <div class="w-8 h-0.5 bg-gray-200 rounded"></div>
+            <div class="step-item" id="step3-ind"><div class="step-circle">3</div> Review</div>
+            <div class="w-8 h-0.5 bg-gray-200 rounded"></div>
+            <div class="step-item" id="step4-ind"><div class="step-circle">4</div> Bayar</div>
         </div>
+    </div>
 
-        <div class="hero-right">
-          <div class="price-big">Paket Mulai Dari <strong><?= rupiah(100000) ?></strong></div>
-          <div class="testi card">
-            <strong>⭐ Testimonial Member</strong>
-            <p>"Mudah book, lapangan selalu rapi. Jadi member worth it banget!" — Aldo</p>
-            <p>"Hemat waktu dan uang, recommended!" — Sari</p>
-          </div>
-          <div class="stats card" style="margin-top:16px;background:rgba(255,255,255,0.9);padding:16px;border-radius:12px">
-            <div style="display:flex;justify-content:space-between;text-align:center">
-              <div>
-                <div style="font-size:1.5rem;font-weight:700;color:#2563eb">500+</div>
-                <div style="font-size:0.8rem;color:#64748b">Member Aktif</div>
-              </div>
-              <div>
-                <div style="font-size:1.5rem;font-weight:700;color:#10b981">98%</div>
-                <div style="font-size:0.8rem;color:#64748b">Kepuasan</div>
-              </div>
-              <div>
-                <div style="font-size:1.5rem;font-weight:700;color:#f59e0b">24/7</div>
-                <div style="font-size:0.8rem;color:#64748b">Support</div>
-              </div>
+    <div class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[500px] p-8 relative">
+        
+        <div id="step1" class="step-content">
+            <h3 class="text-xl font-bold text-slate-800 mb-6 text-center">1. Pilih Durasi & Lapangan</h3>
+            <div class="max-w-2xl mx-auto">
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Lapangan</label>
+                    <select id="inputLapangan" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-100 outline-none">
+                        <?php foreach($lapangans as $lap): ?>
+                            <option value="<?= $lap['id_lapangan'] ?>" data-harga="<?= $lap['harga_per_jam_member'] ?>">
+                                <?= htmlspecialchars($lap['nama_lapangan']) ?> (Rp <?= number_format($lap['harga_per_jam_member'],0,',','.') ?>/jam)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="paket" value="1" data-quota="4" class="peer sr-only" checked>
+                        <div class="p-6 rounded-2xl border-2 border-slate-200 peer-checked:border-primary peer-checked:bg-blue-50 transition-all h-full flex flex-col items-center justify-center">
+                            <div class="w-14 h-14 bg-blue-100 text-primary rounded-full flex items-center justify-center text-2xl mb-3"><i class="fa-solid fa-calendar-days"></i></div>
+                            <h4 class="font-bold text-lg">Paket 1 Bulan</h4>
+                            <p class="text-sm text-slate-500 mt-1">Kuota: 4x Main</p>
+                        </div>
+                        <div class="absolute top-4 right-4 text-primary opacity-0 peer-checked:opacity-100"><i class="fa-solid fa-circle-check text-xl"></i></div>
+                    </label>
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="paket" value="3" data-quota="12" class="peer sr-only">
+                        <div class="p-6 rounded-2xl border-2 border-slate-200 peer-checked:border-primary peer-checked:bg-blue-50 transition-all h-full flex flex-col items-center justify-center">
+                            <div class="absolute top-0 right-0 bg-orange-400 text-white text-xs font-bold px-3 py-1 rounded-bl-xl">HEMAT</div>
+                            <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-2xl mb-3"><i class="fa-solid fa-medal"></i></div>
+                            <h4 class="font-bold text-lg">Paket 3 Bulan</h4>
+                            <p class="text-sm text-slate-500 mt-1">Kuota: 12x Main</p>
+                        </div>
+                        <div class="absolute top-4 left-4 text-primary opacity-0 peer-checked:opacity-100"><i class="fa-solid fa-circle-check text-xl"></i></div>
+                    </label>
+                </div>
+                <div class="mt-8 text-right">
+                    <button onclick="nextStep(2)" class="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primaryDark transition-all shadow-lg">Lanjut <i class="fa-solid fa-arrow-right ml-2"></i></button>
+                </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <section class="how card">
-      <h2>Harga Paket Member</h2>
-      <div class="prices">
-        <div class="price-item">
-          <strong>1 Bulan</strong>
-          <span><?= rupiah(100000) ?></span>
-          <div style="font-size:0.9rem;color:#64748b;margin-top:8px"></div>
-        </div>
-        <div class="price-item">
-          <strong>2 Bulan</strong>
-          <span><?= rupiah(200000) ?></span>
-          <div style="font-size:0.9rem;color:#64748b;margin-top:8px"></div>
-        </div>
-        <div class="price-item">
-          <strong>3 Bulan</strong>
-          <span><?= rupiah(300000) ?></span>
-          <div style="font-size:0.9rem;color:#64748b;margin-top:8px"></div>
-        </div>
-      </div>
-    </section>
-
-    <?php if (!empty($errors)): ?>
-      <div class="notice error card">
-        <strong>Perbaiki dulu:</strong>
-        <ul><?php foreach($errors as $e) echo "<li>" . htmlspecialchars($e) . "</li>"; ?></ul>
-      </div>
-    <?php endif; ?>
-
-    <footer class="footer">
-      <div style="max-width:600px;margin:0 auto;text-align:center">
-        <div style="font-size:1.2rem;font-weight:600;margin-bottom:16px;color:#2563eb">Butuh Bantuan?</div>
-        <div style="display:flex;justify-content:center;gap:32px;margin-bottom:24px;flex-wrap:wrap">
-          <div>📞 0812-3456-7890</div>
-          <div>📧 support@badminton.com</div>
-          <div>🕒 Buka 24/7</div>
-        </div>
-        <div>© <?= date('Y') ?> Booking Lapangan Badminton - All rights reserved</div>
-      </div>
-    </footer>
-  </main>
-
-  <!-- FLOW POPUP (besar & per-month flow) -->
-  <div id="flowPopup" class="popup big" aria-hidden="true">
-    <div class="popup-overlay"></div>
-    <div class="popup-dialog">
-      <button id="closeFlow" class="close" type="button">&times;</button>
-      <h2 class="flow-title">Gabung / Perpanjang Member</h2>
-
-      <form id="memberForm" method="post" enctype="multipart/form-data" action="member.php?action=submit_member">
-        <input type="hidden" name="action" value="submit_member">
-
-        <!-- SECTION A -->
-        <div class="section" id="sectionA">
-          <h3>1. Data Diri & Paket</h3>
-          <label class="label">Nama lengkap
-            <input name="name" id="name" required placeholder="Masukkan nama lengkap Anda">
-          </label>
-          <label class="label">Email 
-            <div id="emailDisplay" style="padding: 12px; background: #f3f4f6; border-radius: 8px; color: #4b5563; font-size: 14px;">Memuat email...</div>
-            <input name="email" id="email" type="hidden" required>
-          </label>
-
-          <label class="label">Pilih Paket
-            <select name="paket" id="paket" required>
-              <option value="">-- Pilih Paket --</option>
-              <option value="1">1 Bulan — <?= rupiah(100000) ?></option>
-              <option value="2">2 Bulan — <?= rupiah(200000) ?></option>
-              <option value="3">3 Bulan — <?= rupiah(300000) ?></option>
-            </select>
-          </label>
-
-          <label class="label">Mulai dari bulan
-            <div class="muted" style="font-size:13px;margin-bottom:8px;">Klik area input untuk memilih bulan</div>
-            <input type="month" id="startMonth" name="start_month" required style="cursor:pointer;">
-          </label>
-
-          <label class="label">Pilih Lapangan 
-            <div class="muted" style="font-size:13px;margin-bottom:8px;">Satu pilihan berlaku untuk seluruh periode member</div>
-            <select name="court" id="court" required>
-              <option value="">-- Pilih Lapangan --</option>
-              <option value="1">🏸 Lapangan 1</option>
-              <option value="2">🏸 Lapangan 2</option>
-              <option value="3">🏸 Lapangan 3</option>
-              <option value="4">🏸 Lapangan 4</option>
-            </select>
-          </label>
-
-          <div class="form-actions">
-            <button type="button" id="toScheduleBtn" class="btn primary">Lanjut Pilih Jadwal</button>
-          </div>
         </div>
 
-        <!-- SECTION B (per-month) -->
-        <div class="section" id="sectionB" style="display:none">
-          <h3>2. Pilih Jadwal Mingguan</h3>
-          <!-- REVISI: Update pesan untuk sistem fleksibel -->
-          <div class="warning-text">
-            <strong>📢 Sistem Fleksibel:</strong> Untuk setiap bulan, pilih <strong>minimal 2 tanggal</strong> (bebas minggu ke berapa). Minggu ke-5 bersifat opsional.
-          </div>
-          <p class="muted">Tanggal yang ditampilkan hanya yang tersedia berdasarkan pilihan lapangan. Ganti lapangan jika ingin melihat jadwal lain.</p>
-
-          <div id="monthFlowWrap"></div>
-          <input type="hidden" name="selected_dates" id="selected_dates">
-
-          <div class="form-actions">
-            <button type="button" id="backToA" class="btn outline">⬅️ Kembali</button>
-            <button type="button" id="toPaymentBtn" class="btn primary">Lanjut ke Pembayaran</button>
-          </div>
+        <div id="step2" class="step-content hidden">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">2. Pilih Jadwal Main</h3>
+            <div class="flex flex-col lg:flex-row gap-8 h-full">
+                <div class="flex-1">
+                    <div class="alert-info bg-blue-50 text-blue-700 p-3 rounded-lg text-sm mb-4 flex gap-2 border border-blue-100">
+                        <i class="fa-solid fa-circle-info mt-1"></i>
+                        <div><strong>Aturan Member:</strong> Wajib memilih 1 jadwal untuk setiap minggunya.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="text-sm font-bold text-slate-700">Pilih Tanggal</label>
+                        <input type="date" id="inputTanggal" class="w-full mt-1 px-4 py-3 rounded-xl border border-slate-300 focus:border-primary outline-none" min="<?= date('Y-m-d') ?>">
+                    </div>
+                    <div id="slotContainer">
+                        <p class="text-center text-slate-400 py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">Pilih tanggal untuk melihat slot.</p>
+                    </div>
+                </div>
+                <div class="lg:w-1/3 border-l border-slate-100 pl-0 lg:pl-8">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 h-full flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="font-bold text-slate-800">Keranjang Jadwal</h4>
+                            <span class="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-primary"><span id="countSelected">0</span> / <span id="maxQuota">0</span></span>
+                        </div>
+                        <div id="selectedList" class="flex-1 overflow-y-auto max-h-[300px] space-y-2 mb-4 pr-1 custom-scrollbar">
+                            <p class="text-xs text-slate-400 text-center mt-10">Belum ada jadwal dipilih.</p>
+                        </div>
+                        <div class="pt-4 border-t border-slate-200">
+                            <button onclick="nextStep(3)" id="btnToStep3" class="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-primaryDark transition-all opacity-50 cursor-not-allowed" disabled>Lanjut Review</button>
+                            <button onclick="prevStep(1)" class="w-full mt-2 text-slate-500 text-sm hover:text-slate-700 py-2">Kembali</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- SECTION C: payment -->
-        <div class="section" id="sectionC" style="display:none">
-          <h3>3. Pembayaran</h3>
-          <label class="label">Metode Pembayaran
-            <select name="payment_method" id="payment_method" required>
-              <option value="">-- Pilih Metode --</option>
-              <option value="qris">QRIS</option>
-              <option value="bca">Transfer BCA</option>
-              <option value="mandiri">Transfer Mandiri</option>
-            </select>
-          </label>
-
-          <div id="paymentDetails" class="paymentDetails"></div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-            <label class="label">Upload Bukti Transfer
-              <div class="muted" style="font-size:13px;">Format: jpg, png, pdf (maks. 5MB)</div>
-              <input type="file" name="bukti" id="bukti" accept=".jpg,.jpeg,.png,.pdf" required>
-            </label>
-
-            <label class="label">Jumlah Pembayaran
-              <input type="text" id="transfer_display" disabled style="background:#f8fafc">
-              <input type="hidden" name="transfer_amount" id="transfer_amount">
-            </label>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-            <label class="label">Nama Pengirim
-              <input type="text" name="bank_from_name" id="bank_from_name" placeholder="Nama sesuai rekening">
-            </label>
-
-            <label class="label">No. Rekening Pengirim
-              <input type="text" name="bank_from_number" id="bank_from_number" inputmode="numeric" pattern="\d*" placeholder="Contoh: 1234567890">
-            </label>
-          </div>
-
-          <div class="form-actions">
-            <button type="button" id="backToB" class="btn outline">⬅️ Kembali</button>
-            <button type="button" id="submitBtn" class="btn primary">Kirim Pendaftaran</button>
-          </div>
+        <div id="step3" class="step-content hidden">
+            <h3 class="text-xl font-bold text-slate-800 mb-6 text-center">3. Review Pesanan & Metode</h3>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h4 class="font-bold text-slate-700 mb-3">Jadwal Yang Dipilih</h4>
+                    <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden max-h-[300px] overflow-y-auto">
+                        <table class="review-table">
+                            <thead><tr><th>No</th><th>Tanggal</th><th>Jam</th></tr></thead>
+                            <tbody id="reviewTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 flex justify-between items-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                        <span class="text-slate-600 font-medium">Total Harga</span>
+                        <span class="text-xl font-bold text-primary" id="reviewTotalPrice">Rp 0</span>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-bold text-slate-700 mb-3">Pilih Metode Pembayaran</h4>
+                    <div class="space-y-3">
+                        <label class="flex justify-between items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-blue-50 transition-all bg-white">
+                            <div class="flex items-center gap-3"><i class="fa-solid fa-qrcode text-primary text-2xl"></i><span class="font-medium text-sm">QRIS</span></div>
+                            <input type="radio" name="metode" value="qris" class="h-5 w-5 text-primary" checked>
+                        </label>
+                        <label class="flex justify-between items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-blue-50 transition-all bg-white">
+                            <div class="flex items-center gap-3"><i class="fa-solid fa-building-columns text-blue-800 text-2xl"></i><span class="font-medium text-sm">Transfer BCA</span></div>
+                            <input type="radio" name="metode" value="bca" class="h-5 w-5 text-primary">
+                        </label>
+                        <label class="flex justify-between items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-blue-50 transition-all bg-white">
+                            <div class="flex items-center gap-3"><i class="fa-solid fa-building-columns text-yellow-600 text-2xl"></i><span class="font-medium text-sm">Transfer Mandiri</span></div>
+                            <input type="radio" name="metode" value="mandiri" class="h-5 w-5 text-primary">
+                        </label>
+                    </div>
+                    <div class="mt-8 flex gap-3">
+                        <button onclick="prevStep(2)" class="px-6 py-3 border border-slate-300 rounded-xl text-slate-600 font-bold hover:bg-slate-50">Kembali</button>
+                        <button onclick="nextStep(4)" class="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primaryDark shadow-lg shadow-primary/30">Lanjut Bayar</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-      </form>
+        <div id="step4" class="step-content hidden">
+            <h3 class="text-xl font-bold text-slate-800 mb-6 text-center">4. Selesaikan Pembayaran</h3>
+            <div class="max-w-2xl mx-auto">
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Nama Pemesan</label>
+                    <input type="text" class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm font-medium text-slate-700 bg-gray-50" value="<?= htmlspecialchars($user_nama ?? '') ?>" readonly>
+                </div>
+
+                <div id="paymentInstruction" class="text-center mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200"></div>
+                <div class="mb-8">
+                    <label class="block text-sm font-bold text-slate-700 mb-2 text-center">Upload Bukti Transfer</label>
+                    <div class="upload-box" onclick="document.getElementById('inputBukti').click()">
+                        <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-400 mb-3"></i>
+                        <p class="text-sm text-slate-500 font-medium" id="fileName">Klik area ini untuk memilih file (JPG/PNG/PDF)</p>
+                        <input type="file" id="inputBukti" class="hidden" accept="image/*,application/pdf" onchange="document.getElementById('fileName').textContent = this.files[0].name">
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="prevStep(3)" class="px-6 py-3 border border-slate-300 rounded-xl text-slate-600 font-bold hover:bg-slate-50">Kembali</button>
+                    <button onclick="submitMember()" id="btnFinalSubmit" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg shadow-green-600/30 flex justify-center items-center gap-2"><i class="fa-solid fa-check-circle"></i> Konfirmasi Pembayaran</button>
+                </div>
+            </div>
+        </div>
+
     </div>
-  </div>
+</main>
 
-  <!-- CONFIRM POPUP -->
-  <div id="confirmPopup" class="popup small" aria-hidden="true">
-    <div class="popup-overlay"></div>
-    <div class="popup-dialog">
-      <button id="confirmClose" class="close" type="button">&times;</button>
-      <h3>Konfirmasi Data Member</h3>
-      <div id="confirmContent" style="max-height:400px;overflow:auto;margin:16px 0"></div>
-      <div class="note muted" style="padding:12px;background:#f8fafc;border-radius:8px;margin:16px 0">
-        <strong>Pastikan semua data sudah benar:</strong><br>
-        • Data tidak dapat diubah setelah dikirim<br>
-        • Proses verifikasi membutuhkan waktu 1x24 jam<br>
-        • Pilih 'Ubah Data' untuk kembali ke form
-      </div>
-      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px">
-        <button id="editBtn" class="btn outline" type="button">Ubah Data</button>
-        <button id="confirmSendBtn" class="btn primary" type="button">Kirim & Tunggu Verifikasi</button>
-      </div>
-    </div>
-  </div>
+<script>
+    let currentStep = 1;
+    let selectedSlots = []; 
+    let maxQuota = 0;
+    let hargaPerJam = 0;
+    let selectedMethod = 'qris';
 
-  <!-- SMALL POPUP (auto-close but also has X) -->
-  <div id="smallPopup" class="small-popup" aria-hidden="true">
-    <div class="popup-overlay"></div>
-    <div class="small-popup-box">
-      <button id="smallPopupClose" class="close small" type="button">&times;</button>
-      <div id="smallPopupMessage"></div>
-    </div>
-  </div>
+    function getISOWeek(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
 
-  <script src="member.js?v=5" defer></script>
-</body>
-</html>
+    function nextStep(step) {
+        if (step === 2) {
+            const paketEl = document.querySelector('input[name="paket"]:checked');
+            const lapEl = document.getElementById('inputLapangan');
+            if (!paketEl) return Swal.fire('Pilih Paket', 'Silakan pilih durasi paket.', 'warning');
+            
+            maxQuota = parseInt(paketEl.dataset.quota);
+            hargaPerJam = parseInt(lapEl.options[lapEl.selectedIndex].dataset.harga);
+            document.getElementById('maxQuota').textContent = maxQuota;
+            renderSelectedList(); 
+        }
+        
+        if (step === 3) {
+            if (selectedSlots.length !== maxQuota) return Swal.fire('Jadwal Belum Lengkap', `Anda harus memilih <b>${maxQuota}</b> slot jadwal.`, 'warning');
+            renderReviewStep();
+        }
+
+        if (step === 4) {
+            selectedMethod = document.querySelector('input[name="metode"]:checked').value;
+            renderPaymentInstruction();
+        }
+
+        document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`step${step}`).classList.remove('hidden');
+        document.querySelectorAll('.step-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`step${step}-ind`).classList.add('active');
+        currentStep = step;
+    }
+
+    function prevStep(step) {
+        document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`step${step}`).classList.remove('hidden');
+        document.querySelectorAll('.step-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`step${step}-ind`).classList.add('active');
+        currentStep = step;
+    }
+
+    document.getElementById('inputTanggal').addEventListener('change', function() {
+        const tanggal = this.value;
+        const id_lapangan = document.getElementById('inputLapangan').value;
+        const container = document.getElementById('slotContainer');
+        
+        container.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-circle-notch fa-spin text-primary text-2xl"></i></div>';
+
+        const formData = new FormData();
+        formData.append('action', 'get_slots');
+        formData.append('id_lapangan', id_lapangan);
+        formData.append('tanggal', tanggal);
+
+        fetch('member.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if(data.status === 'success') {
+                let html = '<div class="slot-grid">';
+                data.slots.forEach(slot => {
+                    const isSelected = selectedSlots.some(s => s.id_waktu === slot.id_waktu && s.tanggal === tanggal);
+                    const statusClass = slot.status === 'tersedia' ? 'available' : 'booked disabled';
+                    const selectedClass = isSelected ? 'selected' : '';
+                    html += `<div class="slot-btn ${statusClass} ${selectedClass}" onclick="toggleSlot('${slot.id_waktu}', '${tanggal}', '${slot.jam}', this)">${slot.jam}</div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+        });
+    });
+
+    function toggleSlot(id_waktu, tanggal, jam, el) {
+        if (el.classList.contains('disabled')) return;
+        const index = selectedSlots.findIndex(s => s.id_waktu === id_waktu && s.tanggal === tanggal);
+
+        if (index > -1) {
+            selectedSlots.splice(index, 1);
+            el.classList.remove('selected');
+        } else {
+            if (selectedSlots.length >= maxQuota) return Swal.fire('Kuota Penuh', `Maksimal ${maxQuota} slot.`, 'info');
+            
+            const targetDate = new Date(tanggal);
+            const targetWeek = getISOWeek(targetDate);
+            const targetYear = targetDate.getFullYear();
+            const isWeekOccupied = selectedSlots.some(s => {
+                const d = new Date(s.tanggal);
+                return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
+            });
+            if (isWeekOccupied) return Swal.fire('Jadwal Bentrok', 'Anda hanya boleh memilih <b>1 jadwal</b> dalam minggu ini.', 'warning');
+
+            selectedSlots.push({ id_waktu, tanggal, jam });
+            el.classList.add('selected');
+        }
+        renderSelectedList();
+    }
+
+    function renderSelectedList() {
+        const listEl = document.getElementById('selectedList');
+        const btnTo3 = document.getElementById('btnToStep3');
+        document.getElementById('countSelected').textContent = selectedSlots.length;
+        
+        if (selectedSlots.length === maxQuota) {
+            btnTo3.disabled = false;
+            btnTo3.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+            btnTo3.disabled = true;
+            btnTo3.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        if (selectedSlots.length === 0) listEl.innerHTML = '<p class="text-xs text-slate-400 text-center mt-10">Belum ada jadwal.</p>';
+        else {
+            selectedSlots.sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
+            listEl.innerHTML = selectedSlots.map((s, i) => `<div class="selected-item"><div><div class="text-xs font-bold text-slate-700">${formatDate(s.tanggal)}</div><div class="text-xs text-slate-500">${s.jam}</div></div><button onclick="removeSlot(${i})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+        }
+    }
+
+    function removeSlot(index) {
+        const removed = selectedSlots[index];
+        selectedSlots.splice(index, 1);
+        renderSelectedList();
+        const currentTanggal = document.getElementById('inputTanggal').value;
+        if (currentTanggal === removed.tanggal) document.getElementById('inputTanggal').dispatchEvent(new Event('change'));
+    }
+
+    function renderReviewStep() {
+        const tbody = document.getElementById('reviewTableBody');
+        const totalEl = document.getElementById('reviewTotalPrice');
+        const totalBayar = selectedSlots.length * hargaPerJam;
+        tbody.innerHTML = selectedSlots.map((s, i) => `<tr><td>${i+1}</td><td>${formatDate(s.tanggal)}</td><td>${s.jam}</td></tr>`).join('');
+        totalEl.textContent = 'Rp ' + totalBayar.toLocaleString('id-ID');
+    }
+
+    function renderPaymentInstruction() {
+        const container = document.getElementById('paymentInstruction');
+        const totalBayar = selectedSlots.length * hargaPerJam;
+        const totalFormatted = 'Rp ' + totalBayar.toLocaleString('id-ID');
+        let content = `<p class="text-slate-600 mb-2">Total Pembayaran: <strong class="text-lg text-slate-800">${totalFormatted}</strong></p>`;
+        if (selectedMethod === 'qris') content += `<div class="mt-4"><img src="../assets/images/qris_rush.jpg" alt="QRIS" class="mx-auto w-48 rounded-lg border p-2 mb-2"><p class="text-xs font-mono text-slate-500">NMID: ID1025384582157</p><p class="text-sm text-slate-600 mt-2">Scan QRIS di atas.</p></div>`;
+        else if (selectedMethod === 'bca') content += `<div class="mt-4 bg-blue-100 p-4 rounded-xl inline-block"><h5 class="font-bold text-blue-900">Bank BCA</h5><p class="text-2xl font-bold text-slate-800 my-2 tracking-widest">123 456 7890</p><p class="text-sm text-slate-600">a.n Rush Badminton Academy</p></div>`;
+        else if (selectedMethod === 'mandiri') content += `<div class="mt-4 bg-yellow-100 p-4 rounded-xl inline-block"><h5 class="font-bold text-yellow-900">Bank Mandiri</h5><p class="text-2xl font-bold text-slate-800 my-2 tracking-widest">098 765 4321</p><p class="text-sm text-slate-600">a.n Rush Badminton Academy</p></div>`;
+        container.innerHTML = content;
+    }
+
+    function submitMember() {
+        const fileInput = document.getElementById('inputBukti');
+        if (fileInput.files.length === 0) return Swal.fire('Upload Bukti', 'Bukti transfer wajib diupload.', 'warning');
+
+        const btn = document.getElementById('btnFinalSubmit');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...';
+
+        const formData = new FormData();
+        formData.append('action', 'submit_member');
+        formData.append('id_lapangan', document.getElementById('inputLapangan').value);
+        formData.append('paket_bulan', document.querySelector('input[name="paket"]:checked').value);
+        formData.append('total_bayar', selectedSlots.length * hargaPerJam);
+        formData.append('metode_pembayaran', selectedMethod);
+        formData.append('selected_slots', JSON.stringify(selectedSlots));
+        formData.append('bukti_transfer', fileInput.files[0]);
+
+        fetch('member.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') Swal.fire('Berhasil!', 'Pendaftaran berhasil.', 'success').then(() => window.location.href = '../DashPengguna.php');
+            else { Swal.fire('Gagal', data.message, 'error'); btn.disabled = false; btn.innerHTML = 'Konfirmasi Pembayaran'; }
+        })
+        .catch(err => { console.error(err); Swal.fire('Error', 'Kesalahan koneksi.', 'error'); btn.disabled = false; btn.innerHTML = 'Konfirmasi Pembayaran'; });
+    }
+
+    function formatDate(dateString) { return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); }
+</script>
+
+<?php require '../include_user/footer.php'; ?>

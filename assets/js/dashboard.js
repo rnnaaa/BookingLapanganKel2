@@ -24,8 +24,33 @@ document.addEventListener("DOMContentLoaded", () => {
     setText("statHours", totalHours + " Jam"); // Menambahkan label 'Jam'
     setText("statTotalSpend", formatRupiah(totalSpend)); // Format Rupiah
 
-    // Widget Jadwal Berikutnya
-    const nextBooking = BOOKINGS.find(b => b.status === 'disetujui' && new Date(b.tanggal) >= new Date());
+    // --- WIDGET JADWAL BERIKUTNYA (LOGIKA BARU: FILTER & SORTING) ---
+    
+    const now = new Date();
+
+    // 1. Filter: Ambil hanya yang 'disetujui' DAN waktunya belum lewat
+    const upcomingBookings = BOOKINGS.filter(b => {
+        if (b.status !== 'disetujui') return false;
+
+        // Gabungkan Tanggal dan Jam untuk perbandingan presisi
+        // Asumsi format b.tanggal: "YYYY-MM-DD" dan b.jam_mulai: "HH:MM:SS"
+        const bookingTime = new Date(`${b.tanggal}T${b.jam_mulai}`);
+
+        // Return true jika waktu booking masih di masa depan (lebih besar dari sekarang)
+        return bookingTime > now;
+    });
+
+    // 2. Sort: Urutkan dari yang paling dekat (Ascending)
+    upcomingBookings.sort((a, b) => {
+        const timeA = new Date(`${a.tanggal}T${a.jam_mulai}`);
+        const timeB = new Date(`${b.tanggal}T${b.jam_mulai}`);
+        return timeA - timeB; // Ascending: Kecil (dekat) ke Besar (jauh)
+    });
+
+    // 3. Ambil item pertama (yang paling dekat)
+    const nextBooking = upcomingBookings.length > 0 ? upcomingBookings[0] : null;
+
+    // 4. Render ke HTML
     const nextBox = document.getElementById("nextBookingBox");
     if(nextBox) {
         if (nextBooking) {
@@ -34,7 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center text-xl">📅</div>
                     <div>
                         <h5 class="font-bold text-lg">${nextBooking.nama_lapangan}</h5>
-                        <p class="text-white/70 text-sm">${formatDate(nextBooking.tanggal)} • ${nextBooking.jam_mulai.substring(0,5)}</p>
+                        <p class="text-white/70 text-sm">
+                            ${formatDate(nextBooking.tanggal)} • ${nextBooking.jam_mulai.substring(0,5)}
+                        </p>
                     </div>
                 </div>`;
         } else {
@@ -68,8 +95,75 @@ document.addEventListener("DOMContentLoaded", () => {
         for(let i=8; i<=22; i++) { labels.push(i < 10 ? `0${i}:00` : `${i}:00`); data.push(hoursMap[i]); }
         new Chart(ctx, {
             type: 'bar',
-            data: { labels: labels, datasets: [{ label: 'Frekuensi Main', data: data, backgroundColor: '#0b63d6', borderRadius: 4, barThickness: 12 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { display: true, drawBorder: false } }, x: { grid: { display: false } } } }
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Frekuensi Main',
+                    data: data,
+                    backgroundColor: function(context) {
+                        const chart = context.chart;
+                        const {ctx, chartArea} = chart;
+                        if (!chartArea) return null;
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, '#0056b3');
+                        gradient.addColorStop(1, '#004494');
+                        return gradient;
+                    },
+                    borderColor: '#003d82',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barThickness: 16
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1500,
+                    easing: 'easeOutQuart'
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        titleColor: '#0056b3',
+                        titleFont: { weight: 'bold' },
+                        bodyColor: '#333333',
+                        borderColor: '#dddddd',
+                        borderWidth: 1,
+                        cornerRadius: 6,
+                        padding: 10,
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return ' ' + context.parsed.y + ' kali';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            color: '#666666',
+                            font: { size: 12 }
+                        },
+                        grid: {
+                            color: '#e5e7eb',
+                            drawBorder: false
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#666666',
+                            font: { size: 12 }
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
         });
     }
 

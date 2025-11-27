@@ -2,7 +2,6 @@
 document.addEventListener("DOMContentLoaded", function () {
   
   // === PATH DINAMIS BERDASARKAN HEADER PHP ===
-  // Mengambil base_url yang diset di header.php
   const projectRoot = window.BASE_URL || "/BookingLapanganKel2"; 
   
   const bookingEndpoint = `${projectRoot}/BookingPengguna/booking.php`;
@@ -44,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // --- 1. LOGIKA KLIK JAM ---
+  // --- 1. LOGIKA KLIK JAM (Dengan SweetAlert) ---
   document.querySelectorAll(".jam-main").forEach((btn) => {
     btn.addEventListener("click", function () {
       const slotData = {
@@ -58,7 +57,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const data = new URLSearchParams();
       data.append("action", "add_to_cart");
-      // Copy semua property
       for (const key in slotData) data.append(key, slotData[key]);
 
       fetch(bookingEndpoint, {
@@ -100,7 +98,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // --- 3. HAPUS ITEM ---
+  // --- 3. HAPUS ITEM (Tanpa Konfirmasi) ---
   if (keranjangList) {
     keranjangList.addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("remove-item-btn")) {
@@ -146,12 +144,10 @@ document.addEventListener("DOMContentLoaded", function () {
       checkoutBtn.innerText = "Memproses...";
       checkoutBtn.disabled = true;
 
-      // FETCH LANGSUNG KE PATH ABSOLUT
       fetch(processCheckoutEndpoint, { method: 'POST' })
       .then(r => r.json())
       .then(res => {
           if (res.status === 'ok') {
-              // Redirect ke URL Absolut juga agar aman
               window.location.href = projectRoot + "/BookingPengguna/" + res.redirect.replace('BookingPengguna/', '');
           } else {
               Swal.fire({
@@ -174,24 +170,44 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
   
-  // --- 5. LOGOUT (DESKTOP & MOBILE) ---
+  // --- 5. LOGOUT LOGIC (SWEETALERT) ---
+  // Menangkap semua link yang mengarah ke logout.php (baik di desktop maupun mobile)
   const logoutLinks = document.querySelectorAll('a[href*="logout.php"]');
-  const logoutModal = document.getElementById("logoutModal");
-  const cancelLogoutBtn = document.getElementById("cancelLogoutBtn");
-  const confirmLogoutBtn = document.getElementById("confirmLogoutBtn");
-  let targetLogoutUrl = "";
 
   if (logoutLinks.length > 0) {
       logoutLinks.forEach(link => {
           link.addEventListener("click", function (e) {
-              e.preventDefault();
-              targetLogoutUrl = this.href;
-              if (logoutModal) logoutModal.classList.remove("hidden");
+              e.preventDefault(); // Mencegah logout langsung
+              const targetUrl = this.href;
+
+              // Tampilkan SweetAlert
+              Swal.fire({
+                  title: 'Konfirmasi Keluar',
+                  text: "Apakah Anda yakin ingin keluar dari akun Anda?",
+                  icon: 'warning',
+                  iconColor: '#ef4444', // Ikon merah
+                  showCancelButton: true,
+                  confirmButtonText: 'Ya, Keluar',
+                  cancelButtonText: 'Batal',
+                  reverseButtons: true, // Tombol Batal di kiri, Keluar di kanan
+                  
+                  // Styling Custom Tailwind agar seragam dengan desain
+                  customClass: {
+                      popup: 'rounded-2xl font-sans', 
+                      title: 'text-xl font-bold text-slate-800',
+                      htmlContainer: 'text-slate-500',
+                      confirmButton: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1',
+                      cancelButton: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1'
+                  },
+                  buttonsStyling: false // Matikan style bawaan SweetAlert
+              }).then((result) => {
+                  if (result.isConfirmed) {
+                      window.location.href = targetUrl; // Lanjut logout jika dikonfirmasi
+                  }
+              });
           });
       });
   }
-  if (cancelLogoutBtn) cancelLogoutBtn.addEventListener("click", () => logoutModal?.classList.add("hidden"));
-  if (confirmLogoutBtn) confirmLogoutBtn.addEventListener("click", () => { if (targetLogoutUrl) window.location.href = targetLogoutUrl; });
 
   // --- HELPER ---
   function reindexRemoveButtons() {

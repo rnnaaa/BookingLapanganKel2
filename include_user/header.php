@@ -35,6 +35,9 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Rush Badminton</title>
+    
+    <link rel="icon" href="<?= $base_url ?>/assets/images/LogoRush1(white).png" type="image/png">
+    <link rel="shortcut icon" href="<?= $base_url ?>/assets/images/LogoRush1(white).png" type="image/png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -175,7 +178,7 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
                         <li><a href="<?= $base_url ?>/index.php" class="nav-link px-2 py-1 text-sm">Beranda</a></li>
                         <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm">Lapangan</a></li>
                         <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm">Kontak</a></li>
-                        <li><a href="<?= $base_url ?>/member.php" class="nav-link px-2 py-1 text-sm">Member</a></li>
+                        <li><a href="<?= $base_url ?>/member/member.php" class="nav-link px-2 py-1 text-sm">Member</a></li>
                         <li><a href="<?= $base_url ?>/riwayat/riwayat.php" class="nav-link px-2 py-1 text-sm">Riwayat</a></li>
                         <li>
                             <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer" title="Lihat Keranjang">
