@@ -1,7 +1,7 @@
 <!-- Preloader -->
 
 <div class="preloader flex-column justify-content-center align-items-center">
-  <img class="animation__shake" src="../public/asseth/tampilan_admin/dist/img/AdminLTELogo.png" alt="Badmintoon Logo" height="60" width="60">
+  <img class="animation__shake" src="../uploads/bukti_pembayaran/bukti_13_1763043777.png" alt="Badmintoon Logo" height="60" width="60">
 </div>
 
 <!-- Navbar -->
@@ -16,9 +16,6 @@
     </li>
     <li class="nav-item d-none d-sm-inline-block">
       <a href="dashboard.php" class="nav-link">Dashboard</a>
-    </li>
-    <li class="nav-item d-none d-sm-inline-block">
-      <a href="#" class="nav-link">Kontak</a>
     </li>
   </ul>
 

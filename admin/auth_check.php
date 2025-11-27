@@ -18,11 +18,11 @@ if ($_SESSION['role'] !== 'admin') {
 }
 
 // Optional: Cek masa aktif session (30 menit)
-if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
-    session_unset();
-    session_destroy();
-    header('Location: ../Auth/login.php?timeout=1');
-    exit;
-}
+// if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
+//     session_unset();
+//     session_destroy();
+//     header('Location: ../Auth/login.php?timeout=1');
+//     exit;
+// }
 $_SESSION['last_activity'] = time();
 ?>

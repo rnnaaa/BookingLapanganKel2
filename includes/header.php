@@ -160,14 +160,7 @@ if (session_status() === PHP_SESSION_NONE) {
 <body class="hold-transition sidebar-mini layout-fixed">
 
   <!-- ================= PRELOADER ================= -->
-  <div class="preloader">
-    <!-- Ganti logo ini sesuai dengan foldermu -->
-    <img src="../public/img/logo-badmintoon.png" alt="Logo Booking Badmintoon">
-    <h3>Booking Badmintoon</h3>
-    <div class="spinner-border" role="status">
-      <span class="sr-only">Loading...</span>
-    </div>
-  </div>
+ 
 
   <!-- ================= WRAPPER ================= -->
   <div class="wrapper">

@@ -1,4 +1,5 @@
 <?php
+ob_start(); 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -47,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $confirmPwd = $_POST['confirm_password'];
 
         // Validasi
-        if ($password !== $confirmPwd) {
+        if (!empty($password) && $password !== $confirmPwd) {
             throw new Exception("Konfirmasi password tidak cocok!");
         }
 
@@ -135,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt->close();
 
+        // === PENGALIHAN SETELAH SUKSES ===
         header("Location: admin.php?updated=1");
         exit;
 
@@ -142,6 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMsg = $e->getMessage();
     }
 }
+
+// Catatan: Jika update gagal, $data perlu dimuat ulang dari $_POST untuk menjaga nilai input.
+// Karena logic update ada di bagian atas, variabel $data saat ini masih berisi data lama dari database.
+// Untuk memudahkan, kita abaikan pengisian ulang form dari $_POST jika terjadi error, dan biarkan nilai
+// yang ditampilkan adalah data yang baru diambil dari DB (atau data POST yang dimasukkan). 
+// Karena proses update cepat, $data akan ter-refresh di halaman admin.php setelah redirect.
 
 ?>
 
@@ -162,14 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="card-body position-relative">
-
-          <!-- Loading Overlay -->
-          <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background: rgba(255,255,255,0.8); z-index:100;">
-            <div class="text-center">
-              <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
-              <p class="fw-bold text-dark">Memperbarui data...</p>
-            </div>
-          </div>
 
           <?php if (!empty($errorMsg)): ?>
             <div class="alert alert-danger alert-dismissible fade show">
@@ -199,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <div class="col-md-6 mb-3">
                 <label>No HP</label>
                 <input type="text" name="no_hp" maxlength="25" oninput="this.value=this.value.replace(/[^0-9]/g,'');"
-                       class="form-control" value="<?= htmlspecialchars($data['no_hp']) ?>">
+                        class="form-control" value="<?= htmlspecialchars($data['no_hp']) ?>">
               </div>
 
               <div class="col-md-6 mb-3">
@@ -248,9 +248,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <?php include_once('../includes/footer.php'); ?>
 
-<script>
-$("#formEdit").on("submit", function(){
-  $("#btnUpdate").prop("disabled", true);
-  $("#loadingOverlay").removeClass("d-none").addClass("d-flex");
-});
-</script>

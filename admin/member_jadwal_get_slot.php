@@ -1,4 +1,5 @@
 <?php
+// member_jadwal_get_slot.php
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 
@@ -10,7 +11,16 @@ if (!$id_lapangan || !$tanggal) {
     exit;
 }
 
-// cek jadwal harian
+$current_date = date('Y-m-d');
+$current_time = date('H:i:s');
+
+// 1. Validasi Tanggal Lewat (Security Layer 1)
+if ($tanggal < $current_date) {
+    echo json_encode(['status'=>'error','message'=>'Tanggal sudah lewat tidak dapat dipilih.']);
+    exit;
+}
+
+// Cek jadwal harian
 $stmt = $conn->prepare("
     SELECT id_jadwal_harian 
     FROM jadwal_harian 
@@ -23,7 +33,7 @@ $row = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$row) {
-    echo json_encode(['status'=>'error','message'=>'Belum ada jadwal untuk tanggal ini. Jalankan sinkronisasi.']);
+    echo json_encode(['status'=>'error','message'=>'Belum ada jadwal untuk tanggal ini.']);
     exit;
 }
 
@@ -42,11 +52,19 @@ $res = $stmt->get_result();
 
 $slots = [];
 while ($r = $res->fetch_assoc()) {
+    $status_final = $r['status'];
+    
+    // 2. Logika Cek Jam Lewat
+    // Jika tanggal booking == hari ini DAN jam mulai slot < jam sekarang
+    if ($tanggal === $current_date && $r['jam_mulai'] < $current_time) {
+        $status_final = 'lewat'; // Status khusus untuk frontend
+    }
+
     $slots[] = [
         'id_detail' => $r['id_detail'],
         'jam_mulai' => substr($r['jam_mulai'],0,5),
         'jam_selesai'=> substr($r['jam_selesai'],0,5),
-        'status' => $r['status']
+        'status' => $status_final
     ];
 }
 
