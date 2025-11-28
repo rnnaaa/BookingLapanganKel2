@@ -2,47 +2,51 @@
 session_start();
 require '../config/database.php';
 
-// Cek apakah ada booking yang sedang 'hold'
-if (isset($_SESSION['temp_booking_id'])) {
-    $booking_id = $_SESSION['temp_booking_id'];
-    
-    mysqli_begin_transaction($conn);
-    try {
-        // 1. LEPASKAN SLOT JADWAL DULU (PENTING!)
-        // Kita harus memutuskan hubungan booking dengan jadwal sebelum menghapus booking
-        // agar slot kembali menjadi 'tersedia' dan tidak ikut terhapus (jika ada cascade delete)
-        $sql_release = "UPDATE jadwal_detail SET status = 'tersedia', id_booking = NULL 
-                        WHERE id_booking = ?";
-        $stmt = $conn->prepare($sql_release);
-        $stmt->bind_param("i", $booking_id);
-        $stmt->execute();
+// 1. Kumpulkan semua ID Booking yang harus dibatalkan
+$ids_to_cancel = [];
 
-        // 2. HAPUS PERMANEN DATA BOOKING (HARD DELETE)
-        // Karena di database tabel 'detail_booking' biasanya terhubung cascade,
-        // maka detailnya akan ikut terhapus otomatis.
-        $sql_delete = "DELETE FROM booking WHERE id_booking = ?";
-        $stmt2 = $conn->prepare($sql_delete);
-        $stmt2->bind_param("i", $booking_id);
-        $stmt2->execute();
+// Cek Array IDs (Logika Baru - Multi Lapangan)
+if (isset($_SESSION['temp_booking_ids']) && is_array($_SESSION['temp_booking_ids'])) {
+    $ids_to_cancel = $_SESSION['temp_booking_ids'];
+} 
+// Cek Single ID (Logika Lama/Fallback jika cuma 1 lapangan)
+elseif (isset($_SESSION['temp_booking_id'])) {
+    $ids_to_cancel[] = $_SESSION['temp_booking_id'];
+}
 
-        mysqli_commit($conn);
-    } catch (Exception $e) {
-        mysqli_rollback($conn);
+if (!empty($ids_to_cancel)) {
+    foreach ($ids_to_cancel as $booking_id) {
+        $booking_id = (int)$booking_id; // Pastikan integer untuk keamanan
+
+        // A. Kembalikan Status Slot di Jadwal Detail menjadi 'tersedia'
+        // Penting: Lakukan ini SEBELUM menghapus booking agar relasinya jelas
+        $sql_release = "UPDATE jadwal_detail SET status = 'tersedia', id_booking = NULL WHERE id_booking = '$booking_id'";
+        mysqli_query($conn, $sql_release);
+
+        // B. Hapus Data di Tabel Booking
+        // (Tabel detail_booking biasanya terhapus otomatis jika ada ON DELETE CASCADE di database, 
+        // tapi menghapus induknya adalah langkah wajib)
+        $sql_delete = "DELETE FROM booking WHERE id_booking = '$booking_id'";
+        mysqli_query($conn, $sql_delete);
     }
 }
 
-// 3. Bersihkan Sesi Terkait
-unset($_SESSION['temp_booking_id']);
-unset($_SESSION['booking_expired_at']);
+// 2. Bersihkan Semua Session Terkait Booking
 unset($_SESSION['keranjang']);
 unset($_SESSION['produk_tambahan']);
+unset($_SESSION['temp_booking_id']);   // Hapus single ID
+unset($_SESSION['temp_booking_ids']);  // Hapus array IDs (PENTING)
+unset($_SESSION['booking_expired_at']);
+unset($_SESSION['payment_temp']);
 
-// Respons untuk AJAX/Redirect
-if ((isset($_SERVER['HTTP_CONTENT_TYPE']) && stripos($_SERVER['HTTP_CONTENT_TYPE'], 'application/json') !== false) || isset($_GET['ajax'])) {
-    header('Content-Type: application/json');
-    echo json_encode(['status' => 'ok', 'message' => 'Booking telah dihapus']);
-} else {
-    header("Location: booking.php");
+// 3. Response / Redirect
+// Jika dipanggil lewat AJAX/Beacon (saat tutup tab/back button), tidak perlu redirect
+if (isset($_GET['ajax'])) {
+    echo json_encode(['status' => 'ok']);
     exit;
 }
+
+// Jika dipanggil lewat tombol "Batal" biasa
+header("Location: booking.php");
+exit;
 ?>

@@ -4,6 +4,13 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 date_default_timezone_set('Asia/Jakarta');
 
+// === DEFINISI BASE URL ===
+$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+$host = $_SERVER['HTTP_HOST'];
+// Sesuaikan folder root project Anda jika berbeda, kosongkan jika di hosting root
+$folder_project = ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1') ? '/BookingLapanganKel2' : ''; 
+$base_url = $protocol . "://" . $host . $folder_project;
+
 // === AUTO LOGOUT (20 MENIT) ===
 if (isset($_SESSION['id_user'])) {
     $timeout_duration = 1200; 
@@ -12,7 +19,7 @@ if (isset($_SESSION['id_user'])) {
         if ($inactive_time > $timeout_duration) {
             session_unset();
             session_destroy();
-            header("Location: /BookingLapanganKel2/index.php");
+            header("Location: " . $base_url . "/index.php");
             exit; 
         } else {
             $_SESSION['last_activity'] = time();
@@ -22,12 +29,10 @@ if (isset($_SESSION['id_user'])) {
     }
 }
 
-// === DEFINISI BASE URL YANG ROBUST ===
-// Menggunakan logika server protocol agar aman di localhost maupun hosting
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-$host = $_SERVER['HTTP_HOST'];
-// Sesuaikan folder root project Anda jika berbeda
-$base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
+// Fungsi Helper untuk Menandai Menu Aktif
+function isActive($page_name) {
+    return (basename($_SERVER['PHP_SELF']) == $page_name) ? 'active' : '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -77,7 +82,7 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
     
     <script>
         window.USER_ID = <?= json_encode($_SESSION['id_user'] ?? 0); ?>;
-        window.BASE_URL = "<?= $base_url ?>"; // Variabel penting untuk JS
+        window.BASE_URL = "<?= $base_url ?>"; 
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
@@ -89,7 +94,7 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
         body { font-family: 'Inter', sans-serif; background-color: #f6f8fb; }
         .nav-link { @apply relative text-slate-600 transition-colors duration-300; }
         .nav-link:not(.active):hover { @apply text-primary; }
-        .nav-link.active { color: #0b63d6 !important; font-weight: 600 !important; }
+        .nav-link.active { color: #0b63d6 !important; font-weight: 700 !important; }
         html { scroll-behavior: smooth; }
         
         /* Sidebar Styles */
@@ -123,6 +128,18 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
         .slot-card.available:hover .time { @apply text-primary; }
         .slot-card.booked { @apply bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed; }
         
+        /* Animasi Dropdown Mobile */
+        #mobileNav {
+            transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        #mobileNav.open {
+            max-height: 500px; /* Estimasi tinggi maksimal */
+            opacity: 1;
+        }
+
         @media (max-width: 640px) {
             .sidebar { width: 100%; right: -100%; }
             .sidebar.active { right: 0; }
@@ -138,7 +155,7 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
         </div>
         <div class="sidebar-body" id="keranjangList">
             <?php if (empty($_SESSION['keranjang'] ?? [])): ?>
-                <p class="text-slate-400">Belum ada jadwal di keranjang.</p>
+                <p class="text-slate-400 text-center mt-10">Belum ada jadwal di keranjang.</p>
             <?php else: ?>
                 <?php foreach ($_SESSION['keranjang'] as $i => $it): ?>
                     <div class="keranjang-item" data-index="<?= $i ?>">
@@ -149,7 +166,7 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
                         </div>
                         <div class="right">
                             <div class="text-sm font-semibold">Rp <?= number_format($it['harga'],0,',','.') ?></div>
-                            <button class="text-xs mt-2 text-red-600 remove-item-btn" data-index="<?= $i ?>" style="background:none;border:none;cursor:pointer;">Hapus</button>
+                            <button class="text-xs mt-2 text-red-600 hover:text-red-800 font-medium remove-item-btn" data-index="<?= $i ?>">Hapus</button>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -163,11 +180,12 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
     <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-md">
         <div class="max-w-7xl mx-auto px-4">
             <nav class="flex items-center justify-between h-20">
+                
                 <a href="<?= $base_url ?>/index.php" class="flex items-center gap-3">
-                    <div class="w-14 h-14 flex items-center justify-center transform transition-all duration-500 hover:scale-110">
-                        <img src="<?= $base_url ?>/assets/images/LogoRush.png" alt="Logo" class="w-14 h-14 object-contain rounded-xl shadow-md">
+                    <div class="w-12 h-12 flex items-center justify-center transform transition-all duration-500 hover:scale-110">
+                        <img src="<?= $base_url ?>/assets/images/LogoRush.png" alt="Logo" class="w-full h-full object-contain rounded-xl shadow-sm">
                     </div>
-                    <div>
+                    <div class="hidden sm:block">
                         <div class="font-poppins font-semibold text-lg leading-tight">Rush Badminton Academy</div>
                         <div class="text-xs text-slate-500 -mt-0.5">Booking Lapangan Online</div>
                     </div>
@@ -175,11 +193,11 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
 
                 <div class="hidden lg:flex flex-1 justify-center">
                     <ul id="topNav" class="flex gap-8 items-end">
-                        <li><a href="<?= $base_url ?>/index.php" class="nav-link px-2 py-1 text-sm">Beranda</a></li>
-                        <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm">Lapangan</a></li>
-                        <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm">Kontak</a></li>
-                        <li><a href="<?= $base_url ?>/member/member.php" class="nav-link px-2 py-1 text-sm">Member</a></li>
-                        <li><a href="<?= $base_url ?>/riwayat/riwayat.php" class="nav-link px-2 py-1 text-sm">Riwayat</a></li>
+                        <li><a href="<?= $base_url ?>/index.php" class="nav-link px-2 py-1 text-sm <?= isActive('index.php') ?>">Beranda</a></li>
+                        <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm <?= isActive('booking.php') ?>">Lapangan</a></li>
+                        <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm <?= isActive('kontak.php') ?>">Kontak</a></li>
+                        <li><a href="<?= $base_url ?>/member/member.php" class="nav-link px-2 py-1 text-sm <?= isActive('member.php') ?>">Member</a></li>
+                        <li><a href="<?= $base_url ?>/riwayat/riwayat.php" class="nav-link px-2 py-1 text-sm <?= isActive('riwayat.php') ?>">Riwayat</a></li>
                         <li>
                             <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer" title="Lihat Keranjang">
                                 <i class="fa-solid fa-cart-shopping text-lg"></i>
@@ -191,7 +209,7 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
                     </ul>
                 </div>
                 
-                <div class="hidden md:flex items-center gap-4">
+                <div class="hidden lg:flex items-center gap-4">
                     <?php if (isset($_SESSION['id_user']) && $_SESSION['id_user'] != 1): ?>
                         <?php
                         $foto_profil = $base_url . '/assets/images/default-avatar.png';
@@ -213,16 +231,21 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
                         </a>
 
                     <?php else: ?>
-
                         <a href="<?= $base_url ?>/auth/login.php" class="border border-primary text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary hover:text-white transition-all duration-300">Masuk</a>
                         <a href="<?= $base_url ?>/auth/register.php" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primaryDark transition-all duration-300">Daftar</a>
-
                     <?php endif; ?>
                 </div>
 
-                <div class="lg:hidden">
-                    <button id="mobileBtn" class="p-2 rounded-md hover:bg-slate-100 focus:outline-none transition-colors">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6H21M3 12H21M3 18H21" stroke="#0b1a2b" stroke-width="1.5" stroke-linecap="round" /></svg>
+                <div class="flex items-center gap-4 lg:hidden">
+                    <a href="#" id="mobileCartIcon" class="relative text-slate-700 hover:text-primary transition-colors">
+                        <i class="fa-solid fa-cart-shopping text-xl"></i>
+                        <span id="mobileCartCount" class="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                            <?= count($_SESSION['keranjang'] ?? []) ?>
+                        </span>
+                    </a>
+
+                    <button id="mobileBtn" class="p-2 rounded-md text-slate-700 hover:bg-slate-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-bars text-2xl"></i>
                     </button>
                 </div>
             </nav>
@@ -234,28 +257,98 @@ $base_url = $protocol . "://" . $host . "/BookingLapanganKel2";
           <h3 class="text-lg font-bold text-slate-800 mb-2">Login Diperlukan</h3>
           <p class="text-sm text-slate-500 mb-6">Anda harus login terlebih dahulu untuk melanjutkan checkout.</p>
           <div class="flex flex-col gap-3">
-              <button id="btnLoginYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all">IYA, LOGIN</button>
+              <a href="<?= $base_url ?>/auth/login.php" id="btnLoginYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all block">IYA, LOGIN</a>
               <button id="btnLoginNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">BATAL</button>
           </div>
       </div>
     </div>
 
-    <div id="mobileNav" class="lg:hidden hidden bg-white border-t border-slate-100 shadow-lg">
+    <div id="mobileNav" class="lg:hidden bg-white border-t border-slate-100 shadow-lg absolute w-full left-0 z-40">
         <div class="px-4 py-4 flex flex-col gap-2">
-            <a href="<?= $base_url ?>/index.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Beranda</a>
-            <a href="<?= $base_url ?>/BookingPengguna/booking.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Lapangan</a>
-            <a href="<?= $base_url ?>/kontak.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Kontak</a>
-            <a href="<?= $base_url ?>/member.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Member</a>
-            <a href="<?= $base_url ?>/riwayat/riwayat.php" class="py-3 px-2 rounded-lg hover:bg-slate-50 transition-colors">Riwayat</a>
+            <a href="<?= $base_url ?>/index.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('index.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
+                <i class="fa-solid fa-house mr-3 w-5 text-center"></i> Beranda
+            </a>
+            <a href="<?= $base_url ?>/BookingPengguna/booking.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('booking.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
+                <i class="fa-regular fa-calendar-check mr-3 w-5 text-center"></i> Lapangan
+            </a>
+            <a href="<?= $base_url ?>/kontak.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('kontak.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
+                <i class="fa-regular fa-envelope mr-3 w-5 text-center"></i> Kontak
+            </a>
+            <a href="<?= $base_url ?>/member/member.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('member.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
+                <i class="fa-solid fa-crown mr-3 w-5 text-center text-yellow-500"></i> Member
+            </a>
+            <a href="<?= $base_url ?>/riwayat/riwayat.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('riwayat.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
+                <i class="fa-solid fa-clock-rotate-left mr-3 w-5 text-center"></i> Riwayat
+            </a>
             
-            <div class="pt-2 flex gap-2 mt-2 border-t">
+            <div class="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-3">
                  <?php if (isset($_SESSION['id_user']) && $_SESSION['id_user'] != 1): ?>
-                    <a href="<?= $base_url ?>/DashPengguna.php" class="flex-1 text-center border border-primary text-primary py-2 rounded-lg font-medium">Dashboard</a>
-                    <a href="<?= $base_url ?>/auth/php/logout.php" class="flex-1 text-center bg-red-600 text-white py-2 rounded-lg font-medium">Keluar</a>
+                    <div class="flex items-center gap-3 px-4 mb-2">
+                        <img src="<?= $foto_profil ?>" class="w-10 h-10 rounded-full border object-cover">
+                        <div>
+                            <div class="text-sm font-bold text-slate-800"><?= $tampil_username ?></div>
+                            <div class="text-xs text-slate-500">User Terdaftar</div>
+                        </div>
+                    </div>
+                    <a href="<?= $base_url ?>/DashPengguna.php" class="w-full text-center border border-primary text-primary py-2.5 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">Dashboard</a>
+                    <a href="<?= $base_url ?>/auth/php/logout.php" class="w-full text-center bg-red-50 text-red-600 py-2.5 rounded-xl font-bold hover:bg-red-100 transition-all">Keluar</a>
                  <?php else: ?>
-                    <a href="<?= $base_url ?>/auth/login.php" class="flex-1 text-center border border-primary text-primary py-2 rounded-lg font-medium">Masuk</a>
-                    <a href="<?= $base_url ?>/auth/register.php" class="flex-1 text-center bg-primary text-white py-2 rounded-lg font-medium">Daftar</a>
+                    <a href="<?= $base_url ?>/auth/login.php" class="w-full text-center border border-primary text-primary py-2.5 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">Masuk</a>
+                    <a href="<?= $base_url ?>/auth/register.php" class="w-full text-center bg-primary text-white py-2.5 rounded-xl font-bold hover:bg-primaryDark transition-all shadow-lg shadow-blue-200">Daftar Sekarang</a>
                  <?php endif; ?>
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Mobile Menu Toggle
+            const mobileBtn = document.getElementById('mobileBtn');
+            const mobileNav = document.getElementById('mobileNav');
+            
+            if(mobileBtn && mobileNav) {
+                mobileBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    mobileNav.classList.toggle('open');
+                    // Toggle icon icon bars/xmark
+                    const icon = mobileBtn.querySelector('i');
+                    if(mobileNav.classList.contains('open')) {
+                        icon.classList.replace('fa-bars', 'fa-xmark');
+                    } else {
+                        icon.classList.replace('fa-xmark', 'fa-bars');
+                    }
+                });
+                
+                // Close menu when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!mobileNav.contains(e.target) && !mobileBtn.contains(e.target)) {
+                        mobileNav.classList.remove('open');
+                        mobileBtn.querySelector('i').classList.replace('fa-xmark', 'fa-bars');
+                    }
+                });
+            }
+
+            // 2. Sync Cart Count (Desktop <-> Mobile)
+            // Karena booking-script.js update 'cartCount', kita perlu sync 'mobileCartCount'
+            const deskCart = document.getElementById('cartCount');
+            const mobCart = document.getElementById('mobileCartCount');
+            
+            if(deskCart && mobCart) {
+                // Observer untuk memantau perubahan pada desktop cart (oleh AJAX)
+                const observer = new MutationObserver(() => {
+                    mobCart.textContent = deskCart.textContent;
+                });
+                observer.observe(deskCart, {childList: true, characterData: true, subtree: true});
+            }
+
+            // 3. Mobile Cart Click -> Open Sidebar
+            const mobileCartIcon = document.getElementById('mobileCartIcon');
+            const sidebar = document.getElementById('sidebarKeranjang');
+            if(mobileCartIcon && sidebar) {
+                mobileCartIcon.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    sidebar.classList.add('active');
+                });
+            }
+        });
+    </script>

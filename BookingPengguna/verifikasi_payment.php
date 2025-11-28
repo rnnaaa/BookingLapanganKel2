@@ -16,7 +16,7 @@ $user_nama = $_SESSION['nama'] ?? 'User';
 // ========================================================
 // 2. LOGIKA TIMER (HOLD BOOKING)
 // ========================================================
-if (!isset($_SESSION['temp_booking_id']) || !isset($_SESSION['booking_expired_at'])) {
+if ((!isset($_SESSION['temp_booking_ids']) && !isset($_SESSION['temp_booking_id'])) || !isset($_SESSION['booking_expired_at'])) {
     header("Location: booking.php");
     exit;
 }
