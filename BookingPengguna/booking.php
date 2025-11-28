@@ -133,19 +133,38 @@ $hari_num = date('N', strtotime($selected_date));
 $hari_map = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
 $hari = $hari_map[$hari_num - 1];
 
+// 1. TENTUKAN BATASAN WAKTU (7 HARI KEDEPAN)
+$today = date('Y-m-d');
+$max_allowed_date = date('Y-m-d', strtotime('+7 days')); // Batas H+7
+
+// 2. AMBIL KETERSEDIAAN DARI DATABASE (Jadwal yang sudah dibuat Admin)
 $date_range_query = mysqli_query($conn, "SELECT MIN(tanggal) AS min_date, MAX(tanggal) AS max_date FROM jadwal_harian WHERE id_lapangan = $selected_lapangan AND tanggal >= CURDATE()");
 $date_range = mysqli_fetch_assoc($date_range_query);
-$min_date = $date_range['min_date'] ?? date('Y-m-d');
-$max_date = $date_range['max_date'] ?? date('Y-m-d');
 
+// 3. ATUR MIN & MAX UNTUK INPUT CALENDAR (HTML)
+$min_date = $today; 
+$db_max_date = $date_range['max_date'] ?? $today;
+
+if ($db_max_date > $max_allowed_date) {
+    $max_date = $max_allowed_date;
+} else {
+    $max_date = $db_max_date;
+}
+
+// 4. VALIDASI STATUS TANGGAL YANG DIPILIH
 $hari_status = 'tidak_tersedia';
 $hari_status_message = '';
 $id_jadwal_harian_today = 0; 
 
-if (strtotime($selected_date) < strtotime(date('Y-m-d'))) {
+if (strtotime($selected_date) < strtotime($today)) {
     $hari_status = 'kadaluarsa';
     $hari_status_message = 'Anda tidak dapat memesan jadwal di masa lalu.';
+} elseif (strtotime($selected_date) > strtotime($max_allowed_date)) {
+    // [BARU] Validasi jika tanggal melebihi 7 hari
+    $hari_status = 'tidak_tersedia';
+    $hari_status_message = 'Pemesanan Reguler hanya dibuka untuk 7 hari ke depan (Maksimal: ' . date('d/m/Y', strtotime($max_allowed_date)) . '). Silakan daftar Member untuk akses lebih panjang.';
 } else {
+    // Cek Database seperti biasa
     $status_query = "SELECT id_jadwal_harian, status_hari FROM jadwal_harian WHERE id_lapangan = ? AND tanggal = ?";
     $stmt_status = mysqli_prepare($conn, $status_query);
     mysqli_stmt_bind_param($stmt_status, "is", $selected_lapangan, $selected_date);

@@ -202,14 +202,25 @@ $badge_member = $is_member ? '<span class="bg-white/20 text-white text-[10px] sm
             </div>
         </div>
 
-        <?php if($is_member): ?>
+    <?php if($is_member): ?>
         <div class="mb-8 animate-fade-in-up" style="animation-delay: 0.1s;">
             <div class="bg-white rounded-2xl p-5 border border-yellow-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden">
                 <div class="absolute right-0 top-0 h-full w-2 bg-yellow-400"></div>
                 <div>
                     <h4 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Status Membership</h4>
-                    <p class="font-bold text-lg text-slate-800"><?= htmlspecialchars($member_data['nama_lapangan']) ?> • <?= $member_data['durasi_bulan'] ?> Bulan</p>
-                    <p class="text-xs text-slate-500">Berlaku hingga: <span class="font-semibold text-slate-700"><?= date('d F Y', strtotime($member_data['tanggal_berakhir'])) ?></span></p>
+                    <p class="font-bold text-lg text-slate-800 mb-1">
+                        <?= htmlspecialchars($member_data['nama_lapangan']) ?> • <?= $member_data['durasi_bulan'] ?> Bulan
+                    </p>
+                    
+                    <div class="text-xs text-slate-500 flex flex-col gap-1">
+                        <p>
+                            Mulai: <span class="font-semibold text-slate-700"><?= date('d F Y', strtotime($member_data['tanggal_mulai'])) ?></span>
+                        </p>
+                        <p>
+                            Berlaku hingga: <span class="font-semibold text-slate-700"><?= date('d F Y', strtotime($member_data['tanggal_berakhir'])) ?></span>
+                        </p>
+                    </div>
+
                 </div>
                 <div class="bg-yellow-50 px-4 py-2 rounded-lg border border-yellow-100 text-yellow-700 text-sm font-semibold flex items-center gap-2">
                     <i class="fa-solid fa-check-circle"></i> Aktif
