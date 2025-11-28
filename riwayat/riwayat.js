@@ -1,288 +1,971 @@
 // ==============================================
-// FILE: riwayat.js
-// DESCRIPTION: Frontend JavaScript untuk interaktivitas riwayat booking
+// riwayat.js - VERSI REVISI 100% SYNC DENGAN PHP
 // ==============================================
 
-// === 1. KODE INISIALISASI DAN TAB FUNCTIONALITY ===
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("DOM Content Loaded - Riwayat Page");
+  console.log("Riwayat page loaded - Revised Version");
 
-  const tabButtons = document.querySelectorAll(".tab-button");
-  const tabContents = document.querySelectorAll(".tab-content");
-
-  tabButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const tabId = button.getAttribute("data-tab");
-      console.log("Tab clicked:", tabId);
-
-      // Update buttons
-      tabButtons.forEach((btn) => btn.classList.remove("active"));
-      button.classList.add("active");
-
-      // Update contents
-      tabContents.forEach((content) => content.classList.remove("active"));
-      const targetTab = document.getElementById(tabId + "-tab");
-      if (targetTab) {
-        targetTab.classList.add("active");
-      }
-    });
-  });
+  initializeTabs();
+  initializeCountdownTimers();
+  initializeModalEvents();
+  initializeDisabledButtonHandlers();
 });
 
-// === 2. KODE NOTIFICATION SYSTEM ===
-function showNotification(message, type = "info") {
-  console.log("Showing notification:", message, type);
+function initializeTabs() {
+  document.querySelectorAll(".tab-button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
 
-  // Hapus notif lama jika ada
+      document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+      document.getElementById(btn.dataset.tab + "-tab").classList.add("active");
+    });
+  });
+}
+
+function initializeCountdownTimers() {
+  document.querySelectorAll(".countdown-timer[data-deadline]").forEach((timer) => {
+    const deadline = new Date(timer.dataset.deadline).getTime();
+
+    function update() {
+      const now = new Date().getTime();
+      const distance = deadline - now;
+
+      if (distance <= 0) {
+        timer.innerHTML = '<small class="expired-text">Waktu habis</small>';
+        timer.classList.add("expired");
+
+        const card = timer.closest(".card");
+        card?.querySelectorAll(".btn-ubah, .btn-batal").forEach((btn) => {
+          if (!btn.classList.contains("disabled")) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+
+            // Update button text based on which deadline expired
+            if (btn.classList.contains("btn-ubah")) {
+              btn.innerHTML = '<i class="fa-solid fa-calendar-times"></i> Ubah Jadwal';
+            } else if (btn.classList.contains("btn-batal")) {
+              btn.innerHTML = '<i class="fa-solid fa-ban"></i> Batalkan';
+            }
+          }
+        });
+        return;
+      }
+
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+      timer.innerHTML = `<small>
+                <i class="fa-solid fa-clock"></i> Tersisa: 
+                <strong>${hours}j ${minutes}m ${seconds}d</strong>
+            </small>`;
+
+      if (distance < 3600000) {
+        // Kurang dari 1 jam
+        timer.style.color = "#e74c3c";
+        timer.style.fontWeight = "bold";
+      }
+
+      setTimeout(update, 1000);
+    }
+    update();
+  });
+}
+
+function initializeModalEvents() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (typeof Swal !== "undefined") {
+        Swal.close();
+      }
+    }
+  });
+}
+
+function initializeDisabledButtonHandlers() {
+  // Handle klik tombol disabled dengan pesan error
+  document.addEventListener("click", function (e) {
+    if (e.target.classList.contains("disabled")) {
+      const btn = e.target;
+      if (btn.classList.contains("btn-ubah")) {
+        showDisabledMessage("ubah");
+      } else if (btn.classList.contains("btn-batal")) {
+        showDisabledMessage("batal");
+      }
+    }
+  });
+}
+
+// Mencegah error jika Swal belum diload
+if (typeof Swal === "undefined") {
+  console.warn("SweetAlert2 tidak ter-load! Beberapa fitur mungkin tidak bekerja.");
+  // Fallback untuk modal basic
+  window.Swal = {
+    fire: function (options) {
+      if (typeof options === "string") {
+        alert(options);
+      } else {
+        alert(options.title || "Info");
+      }
+      return Promise.resolve({ isConfirmed: false });
+    },
+    close: function () {},
+    showLoading: function () {},
+    showValidationMessage: function (msg) {
+      alert(msg);
+    },
+  };
+}
+
+function formatTanggal(tanggal) {
+  const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+  return new Date(tanggal).toLocaleDateString("id-ID", options);
+}
+
+// === FUNGSI AJUKAN PEMBATALAN - DENGAN AUTO-FILL USERNAME ===
+// === FUNGSI AJUKAN PEMBATALAN - FIXED AUTO-FILL ===
+function ajukanBatal(id_sesi, tanggal, jam) {
+  // Langsung tampilkan form, jika error tetap lanjut tanpa auto-fill
+  showBatalForm(id_sesi, tanggal, jam);
+}
+
+function showBatalForm(id_sesi, tanggal, jam, username = "", nama = "") {
+  Swal.fire({
+    title: "Ajukan Pembatalan",
+    html: `
+      <div class="text-start p-3 bg-light rounded mb-3">
+        <p class="mb-1"><strong>Tanggal:</strong> ${formatTanggal(tanggal)}</p>
+        <p class="mb-0"><strong>Jam:</strong> ${jam}</p>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" id="username" class="form-control" value="${username}" readonly disabled>
+        <small class="form-text text-muted">Auto-filled dari akun Anda</small>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Nama Penerima <span class="text-danger">*</span></label>
+        <input type="text" id="nama_penerima" class="form-control" placeholder="Masukkan nama lengkap penerima transfer" value="${nama}" required>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">No. Rekening / E-Wallet <span class="text-danger">*</span></label>
+        <input type="text" id="no_rekening" class="form-control" placeholder="Contoh: 081234567890 atau 1234567890" required>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Bank / E-Wallet <span class="text-danger">*</span></label>
+        <select id="bank_ewallet" class="form-control" required>
+          <option value="">Pilih Bank / E-Wallet</option>
+          <option value="BCA">BCA</option>
+          <option value="BNI">BNI</option>
+          <option value="BRI">BRI</option>
+          <option value="Mandiri">Mandiri</option>
+          <option value="CIMB Niaga">CIMB Niaga</option>
+          <option value="OVO">OVO</option>
+          <option value="GoPay">GoPay</option>
+          <option value="DANA">DANA</option>
+        </select>
+      </div>
+
+      <div class="alert alert-warning">
+        <small>
+          <i class="fas fa-exclamation-triangle"></i>
+          <strong>Perhatian:</strong> Pengajuan pembatalan hanya dapat dilakukan minimal H-12 jam sebelum jadwal booking.
+          Dana akan direfund 100% jika disetujui admin.
+        </small>
+      </div>
+    `,
+    width: "600px",
+    showCancelButton: true,
+    confirmButtonText: "Kirim Pengajuan",
+    cancelButtonText: "Batal",
+    didOpen: () => {
+      // Coba ambil data user, jika berhasil update form
+      fetch(`riwayat.php?action=get_user_info`)
+        .then((response) => response.json())
+        .then((userData) => {
+          if (userData.status === "success") {
+            document.getElementById("username").value = userData.username || "";
+            if (!document.getElementById("nama_penerima").value) {
+              document.getElementById("nama_penerima").value = userData.nama || "";
+            }
+          }
+        })
+        .catch((error) => {
+          console.log("Auto-fill optional failed, continuing without it");
+        });
+    },
+    preConfirm: () => {
+      const nama_penerima = document.getElementById("nama_penerima").value.trim();
+      const no_rekening = document.getElementById("no_rekening").value.trim();
+      const bank_ewallet = document.getElementById("bank_ewallet").value;
+
+      if (!nama_penerima) {
+        Swal.showValidationMessage("Nama penerima harus diisi");
+        return false;
+      }
+      if (!no_rekening) {
+        Swal.showValidationMessage("Nomor rekening/ewallet harus diisi");
+        return false;
+      }
+      if (!bank_ewallet) {
+        Swal.showValidationMessage("Pilih bank/ewallet terlebih dahulu");
+        return false;
+      }
+
+      return { id_sesi, nama_penerima, no_rekening, bank_ewallet };
+    },
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+    processAjukanBatal(result.value);
+  });
+}
+
+function processAjukanBatal(data) {
+  const { id_sesi, nama_penerima, no_rekening, bank_ewallet } = data;
+
+  console.log("Submitting cancellation:", data);
+
+  Swal.fire({
+    title: "Mengirim Pengajuan...",
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading(),
+  });
+
+  // Buat form data dengan encoding yang benar
+  const formData = new URLSearchParams();
+  formData.append("action", "ajukan_pembatalan");
+  formData.append("id_sesi", id_sesi);
+  formData.append("nama_penerima", nama_penerima);
+  formData.append("no_rekening", no_rekening);
+  formData.append("bank_ewallet", bank_ewallet);
+
+  console.log("FormData:", formData.toString());
+
+  fetch("riwayat.php", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+    },
+    body: formData,
+  })
+    .then((response) => {
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((res) => {
+      console.log("Cancellation API Response:", res);
+
+      Swal.fire({
+        icon: res.status === "success" ? "success" : "error",
+        title: res.status === "success" ? "Pengajuan Terkirim!" : "Gagal",
+        text: res.message || "Terjadi kesalahan",
+        confirmButtonText: "OK",
+      }).then(() => {
+        if (res.status === "success") {
+          location.reload();
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("Fetch error details:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Koneksi",
+        html: `
+          <div class="text-start">
+            <p>Gagal terhubung ke server. Kemungkinan penyebab:</p>
+            <ul class="text-sm">
+              <li>• Koneksi internet terputus</li>
+              <li>• Server sedang maintenance</li>
+              <li>• Terjadi error di sistem</li>
+            </ul>
+            <p class="mt-2">Silakan coba beberapa saat lagi.</p>
+          </div>
+        `,
+        confirmButtonText: "Mengerti",
+      });
+    });
+}
+// === NOTIFICATION SYSTEM ===
+function showNotification(message, type = "info") {
+  // Hapus notif lama
   const oldNotif = document.querySelector(".notif-toast");
   if (oldNotif) oldNotif.remove();
 
   const notif = document.createElement("div");
   notif.className = `notif-toast ${type}`;
-  notif.textContent = message;
+  notif.innerHTML = `
+    <i class="fa-solid ${type === "success" ? "fa-circle-check" : type === "error" ? "fa-circle-exclamation" : "fa-info-circle"}"></i>
+    <span>${message}</span>
+  `;
 
   document.body.appendChild(notif);
 
-  // Auto remove after 5 seconds
-  setTimeout(() => {
-    if (notif.parentNode) {
-      notif.remove();
-    }
-  }, 5000);
+  // Auto remove
+  setTimeout(() => notif.remove(), 5000);
 }
 
-// === 3. KODE COUNTDOWN TIMER SYSTEM ===
-// COUNTDOWN TIMER — VERSI FINAL SUPER JELAS & AKURAT
-document.addEventListener("DOMContentLoaded", function () {
-  document.querySelectorAll(".countdown-timer").forEach((timer) => {
-    const deadlineAttr = timer.getAttribute("data-booking-deadline");
-    if (!deadlineAttr) {
-      timer.innerHTML = '<span class="expired-text">Waktu ubah jadwal habis</span>';
-      timer.classList.add("expired");
-      return;
-    }
+// === UBAH JADWAL REGULER (PER SESI) ===
+function ubahRegulerSesi(id_sesi, lapangan_id, currentDate, currentTime, nama_lapangan) {
+  console.log("Ubah jadwal reguler:", { id_sesi, lapangan_id, currentDate, currentTime });
 
-    const deadline = new Date(deadlineAttr).getTime();
+  Swal.fire({
+    title: "Ubah Jadwal Booking",
+    html: `
+      <div class="text-start">
+        <div class="current-booking-info mb-3 p-3 bg-light rounded">
+          <h6>Booking Saat Ini:</h6>
+          <p class="mb-1"><strong>Lapangan:</strong> ${nama_lapangan}</p>
+          <p class="mb-1"><strong>Tanggal:</strong> ${formatTanggal(currentDate)}</p>
+          <p class="mb-0"><strong>Jam:</strong> ${currentTime}</p>
+        </div>
+        
+        <label class="form-label">Tanggal Baru:</label>
+        <input type="date" id="new_date" class="form-control" 
+               min="${new Date().toISOString().split("T")[0]}" 
+               max="${getMaxDate(7)}" required>
+        
+        <label class="form-label mt-3">Jam Baru:</label>
+        <select id="new_jam" class="form-control" disabled required>
+          <option value="">Pilih tanggal terlebih dahulu</option>
+        </select>
+        
+        <div class="alert alert-info mt-3">
+          <small>
+            <i class="fas fa-info-circle"></i>
+            <strong>Batas Waktu:</strong> Hanya bisa mengubah jadwal maksimal H-5 jam sebelum waktu booking.
+            <strong>Batas Tanggal:</strong> Maksimal 7 hari dari hari ini.
+          </small>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: "Simpan Perubahan",
+    cancelButtonText: "Batal",
+    didOpen: () => {
+      const tglInput = document.getElementById("new_date");
+      const jamSelect = document.getElementById("new_jam");
 
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const distance = deadline - now;
+      // Set default tanggal
+      tglInput.value = new Date().toISOString().split("T")[0];
 
-      if (distance <= 0) {
-        timer.innerHTML = '<span class="expired-text">Waktu ubah jadwal habis</span>';
-        timer.classList.add("expired");
-
-        // Auto disable tombol ubah jadwal
-        const card = timer.closest(".card");
-        const btn = card?.querySelector(".btn-ubah:not(.disabled)");
-        if (btn) {
-          btn.classList.add("disabled");
-          btn.onclick = () => showDisabledReason("time_expired");
+      // Load jam saat tanggal berubah
+      tglInput.addEventListener("change", function () {
+        if (this.value) {
+          loadAvailableSessions(lapangan_id, this.value, id_sesi, jamSelect);
         }
+      });
+
+      // Load jam awal
+      loadAvailableSessions(lapangan_id, tglInput.value, id_sesi, jamSelect);
+    },
+    preConfirm: () => {
+      const tgl = document.getElementById("new_date").value;
+      const jam = document.getElementById("new_jam").value;
+
+      if (!tgl) {
+        Swal.showValidationMessage("Pilih tanggal baru terlebih dahulu");
+        return false;
+      }
+      if (!jam) {
+        Swal.showValidationMessage("Pilih jam baru terlebih dahulu");
+        return false;
+      }
+
+      return { id_sesi, new_date: tgl, new_jam: jam };
+    },
+  }).then((result) => {
+    if (!result.isConfirmed || !result.value) return;
+
+    const { id_sesi, new_date, new_jam } = result.value;
+
+    // Konfirmasi akhir
+    Swal.fire({
+      title: "Konfirmasi Perubahan",
+      html: `
+        <div class="text-start">
+          <p>Anda akan mengubah jadwal booking menjadi:</p>
+          <div class="p-3 bg-light rounded">
+            <p class="mb-1"><strong>Tanggal:</strong> ${formatTanggal(new_date)}</p>
+            <p class="mb-0"><strong>Jam:</strong> ${getJamTextFromSelect(new_jam)}</p>
+          </div>
+          <p class="text-warning mt-2">
+            <small><i class="fas fa-exclamation-triangle"></i> Pastikan jadwal baru sudah sesuai. Perubahan tidak dapat dibatalkan!</small>
+          </p>
+        </div>
+      `,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya, Ubah Jadwal",
+      cancelButtonText: "Batal",
+    }).then((confirmResult) => {
+      if (confirmResult.isConfirmed) {
+        processUbahJadwalReguler(id_sesi, new_date, new_jam);
+      }
+    });
+  });
+}
+
+// === PROSES UBAH JADWAL REGULER ===
+function processUbahJadwalReguler(id_sesi, new_date, new_jam) {
+  Swal.fire({
+    title: "Memproses...",
+    text: "Sedang mengubah jadwal booking",
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading(),
+  });
+
+  fetch("riwayat.php", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      action: "ubah_jadwal_sesi",
+      id_sesi: id_sesi,
+      new_date: new_date,
+      new_jadwal_waktu: new_jam,
+    }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      Swal.close();
+
+      if (data.status === "success") {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: data.message,
+          confirmButtonText: "OK",
+        }).then(() => {
+          window.location.reload();
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: data.message || "Terjadi kesalahan yang tidak diketahui",
+          confirmButtonText: "OK",
+        });
+      }
+    })
+    .catch((error) => {
+      Swal.close();
+      console.error("Error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Jaringan",
+        text: "Terjadi kesalahan jaringan: " + error.message,
+        confirmButtonText: "OK",
+      });
+    });
+}
+
+// === UBAH JADWAL MEMBER ===
+function showUbahJadwalMember(member_id, nama_lapangan, sisa_kuota, lapangan_id) {
+  console.log("Ubah jadwal member:", { member_id, sisa_kuota });
+
+  // Loading pertama
+  Swal.fire({
+    title: "Memuat...",
+    text: "Sedang memuat data sesi member",
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading(),
+  });
+
+  // Load member sessions
+  fetch(`riwayat.php?action=get_member_sessions&member_id=${member_id}`)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      Swal.close();
+
+      if (data.status !== "success" || !data.member_sessions || data.member_sessions.length === 0) {
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: data.message || "Tidak ada sesi member yang dapat diubah",
+          confirmButtonText: "OK",
+        });
         return;
       }
 
-      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-      let text = "";
-      if (days > 0) text += `${days} hari `;
-      if (hours > 0 || days > 0) text += `${hours} jam `;
-      if (minutes > 0 || hours > 0 || days > 0) text += `${minutes} menit `;
-      text += `${seconds} detik lagi`;
-
-      // Update teks di dalam span timer
-      const timerSpan = timer.querySelector('span[id^="timer-"]');
-      if (timerSpan) {
-        timerSpan.textContent = text;
-      } else {
-        timer.innerHTML = `<span class="time-left">Tersisa <span id="timer-${timer.closest(".card")?.dataset.booking || "x"}">${text}</span></span>`;
-      }
-
-      // Ganti warna jadi merah kalau < 1 jam
-      if (distance < 60 * 60 * 1000) {
-        timer.style.color = "#e74c3c";
-        timer.style.fontWeight = "bold";
-      }
-    };
-
-    updateTimer();
-    setInterval(updateTimer, 1000);
-  });
-});
-
-// === 4. KODE MODAL DETAIL FUNCTIONS ===
-function showDetail(id, lapangan, tanggal, jam, total, status, alasanPenolakan = "", uniqueId = "") {
-  console.log("showDetail called with status:", status);
-
-  const modal = document.getElementById("detailModal");
-  const content = document.getElementById("detailContent");
-  const qrContainer = document.getElementById("qrcode");
-
-  if (!modal || !content) {
-    console.error("Modal element tidak ditemukan");
-    return;
-  }
-
-  qrContainer.innerHTML = "";
-
-  const date = new Date(tanggal);
-  const formattedDate = date.toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  let detailHTML = `
-        <div class="detail-info">
-            <p><strong>ID Booking:</strong> ${uniqueId || "#" + id}</p>
-            <p><strong>Lapangan:</strong> ${lapangan}</p>
-            <p><strong>Tanggal Booking:</strong> ${formattedDate}</p>
-            <p><strong>Jam:</strong> ${jam || "-"}</p>
-            <p><strong>Total:</strong> Rp ${parseInt(total).toLocaleString("id-ID")}</p>
-            <p><strong>Status:</strong> <span class="status ${getStatusClass(status)}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></p>
-    `;
-
-  // Keterangan berdasarkan status
-  if (status === "ditolak" && alasanPenolakan) {
-    detailHTML += `<p><strong>Alasan Penolakan:</strong> ${alasanPenolakan}</p>`;
-    detailHTML += `<p><strong>Keterangan:</strong> Booking ditolak. Silakan buat booking baru.</p>`;
-  } else if (status === "menunggu") {
-    detailHTML += `<p><strong>Keterangan:</strong> Menunggu verifikasi admin. Anda masih bisa mengubah jadwal sampai H-5 jam dari waktu booking.</p>`;
-  } else if (status === "disetujui") {
-    detailHTML += `<p><strong>Keterangan:</strong> Booking disetujui. Silakan tunjukkan QR code saat di tempat.</p>`;
-  } else if (status === "dibatalkan") {
-    detailHTML += `<p><strong>Keterangan:</strong> Booking dibatalkan. Tidak dapat mengubah jadwal.</p>`;
-  }
-
-  detailHTML += `</div>`;
-  content.innerHTML = detailHTML;
-
-  // Generate QR Code hanya untuk status disetujui
-  if (status === "disetujui") {
-    if (typeof QRCode !== "undefined") {
-      try {
-        new QRCode(qrContainer, {
-          text: `BOOKING-${id}-${lapangan}`,
-          width: 150,
-          height: 150,
-          colorDark: "#1e3a8a",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.H,
-        });
-      } catch (error) {
-        console.error("QR Code generation error:", error);
-        qrContainer.innerHTML = "<p>Error generating QR code</p>";
-      }
-    } else {
-      qrContainer.innerHTML = "<p>QR Code functionality not available</p>";
-    }
-  }
-
-  // Show modal
-  modal.style.display = "flex";
-  console.log("Detail modal shown for status:", status);
+      showMemberSessionSelection(member_id, nama_lapangan, sisa_kuota, lapangan_id, data.member_sessions);
+    })
+    .catch((error) => {
+      Swal.close();
+      console.error("Error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal memuat data member: " + error.message,
+        confirmButtonText: "OK",
+      });
+    });
 }
 
-function showMemberDetail(id, lapangan, durasi, mulai, berakhir, total, status, jadwal, ubahCount, maxUbah, uniqueId = "") {
-  console.log("showMemberDetail called with:", { id, lapangan, durasi, mulai, berakhir, total, status, ubahCount, maxUbah });
+// === PILIH SESI MEMBER ===
+function showMemberSessionSelection(member_id, nama_lapangan, sisa_kuota, lapangan_id, sessions) {
+  const sessionsHTML = sessions
+    .map((session) => {
+      const canEdit = validateH12Jam(session.tanggal_booking, session.jam_mulai);
+      const dateFormatted = formatTanggal(session.tanggal_booking);
+      const isActive = session.status_jadwal === "aktif";
 
-  const modal = document.getElementById("detailModal");
-  const content = document.getElementById("detailContent");
-  const qrContainer = document.getElementById("qrcode");
+      return `
+        <div class="form-check mb-2">
+          <input class="form-check-input session-checkbox" type="checkbox" 
+                 value="${session.id_member_jadwal}" 
+                 id="session-${session.id_member_jadwal}"
+                 ${canEdit && isActive ? "" : "disabled"}>
+          <label class="form-check-label ${canEdit && isActive ? "" : "text-muted"}" 
+                 for="session-${session.id_member_jadwal}">
+            ${dateFormatted} - ${session.jam_mulai} sampai ${session.jam_selesai}
+            ${!isActive ? '<small class="text-danger ms-2">(Sesi nonaktif)</small>' : !canEdit ? '<small class="text-danger ms-2">(Tidak dapat diubah - kurang dari 12 jam)</small>' : ""}
+          </label>
+        </div>
+      `;
+    })
+    .join("");
 
-  if (!modal || !content) {
-    console.error("Modal elements not found");
+  Swal.fire({
+    title: "Ubah Jadwal Member",
+    html: `
+      <div class="text-start">
+        <div class="member-info mb-3 p-3 bg-light rounded">
+          <h6>Detail Membership:</h6>
+          <p class="mb-1"><strong>Lapangan:</strong> ${nama_lapangan}</p>
+          <p class="mb-0"><strong>Sisa Kuota Ubah:</strong> ${sisa_kuota} kali</p>
+        </div>
+        
+        <p class="fw-bold">Pilih sesi yang ingin diubah:</p>
+        <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+          ${sessionsHTML}
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-md-6">
+            <label class="form-label">Tanggal Baru:</label>
+            <input type="date" id="tgl_baru_member" class="form-control" 
+                   min="${new Date().toISOString().split("T")[0]}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Jam Baru:</label>
+            <select id="jam_baru_member" class="form-control" disabled>
+              <option value="">Pilih tanggal dulu</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="alert alert-info mt-3">
+          <small>
+            <i class="fas fa-info-circle"></i>
+            <strong>Info Member:</strong> 
+            • Bisa mengubah multiple sesi sekaligus ke tanggal & jam yang sama
+            • Kuota ubah: ${sisa_kuota} dari 3 kali
+            • Batas waktu: H-12 jam sebelum sesi
+          </small>
+        </div>
+      </div>
+    `,
+    width: "800px",
+    showCancelButton: true,
+    confirmButtonText: "Lanjutkan",
+    cancelButtonText: "Batal",
+    didOpen: () => {
+      const tglInput = document.getElementById("tgl_baru_member");
+      const jamSelect = document.getElementById("jam_baru_member");
+
+      tglInput.value = new Date().toISOString().split("T")[0];
+
+      tglInput.addEventListener("change", function () {
+        if (this.value) {
+          loadAvailableSessions(lapangan_id, this.value, 0, jamSelect);
+        }
+      });
+
+      loadAvailableSessions(lapangan_id, tglInput.value, 0, jamSelect);
+    },
+    preConfirm: () => {
+      const selectedSessions = Array.from(document.querySelectorAll(".session-checkbox:checked")).map((cb) => cb.value);
+
+      const tgl = document.getElementById("tgl_baru_member").value;
+      const jam = document.getElementById("jam_baru_member").value;
+
+      if (selectedSessions.length === 0) {
+        Swal.showValidationMessage("Pilih minimal satu sesi member");
+        return false;
+      }
+      if (!tgl) {
+        Swal.showValidationMessage("Pilih tanggal baru");
+        return false;
+      }
+      if (!jam) {
+        Swal.showValidationMessage("Pilih jam baru");
+        return false;
+      }
+
+      return {
+        member_id: member_id,
+        lapangan_id: lapangan_id,
+        member_session_ids: selectedSessions,
+        new_date: tgl,
+        selected_session: jam,
+      };
+    },
+  }).then((result) => {
+    if (!result.isConfirmed || !result.value) return;
+
+    processUbahJadwalMember(result.value);
+  });
+}
+
+// === PROSES UBAH JADWAL MEMBER ===
+function processUbahJadwalMember(data) {
+  const { member_id, lapangan_id, member_session_ids, new_date, selected_session } = data;
+
+  Swal.fire({
+    title: "Memproses...",
+    text: `Sedang mengubah ${member_session_ids.length} sesi member`,
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading(),
+  });
+
+  const formData = new URLSearchParams({
+    action: "ubah_jadwal_member",
+    member_id: member_id,
+    lapangan_id: lapangan_id,
+    new_date: new_date,
+    selected_session: selected_session,
+  });
+
+  member_session_ids.forEach((id, index) => {
+    formData.append(`member_session_ids[${index}]`, id);
+  });
+
+  fetch("riwayat.php", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: formData,
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      Swal.close();
+
+      if (data.status === "success") {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: data.message,
+          confirmButtonText: "OK",
+        }).then(() => {
+          window.location.reload();
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: data.message,
+          confirmButtonText: "OK",
+        });
+      }
+    })
+    .catch((error) => {
+      Swal.close();
+      console.error("Error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Terjadi kesalahan jaringan: " + error.message,
+        confirmButtonText: "OK",
+      });
+    });
+}
+
+// === LOAD AVAILABLE SESSIONS - FIXED ===
+// === LOAD AVAILABLE SESSIONS - COMPLETELY FIXED ===
+function loadAvailableSessions(lapangan_id, tanggal, booking_id, selectElement) {
+  console.log("Loading sessions for:", { lapangan_id, tanggal, booking_id });
+
+  if (!tanggal || !lapangan_id) {
+    selectElement.innerHTML = '<option value="">Pilih tanggal terlebih dahulu</option>';
+    selectElement.disabled = true;
     return;
   }
 
-  qrContainer.innerHTML = "";
+  selectElement.innerHTML = '<option value="">Memuat jam tersedia...</option>';
+  selectElement.disabled = true;
 
-  // Format dates
-  const startDate = new Date(mulai);
-  const endDate = new Date(berakhir);
-  const startFormatted = startDate.toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const endFormatted = endDate.toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // Validasi tanggal
+  const today = new Date();
+  const selectedDate = new Date(tanggal);
+  const maxDate = new Date();
+  maxDate.setDate(today.getDate() + 7);
+
+  // Reset ke hari ini jika tanggal invalid
+  if (selectedDate < today) {
+    selectedDate.setDate(today.getDate());
+  }
+
+  if (selectedDate > maxDate) {
+    selectElement.innerHTML = '<option value="">Tanggal maksimal 7 hari dari sekarang</option>';
+    selectElement.disabled = true;
+    return;
+  }
+
+  // Format tanggal untuk API
+  const formattedDate = selectedDate.toISOString().split("T")[0];
+
+  const url = `riwayat.php?action=get_available_sessions&lapangan_id=${lapangan_id}&selected_date=${formattedDate}&booking_id=${booking_id || 0}&t=${Date.now()}`;
+
+  console.log("Fetching URL:", url);
+
+  fetch(url)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      console.log("Sessions API Response:", data);
+
+      if (data.status === "success" && data.available_sessions && data.available_sessions.length > 0) {
+        selectElement.innerHTML =
+          '<option value="">Pilih jam</option>' +
+          data.available_sessions
+            .map(
+              (session) =>
+                `<option value="${session.id_jadwal_waktu}">
+                  ${session.jam_mulai} - ${session.jam_selesai} 
+                  ${session.harga ? `(Rp ${Number(session.harga).toLocaleString("id-ID")})` : ""}
+                </option>`
+            )
+            .join("");
+        selectElement.disabled = false;
+        console.log("Sessions loaded successfully:", data.available_sessions.length + " sessions");
+      } else {
+        const errorMsg = data.message || "Tidak ada jam tersedia untuk tanggal ini";
+        selectElement.innerHTML = `<option value="">${errorMsg}</option>`;
+        selectElement.disabled = true;
+        console.warn("No sessions available:", data.message);
+      }
+    })
+    .catch((error) => {
+      console.error("Error loading sessions:", error);
+      selectElement.innerHTML = '<option value="">Gagal memuat jam. Coba refresh halaman.</option>';
+      selectElement.disabled = true;
+    });
+}
+
+// === LIHAT DETAIL FUNCTIONS ===
+function showDetail(id_booking, lapangan, tanggal, jam, total, status, alasanPenolakan = "", uniqueId = "") {
+  const formattedDate = formatTanggal(tanggal);
+  const statusClass = getStatusClass(status);
 
   let detailHTML = `
-        <div class="detail-info">
-            <p><strong>ID Member:</strong> ${uniqueId || "#" + id}</p>
-            <p><strong>Lapangan:</strong> ${lapangan}</p>
-            <p><strong>Durasi:</strong> ${durasi} bulan</p>
-            <p><strong>Periode:</strong> ${startFormatted} - ${endFormatted}</p>
-            <p><strong>Total Bayar:</strong> Rp ${parseInt(total).toLocaleString("id-ID")}</p>
-            <p><strong>Status:</strong> <span class="status ${getStatusClass(status)}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></p>
-            <p><strong>Sisa Ubah Jadwal:</strong> ${maxUbah - ubahCount} dari ${maxUbah} kali</p>
-    `;
+    <div class="text-start">
+      <div class="detail-section">
+        <p><strong>ID Booking:</strong> ${uniqueId || "#" + id_booking}</p>
+        <p><strong>Lapangan:</strong> ${lapangan}</p>
+        <p><strong>Tanggal Booking:</strong> ${formattedDate}</p>
+        <p><strong>Jam:</strong> ${jam || "-"}</p>
+        <p><strong>Total:</strong> Rp ${parseInt(total).toLocaleString("id-ID")}</p>
+        <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${status.toUpperCase()}</span></p>
+      </div>
+  `;
 
-  if (status === "pending") {
-    detailHTML += `<p><strong>Keterangan:</strong> Mohon tunggu verifikasi admin. Cek secara berkala.</p>`;
-  } else if (status === "aktif") {
-    detailHTML += `<p><strong>Keterangan:</strong> Membership aktif. Silakan gunakan QR code untuk check-in.</p>`;
+  if (status === "ditolak" && alasanPenolakan) {
+    detailHTML += `
+      <div class="alert alert-warning mt-3">
+        <strong>Alasan Penolakan:</strong> ${alasanPenolakan}
+      </div>
+    `;
+  }
+
+  if (status === "disetujui") {
+    detailHTML += `
+      <div class="alert alert-success mt-3">
+        <i class="fas fa-qrcode"></i> Tunjukkan QR code di tempat untuk check-in
+      </div>
+      <div id="qrcode-container" class="text-center mt-3"></div>
+    `;
+  }
+
+  if (status === "Pembatalan Disetujui") {
+    detailHTML += `
+      <div class="alert alert-info mt-3">
+        <i class="fas fa-money-bill-wave"></i> Dana sudah dikembalikan
+        <div class="mt-2">
+          <small>Bukti transfer refund telah diupload oleh admin</small>
+        </div>
+      </div>
+    `;
   }
 
   detailHTML += `</div>`;
 
-  // Add schedule if available
+  Swal.fire({
+    title: "Detail Booking",
+    html: detailHTML,
+    width: 600,
+    confirmButtonText: "Tutup",
+    didOpen: () => {
+      // Generate QR Code untuk booking yang disetujui
+      if (status === "disetujui") {
+        const qrContainer = document.getElementById("qrcode-container");
+        if (qrContainer) {
+          new QRCode(qrContainer, {
+            text: `BOOKING-${uniqueId || id_booking}`,
+            width: 128,
+            height: 128,
+          });
+        }
+      }
+    },
+  });
+}
+
+function showMemberDetail(id_member, lapangan, durasi, mulai, berakhir, total, status, jadwal, ubahCount, maxUbah, uniqueId = "") {
+  const startFormatted = formatTanggal(mulai);
+  const endFormatted = formatTanggal(berakhir);
+  const statusClass = getStatusClass(status);
+
+  let detailHTML = `
+    <div class="text-start">
+      <div class="detail-section">
+        <p><strong>ID Member:</strong> ${uniqueId || "#" + id_member}</p>
+        <p><strong>Lapangan:</strong> ${lapangan}</p>
+        <p><strong>Durasi:</strong> ${durasi} bulan</p>
+        <p><strong>Periode:</strong> ${startFormatted} - ${endFormatted}</p>
+        <p><strong>Total Bayar:</strong> Rp ${parseInt(total).toLocaleString("id-ID")}</p>
+        <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${status.toUpperCase()}</span></p>
+        <p><strong>Sisa Ubah Jadwal:</strong> ${maxUbah - ubahCount} dari ${maxUbah} kali</p>
+      </div>
+  `;
+
   if (jadwal && jadwal !== "" && jadwal !== "null") {
-    detailHTML += `<div class="schedule-info">`;
-    detailHTML += `<p><strong>Jadwal Terjadwal:</strong></p>`;
+    detailHTML += `
+      <div class="schedule-section mt-3">
+        <strong>Jadwal Terjadwal:</strong>
+        <div style="max-height: 150px; overflow-y: auto; margin-top: 10px;">
+    `;
+
     const jadwalList = jadwal.split("; ");
-    detailHTML += '<ul style="margin-left: 20px;">';
     jadwalList.forEach((j) => {
       if (j.trim() !== "") {
-        detailHTML += `<li>${j}</li>`;
+        detailHTML += `<div class="schedule-item">📅 ${j}</div>`;
       }
     });
-    detailHTML += "</ul>";
-    detailHTML += `</div>`;
+
+    detailHTML += `</div></div>`;
   }
 
-  content.innerHTML = detailHTML;
+  detailHTML += `</div>`;
 
-  // Generate QR Code for active members
-  if (status === "aktif") {
-    if (typeof QRCode !== "undefined") {
-      new QRCode(qrContainer, {
-        text: `MEMBER-${id}-${lapangan}`,
-        width: 150,
-        height: 150,
-        colorDark: "#1e3a8a",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H,
-      });
-    }
-  }
-
-  modal.style.display = "flex";
-  console.log("Member detail modal shown");
+  Swal.fire({
+    title: "Detail Membership",
+    html: detailHTML,
+    width: 600,
+    confirmButtonText: "Tutup",
+  });
 }
 
-// === 5. KODE HELPER FUNCTIONS ===
+// === HELPER FUNCTIONS ===
+function formatTanggal(tanggal) {
+  const date = new Date(tanggal);
+  return date.toLocaleDateString("id-ID", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function getMaxDate(days = 7) {
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + days);
+  return maxDate.toISOString().split("T")[0];
+}
+
+function getJamTextFromSelect(optionValue) {
+  const select = document.getElementById("new_jam");
+  const selectedOption = select?.options[select.selectedIndex];
+  return selectedOption ? selectedOption.text.split(" (")[0] : "";
+}
+
+function validateH12Jam(tanggal, jam) {
+  if (!tanggal || !jam) return false;
+
+  try {
+    const bookingTime = new Date(tanggal + "T" + jam + ":00+07:00"); // Timezone Jakarta
+    const now = new Date();
+    const deadline = new Date(bookingTime);
+    deadline.setHours(deadline.getHours() - 12);
+
+    return now <= deadline;
+  } catch (error) {
+    console.error("Error validating H12:", error);
+    return false;
+  }
+}
+
 function getStatusClass(status) {
-  if (status === "menunggu" || status === "pending") return "menunggu";
-  if (status === "disetujui" || status === "aktif") return "disetujui";
-  if (status === "ditolak" || status === "nonaktif") return "ditolak";
-  return "";
+  const statusMap = {
+    menunggu: "menunggu",
+    pending: "menunggu",
+    disetujui: "disetujui",
+    aktif: "disetujui",
+    ditolak: "ditolak",
+    nonaktif: "ditolak",
+    dibatalkan: "ditolak",
+    "menunggu pengajuan": "orange",
+    "pembatalan ditolak": "ditolak",
+    "pembatalan disetujui": "primary",
+  };
+  return statusMap[status.toLowerCase()] || "menunggu";
 }
 
-// === 6. KODE TOMBOL DISABLED REASON ===
+function showDisabledMessage(type) {
+  const messages = {
+    ubah: "Maaf, waktu ubah jadwal telah habis (H-5 jam dari waktu pemesanan). Anda sudah tidak dapat mengubah jadwal.",
+    batal: "Maaf, waktu ajukan pembatalan telah habis (H-12 jam dari waktu pemesanan). Anda sudah tidak dapat membatalkan booking.",
+  };
+
+  Swal.fire({
+    icon: "warning",
+    title: "Tidak Dapat Dilakukan",
+    text: messages[type] || "Tombol ini tidak dapat digunakan",
+    confirmButtonText: "Mengerti",
+  });
+}
+
 function showDisabledReason(reason) {
   const messages = {
-    already_used: "Anda sudah menggunakan kesempatan ubah jadwal (maksimal 1x)",
+    already_used: "Anda sudah menggunakan kesempatan ubah jadwal (maksimal 1x per sesi)",
     time_expired: "Waktu ubah jadwal sudah habis (H-5 jam dari booking)",
     member_not_active: "Membership tidak aktif. Tidak dapat mengubah jadwal",
     quota_exceeded: "Kuota ubah jadwal member sudah habis (maksimal 3x)",
@@ -291,472 +974,50 @@ function showDisabledReason(reason) {
   };
 
   const message = messages[reason] || "Tidak dapat mengubah jadwal";
-  const type = reason.includes("expired") || reason.includes("exceeded") || reason.includes("rejected") || reason.includes("cancelled") ? "error" : "warning";
 
-  showNotification(message, type);
-}
-
-// === 7. KODE UBAH JADWAL REGULER ===
-function showUbahJadwalReguler(bookingId, currentDate, currentTime, currentLapangan, lapanganId) {
-  console.log("Membuka modal ubah jadwal untuk booking:", bookingId);
-
-  // Validasi H-5 jam
-  const now = new Date();
-  const jamMulai = currentTime.split("-")[0].trim();
-  const bookingDateTime = new Date(currentDate + "T" + jamMulai + ":00");
-  const deadline = new Date(bookingDateTime.getTime() - 5 * 60 * 60 * 1000);
-
-  if (now > deadline) {
-    showNotification("Waktu ubah jadwal sudah habis (H-5 jam dari booking)", "error");
-    return;
-  }
-
-  const card = document.querySelector(`[data-booking="${bookingId}"]`);
-  const ubahBtn = card?.querySelector(".btn-ubah");
-  if (ubahBtn?.classList.contains("disabled")) {
-    showNotification("Tidak dapat mengubah jadwal saat ini", "error");
-    return;
-  }
-
-  // INI YANG BENAR: panggil loadUbahJadwalForm, bukan display langsung!
-  loadUbahJadwalForm(bookingId, currentDate, currentTime, currentLapangan, lapanganId);
-}
-
-function loadUbahJadwalForm(bookingId, currentDate, currentTime, currentLapangan, lapanganId) {
-  const modalContent = document.getElementById("ubahJadwalContent");
-
-  // Show loading
-  modalContent.innerHTML = '<div class="loading">Memuat form ubah jadwal...</div>';
-
-  // Fetch available sessions
-  fetch(`riwayat.php?action=get_available_sessions&lapangan_id=${lapanganId}&current_date=${currentDate}&booking_id=${bookingId}`)
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        displayUbahJadwalForm(bookingId, currentDate, currentTime, currentLapangan, data.available_sessions, lapanganId);
-      } else {
-        modalContent.innerHTML = `<div class="error-state">${data.message}</div>`;
-      }
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      modalContent.innerHTML = '<div class="error-state">Gagal memuat jadwal available</div>';
-    });
-
-  // Show modal
-  document.getElementById("ubahJadwalModal").style.display = "flex";
-}
-
-function displayUbahJadwalForm(bookingId, currentDate, currentTime, currentLapangan, availableSessions, lapanganId) {
-  const modalContent = document.getElementById("ubahJadwalContent");
-
-  const currentDateObj = new Date(currentDate);
-  const formattedDate = currentDateObj.toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+  Swal.fire({
+    icon: "warning",
+    title: "Tidak Dapat Diubah",
+    text: message,
+    confirmButtonText: "Mengerti",
   });
-
-  let formHTML = `
-        <form id="ubahJadwalForm">
-            <input type="hidden" name="action" value="ubah_jadwal_reguler">
-            <input type="hidden" name="booking_id" value="${bookingId}">
-            
-            <div class="detail-pesanan">
-                <h4>Detail Booking Saat Ini</h4>
-                <p><strong>ID Booking:</strong> #${bookingId}</p>
-                <p><strong>Lapangan:</strong> ${currentLapangan}</p>
-                <p><strong>Tanggal:</strong> ${formattedDate}</p>
-                <p><strong>Jam:</strong> ${currentTime}</p>
-                <p><strong>Status:</strong> Dapat Diubah</p>
-            </div>
-            
-            <div class="form-group">
-                <label for="newDate">Pilih Tanggal Baru:</label>
-                <input type="date" name="new_date" id="newDate" class="select-input" required 
-                       min="${new Date().toISOString().split("T")[0]}" 
-                       max="${getMaxDate()}">
-            </div>
-            
-            <div class="form-group">
-                <label>Pilih Jam Baru:</label>
-                <div id="availableSessionsList" class="session-list">
-                    ${displayAvailableSessions(availableSessions)}
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeUbahJadwalModal()">Batal</button>
-                <button type="submit" class="btn-primary" id="submitUbahJadwal">Simpan Perubahan</button>
-            </div>
-        </form>
-    `;
-
-  modalContent.innerHTML = formHTML;
-
-  // Add event listener for form submission
-  document.getElementById("ubahJadwalForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    submitUbahJadwalReguler(this);
-  });
-
-  // FIX: Pastikan lapanganId tersedia di sini!
-  document.getElementById("newDate").addEventListener("change", function () {
-    loadAvailableSessionsForDate(bookingId, lapanganId, this.value);
+}
+// === DEBUG FUNCTION ===
+function debugSessions() {
+  console.log("=== DEBUG SESSIONS ===");
+  const cards = document.querySelectorAll(".card");
+  cards.forEach((card, index) => {
+    const sesi = card.dataset.sesi;
+    const lapangan = card.querySelector("h3").textContent;
+    console.log(`Card ${index + 1}:`, { sesi, lapangan });
   });
 }
 
-function displayAvailableSessions(sessions) {
-  if (!sessions || sessions.length === 0) {
-    return '<div class="empty-state">Tidak ada jadwal available untuk tanggal ini</div>';
-  }
-
-  let sessionsHTML = "";
-  sessions.forEach((session) => {
-    const date = new Date(session.tanggal);
-    const formattedDate = date.toLocaleDateString("id-ID", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    sessionsHTML += `
-            <div class="session-item">
-                <input type="radio" name="selected_session" value="${session.id_jadwal_waktu}" 
-                       data-tanggal="${session.tanggal}" data-jam="${session.jam_mulai}-${session.jam_selesai}"
-                       id="session-${session.id_jadwal_waktu}" required>
-                <div class="session-info">
-                    <div class="session-date">${formattedDate}</div>
-                    <div class="session-time">${session.jam_mulai} - ${session.jam_selesai}</div>
-                    <div class="session-price">Rp ${parseInt(session.harga).toLocaleString("id-ID")}</div>
-                </div>
-            </div>
-        `;
-  });
-
-  return sessionsHTML;
-}
-
-function loadAvailableSessionsForDate(bookingId, lapanganId, selectedDate) {
-  const sessionsList = document.getElementById("availableSessionsList");
-  sessionsList.innerHTML = '<div class="loading">Memuat jadwal available...</div>';
-
-  // TAMBAH &booking_id= DI SINI !!!
-  fetch(`riwayat.php?action=get_available_sessions&lapangan_id=${lapanganId}&selected_date=${selectedDate}&booking_id=${bookingId}`)
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        sessionsList.innerHTML = displayAvailableSessions(data.available_sessions);
-      } else {
-        sessionsList.innerHTML = `<div class="error-state">${data.message}</div>`;
-      }
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      sessionsList.innerHTML = '<div class="error-state">Gagal memuat jadwal</div>';
-    });
-}
-
-function getMaxDate() {
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 7); // Maksimal 7 hari ke depan
-  return maxDate.toISOString().split("T")[0];
-}
-
-function submitUbahJadwalReguler(form) {
-  const submitBtn = document.getElementById("submitUbahJadwal");
-  const originalText = submitBtn.innerHTML;
-
-  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
-  submitBtn.disabled = true;
-
-  const formData = new FormData(form);
-
-  fetch("riwayat.php", {
-    method: "POST",
-    body: formData,
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        showNotification("Jadwal berhasil diubah!", "success");
-        closeUbahJadwalModal();
-        // Refresh page setelah 2 detik
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        showNotification(data.message, "error");
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-      }
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      showNotification("Terjadi kesalahan saat mengubah jadwal", "error");
-      submitBtn.innerHTML = originalText;
-      submitBtn.disabled = false;
-    });
-}
-
-// === 8. KODE UBAH JADWAL MEMBER ===
-function showUbahJadwalMember(memberId, lapanganName, sisaKuota, lapanganId) {
-  console.log("Membuka modal ubah jadwal member:", memberId);
-
-  // Validasi sebelum buka modal
-  const card = document.querySelector(`[data-member="${memberId}"]`);
-  const ubahBtn = card?.querySelector(".btn-ubah");
-
-  if (ubahBtn?.classList.contains("disabled")) {
-    showNotification("Tidak dapat mengubah jadwal member saat ini", "error");
-    return;
-  }
-
-  // Load form ubah jadwal member
-  loadUbahJadwalMemberForm(memberId, lapanganName, sisaKuota, lapanganId);
-}
-
-function loadUbahJadwalMemberForm(memberId, lapanganName, sisaKuota, lapanganId) {
-  const modalContent = document.getElementById("ubahJadwalMemberContent");
-
-  // Show loading
-  modalContent.innerHTML = '<div class="loading">Memuat form ubah jadwal member...</div>';
-
-  // Fetch member sessions
-  fetch(`riwayat.php?action=get_member_sessions&member_id=${memberId}`)
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        displayUbahJadwalMemberForm(memberId, lapanganName, sisaKuota, lapanganId, data.member_sessions);
-      } else {
-        modalContent.innerHTML = `<div class="error-state">${data.message}</div>`;
-      }
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      modalContent.innerHTML = '<div class="error-state">Gagal memuat sesi member</div>';
-    });
-
-  // Show modal
-  document.getElementById("ubahJadwalMemberModal").style.display = "flex";
-}
-
-function displayUbahJadwalMemberForm(memberId, lapanganName, sisaKuota, lapanganId, memberSessions) {
-  const modalContent = document.getElementById("ubahJadwalMemberContent");
-
-  let formHTML = `
-        <form id="ubahJadwalMemberForm">
-            <input type="hidden" name="action" value="ubah_jadwal_member">
-            <input type="hidden" name="member_id" value="${memberId}">
-            <input type="hidden" name="lapangan_id" value="${lapanganId}">
-            
-            <div class="detail-pesanan">
-                <h4>Detail Membership</h4>
-                <p><strong>ID Member:</strong> #${memberId}</p>
-                <p><strong>Lapangan:</strong> ${lapanganName}</p>
-                <p><strong>Sisa Ubah Jadwal:</strong> ${sisaKuota} kali</p>
-                <p><strong>Status:</strong> Aktif</p>
-            </div>
-            
-            <div class="form-group">
-                <label>Pilih Sesi yang Ingin Diubah:</label>
-                <div id="memberSessionsList" class="session-list">
-                    ${displayMemberSessions(memberSessions)}
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="newDateMember">Pilih Tanggal Baru:</label>
-                <input type="date" name="new_date" id="newDateMember" class="select-input" required 
-                       min="${new Date().toISOString().split("T")[0]}" 
-                       max="${getMaxDate()}">
-            </div>
-            
-            <div class="form-group">
-                <label>Pilih Jam Baru:</label>
-                <div id="availableMemberSessions" class="session-list">
-                    <div class="empty-state">Pilih tanggal terlebih dahulu</div>
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeUbahJadwalMemberModal()">Batal</button>
-                <button type="submit" class="btn-primary" id="submitUbahJadwalMember">Simpan Perubahan</button>
-            </div>
-        </form>
-    `;
-
-  modalContent.innerHTML = formHTML;
-
-  // Add event listeners
-  document.getElementById("ubahJadwalMemberForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    submitUbahJadwalMember(this);
-  });
-
-  document.getElementById("newDateMember").addEventListener("change", function () {
-    loadAvailableSessionsForMember(lapanganId, this.value);
-  });
-}
-
-function displayMemberSessions(sessions) {
-  if (!sessions || sessions.length === 0) {
-    return '<div class="empty-state">Tidak ada sesi member yang dapat diubah</div>';
-  }
-
-  let sessionsHTML = "";
-  const now = new Date();
-
-  sessions.forEach((session) => {
-    const sessionDateTime = new Date(session.tanggal_booking + "T" + session.jam_mulai);
-    const timeDiff = (sessionDateTime - now) / (1000 * 60 * 60);
-    const isWithin5Hours = timeDiff <= 5;
-    const canEdit = !isWithin5Hours;
-
-    const date = new Date(session.tanggal_booking);
-    const formattedDate = date.toLocaleDateString("id-ID", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    sessionsHTML += `
-            <div class="session-item">
-                <input type="checkbox" name="member_session_ids[]" value="${session.id_member_jadwal}" 
-                       id="member-session-${session.id_member_jadwal}" 
-                       ${canEdit ? "" : "disabled"}>
-                <div class="session-info">
-                    <div class="session-date">${formattedDate}</div>
-                    <div class="session-time">${session.jam_mulai} - ${session.jam_selesai}</div>
-                    ${!canEdit ? '<div style="color: #e53e3e; font-size: 0.8rem;">Tidak dapat diubah (H-5 jam)</div>' : ""}
-                </div>
-            </div>
-        `;
-  });
-
-  return sessionsHTML;
-}
-
-function loadAvailableSessionsForMember(lapanganId, selectedDate) {
-  const sessionsList = document.getElementById("availableMemberSessions");
-  sessionsList.innerHTML = '<div class="loading">Memuat jadwal available...</div>';
-
-  fetch(`riwayat.php?action=get_available_sessions&lapangan_id=${lapanganId}&selected_date=${selectedDate}`)
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        sessionsList.innerHTML = displayAvailableSessions(data.available_sessions);
-      } else {
-        sessionsList.innerHTML = `<div class="error-state">${data.message}</div>`;
-      }
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      sessionsList.innerHTML = '<div class="error-state">Gagal memuat jadwal</div>';
-    });
-}
-
-function submitUbahJadwalMember(form) {
-  const submitBtn = document.getElementById("submitUbahJadwalMember");
-  const originalText = submitBtn.innerHTML;
-
-  // Validasi: minimal pilih 1 sesi
-  const checkedSessions = document.querySelectorAll('input[name="member_session_ids[]"]:checked');
-  if (checkedSessions.length === 0) {
-    showNotification("Pilih minimal satu sesi member untuk diubah", "error");
-    return;
-  }
-
-  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
-  submitBtn.disabled = true;
-
-  const formData = new FormData(form);
-
-  // Convert array to string for form data
-  const sessionIds = Array.from(checkedSessions).map((session) => session.value);
-  sessionIds.forEach((id) => {
-    formData.append("member_session_ids[]", id);
-  });
-
-  fetch("riwayat.php", {
-    method: "POST",
-    body: formData,
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        showNotification("Jadwal member berhasil diubah!", "success");
-        closeUbahJadwalMemberModal();
-        // Refresh page setelah 2 detik
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        showNotification(data.message, "error");
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-      }
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      showNotification("Terjadi kesalahan saat mengubah jadwal member", "error");
-      submitBtn.innerHTML = originalText;
-      submitBtn.disabled = false;
-    });
-}
-
-// === 9. KODE MODAL CLOSE FUNCTIONS ===
-function closeModal() {
-  const modal = document.getElementById("detailModal");
-  if (modal) {
-    modal.style.display = "none";
-  }
-}
-
-function closeUbahJadwalModal() {
-  const modal = document.getElementById("ubahJadwalModal");
-  if (modal) {
-    modal.style.display = "none";
-  }
-}
-
-function closeUbahJadwalMemberModal() {
-  const modal = document.getElementById("ubahJadwalMemberModal");
-  if (modal) {
-    modal.style.display = "none";
-  }
-}
-
-// === 10. KODE EVENT LISTENERS DAN ERROR HANDLING ===
+// Panggil saat page load
 document.addEventListener("DOMContentLoaded", function () {
-  // Close modal when clicking outside
-  window.addEventListener("click", function (event) {
-    const modals = ["detailModal", "ubahJadwalModal", "ubahJadwalMemberModal"];
-    modals.forEach((modalId) => {
-      const modal = document.getElementById(modalId);
-      if (event.target === modal) {
-        modal.style.display = "none";
-      }
-    });
-  });
+  console.log("Riwayat page loaded - Debug Version");
+  debugSessions();
 
-  // Close modal with ESC key
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") {
-      closeModal();
-      closeUbahJadwalModal();
-      closeUbahJadwalMemberModal();
-    }
-  });
-
-  console.log("All event listeners initialized");
+  initializeTabs();
+  initializeCountdownTimers();
+  initializeModalEvents();
+  initializeDisabledButtonHandlers();
 });
-
-// Global error handler
+// === GLOBAL ERROR HANDLER ===
 window.addEventListener("error", function (e) {
   console.error("Global error:", e.error);
   showNotification("Terjadi kesalahan pada halaman", "error");
 });
+
+// Prevent form resubmission
+if (window.history.replaceState) {
+  window.history.replaceState(null, null, window.location.href);
+}
+
+// Export functions for global access
+window.ubahRegulerSesi = ubahRegulerSesi;
+window.ajukanBatal = ajukanBatal;
+window.showDetail = showDetail;
+window.showMemberDetail = showMemberDetail;
+window.showUbahJadwalMember = showUbahJadwalMember;
+window.showDisabledReason = showDisabledReason;
