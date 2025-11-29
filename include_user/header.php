@@ -7,7 +7,6 @@ date_default_timezone_set('Asia/Jakarta');
 // === DEFINISI BASE URL ===
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
-// Sesuaikan folder root project Anda jika berbeda, kosongkan jika di hosting root
 $folder_project = ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1') ? '/BookingLapanganKel2' : ''; 
 $base_url = $protocol . "://" . $host . $folder_project;
 
@@ -29,7 +28,16 @@ if (isset($_SESSION['id_user'])) {
     }
 }
 
-// Fungsi Helper untuk Menandai Menu Aktif
+// === CEK STATUS MEMBER UNTUK HEADER ===
+$is_member_active = false;
+if (isset($_SESSION['id_user']) && isset($conn)) {
+    $uid_check = $_SESSION['id_user'];
+    $q_member_check = mysqli_query($conn, "SELECT 1 FROM member WHERE id_user = '$uid_check' AND status = 'aktif' AND tanggal_berakhir >= CURDATE() LIMIT 1");
+    if ($q_member_check && mysqli_num_rows($q_member_check) > 0) {
+        $is_member_active = true;
+    }
+}
+
 function isActive($page_name) {
     return (basename($_SERVER['PHP_SELF']) == $page_name) ? 'active' : '';
 }
@@ -97,7 +105,6 @@ function isActive($page_name) {
         .nav-link.active { color: #0b63d6 !important; font-weight: 700 !important; }
         html { scroll-behavior: smooth; }
         
-        /* Sidebar Styles */
         .sidebar {
           @apply fixed top-0 flex flex-col z-[2000] border-l border-solid;
           right: -420px; width: 380px; height: 100vh; background: #fff;
@@ -136,7 +143,7 @@ function isActive($page_name) {
             overflow: hidden;
         }
         #mobileNav.open {
-            max-height: 500px; /* Estimasi tinggi maksimal */
+            max-height: 500px;
             opacity: 1;
         }
 
@@ -181,13 +188,16 @@ function isActive($page_name) {
         <div class="max-w-7xl mx-auto px-4">
             <nav class="flex items-center justify-between h-20">
                 
-                <a href="<?= $base_url ?>/index.php" class="flex items-center gap-3">
-                    <div class="w-12 h-12 flex items-center justify-center transform transition-all duration-500 hover:scale-110">
+                <a href="<?= $base_url ?>/index.php" class="flex items-center gap-2 sm:gap-3 group">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center transform transition-all duration-500 group-hover:scale-110">
                         <img src="<?= $base_url ?>/assets/images/LogoRush.png" alt="Logo" class="w-full h-full object-contain rounded-xl shadow-sm">
                     </div>
-                    <div class="hidden sm:block">
-                        <div class="font-poppins font-semibold text-lg leading-tight">Rush Badminton Academy</div>
-                        <div class="text-xs text-slate-500 -mt-0.5">Booking Lapangan Online</div>
+                    <div class="flex flex-col justify-center">
+                        <div class="font-poppins font-bold text-slate-800 leading-tight">
+                            <span class="block sm:hidden text-sm sm:text-lg">Rush Badminton</span>
+                            <span class="hidden sm:block text-lg">Rush Badminton Academy</span>
+                        </div>
+                        <div class="text-xs text-slate-500 -mt-0.5 hidden sm:block">Booking Lapangan Online</div>
                     </div>
                 </a>
 
@@ -223,7 +233,12 @@ function isActive($page_name) {
                         class="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary transition-colors duration-300"
                         title="Lihat Dashboard">
                             <img src="<?= $foto_profil ?>" alt="Foto Profil" class="w-9 h-9 rounded-full object-cover border-2 border-primary-light">
-                            <span>Halo, <?= $tampil_username ?></span>
+                            <span class="flex items-center gap-1">
+                                Halo, <?= $tampil_username ?>
+                                <?php if($is_member_active): ?>
+                                    <i class="fa-solid fa-crown text-yellow-500 text-xs" title="Member VIP"></i>
+                                <?php endif; ?>
+                            </span>
                         </a>
                         
                         <a href="<?= $base_url ?>/auth/php/logout.php" id="btnLogout" class="text-sm text-gray-500 hover:text-red-600" title="Keluar">
@@ -263,38 +278,55 @@ function isActive($page_name) {
       </div>
     </div>
 
-    <div id="mobileNav" class="lg:hidden bg-white border-t border-slate-100 shadow-lg absolute w-full left-0 z-40">
-        <div class="px-4 py-4 flex flex-col gap-2">
-            <a href="<?= $base_url ?>/index.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('index.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
-                <i class="fa-solid fa-house mr-3 w-5 text-center"></i> Beranda
+    <div id="mobileNav" class="lg:hidden bg-white/95 backdrop-blur-xl border-t border-slate-100 shadow-2xl fixed top-20 left-0 w-full z-40 overflow-y-auto" style="max-height: calc(100vh - 80px);">
+        <div class="px-4 py-6 flex flex-col gap-3">
+            <a href="<?= $base_url ?>/index.php" class="py-3 px-4 rounded-xl hover:bg-primary-light transition-all font-medium text-slate-700 flex items-center group <?= isActive('index.php') ? 'bg-primary-light text-primary font-bold' : '' ?>">
+                <i class="fa-solid fa-house mr-4 w-6 text-center text-slate-400 group-hover:text-primary transition-colors"></i> Beranda
             </a>
-            <a href="<?= $base_url ?>/BookingPengguna/booking.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('booking.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
-                <i class="fa-regular fa-calendar-check mr-3 w-5 text-center"></i> Lapangan
+            <a href="<?= $base_url ?>/BookingPengguna/booking.php" class="py-3 px-4 rounded-xl hover:bg-primary-light transition-all font-medium text-slate-700 flex items-center group <?= isActive('booking.php') ? 'bg-primary-light text-primary font-bold' : '' ?>">
+                <i class="fa-regular fa-calendar-check mr-4 w-6 text-center text-slate-400 group-hover:text-primary transition-colors"></i> Lapangan
             </a>
-            <a href="<?= $base_url ?>/kontak.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('kontak.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
-                <i class="fa-regular fa-envelope mr-3 w-5 text-center"></i> Kontak
+            <a href="<?= $base_url ?>/kontak.php" class="py-3 px-4 rounded-xl hover:bg-primary-light transition-all font-medium text-slate-700 flex items-center group <?= isActive('kontak.php') ? 'bg-primary-light text-primary font-bold' : '' ?>">
+                <i class="fa-regular fa-envelope mr-4 w-6 text-center text-slate-400 group-hover:text-primary transition-colors"></i> Kontak
             </a>
-            <a href="<?= $base_url ?>/member/member.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('member.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
-                <i class="fa-solid fa-crown mr-3 w-5 text-center text-yellow-500"></i> Member
+            <a href="<?= $base_url ?>/member/member.php" class="py-3 px-4 rounded-xl hover:bg-primary-light transition-all font-medium text-slate-700 flex items-center group <?= isActive('member.php') ? 'bg-primary-light text-primary font-bold' : '' ?>">
+                <i class="fa-solid fa-crown mr-4 w-6 text-center text-yellow-500"></i> Member
             </a>
-            <a href="<?= $base_url ?>/riwayat/riwayat.php" class="py-3 px-4 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 <?= isActive('riwayat.php') ? 'bg-slate-50 text-primary font-bold' : '' ?>">
-                <i class="fa-solid fa-clock-rotate-left mr-3 w-5 text-center"></i> Riwayat
+            <a href="<?= $base_url ?>/riwayat/riwayat.php" class="py-3 px-4 rounded-xl hover:bg-primary-light transition-all font-medium text-slate-700 flex items-center group <?= isActive('riwayat.php') ? 'bg-primary-light text-primary font-bold' : '' ?>">
+                <i class="fa-solid fa-clock-rotate-left mr-4 w-6 text-center text-slate-400 group-hover:text-primary transition-colors"></i> Riwayat
             </a>
             
-            <div class="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-3">
+            <div class="mt-4 pt-6 border-t border-slate-100 flex flex-col gap-4">
                  <?php if (isset($_SESSION['id_user']) && $_SESSION['id_user'] != 1): ?>
-                    <div class="flex items-center gap-3 px-4 mb-2">
-                        <img src="<?= $foto_profil ?>" class="w-10 h-10 rounded-full border object-cover">
+                    <div class="flex items-center gap-4 px-2 bg-slate-50 p-4 rounded-xl">
+                        <?php 
+                        $foto_profil_mobile = $base_url . '/assets/images/default-avatar.png';
+                        if (isset($_SESSION['foto_profil']) && !empty($_SESSION['foto_profil'])) {
+                            $foto_profil_mobile = $base_url . '/uploads/profiles/' . htmlspecialchars($_SESSION['foto_profil']);
+                        }
+                        ?>
+                        <img src="<?= $foto_profil_mobile ?>" class="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover">
                         <div>
-                            <div class="text-sm font-bold text-slate-800"><?= $tampil_username ?></div>
+                            <div class="text-sm font-bold text-slate-800 flex items-center gap-1">
+                                <?= isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : 'Member' ?>
+                                <?php if($is_member_active): ?>
+                                    <i class="fa-solid fa-crown text-yellow-500 text-xs animate-bounce"></i>
+                                <?php endif; ?>
+                            </div>
                             <div class="text-xs text-slate-500">User Terdaftar</div>
                         </div>
                     </div>
-                    <a href="<?= $base_url ?>/DashPengguna.php" class="w-full text-center border border-primary text-primary py-2.5 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">Dashboard</a>
-                    <a href="<?= $base_url ?>/auth/php/logout.php" class="w-full text-center bg-red-50 text-red-600 py-2.5 rounded-xl font-bold hover:bg-red-100 transition-all">Keluar</a>
+                    <div class="grid grid-cols-2 gap-3">
+                        <a href="<?= $base_url ?>/DashPengguna.php" class="text-center border border-slate-200 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-user-gear"></i> Dashboard
+                        </a>
+                        <a href="<?= $base_url ?>/auth/php/logout.php" class="text-center bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-power-off"></i> Keluar
+                        </a>
+                    </div>
                  <?php else: ?>
-                    <a href="<?= $base_url ?>/auth/login.php" class="w-full text-center border border-primary text-primary py-2.5 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">Masuk</a>
-                    <a href="<?= $base_url ?>/auth/register.php" class="w-full text-center bg-primary text-white py-2.5 rounded-xl font-bold hover:bg-primaryDark transition-all shadow-lg shadow-blue-200">Daftar Sekarang</a>
+                    <a href="<?= $base_url ?>/auth/login.php" class="w-full text-center border-2 border-primary text-primary py-3 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">Masuk Akun</a>
+                    <a href="<?= $base_url ?>/auth/register.php" class="w-full text-center bg-gradient-to-r from-primary to-primaryDark text-white py-3 rounded-xl font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-blue-200">Daftar Member Baru</a>
                  <?php endif; ?>
             </div>
         </div>
@@ -329,12 +361,10 @@ function isActive($page_name) {
             }
 
             // 2. Sync Cart Count (Desktop <-> Mobile)
-            // Karena booking-script.js update 'cartCount', kita perlu sync 'mobileCartCount'
             const deskCart = document.getElementById('cartCount');
             const mobCart = document.getElementById('mobileCartCount');
             
             if(deskCart && mobCart) {
-                // Observer untuk memantau perubahan pada desktop cart (oleh AJAX)
                 const observer = new MutationObserver(() => {
                     mobCart.textContent = deskCart.textContent;
                 });

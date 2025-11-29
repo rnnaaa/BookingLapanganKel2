@@ -1,78 +1,167 @@
 /* member.css */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 
-/* Style Wizard Indicator */
-.step-item { 
-    display: flex; 
-    align-items: center; 
-    gap: 10px; 
-    opacity: 0.5; 
-    transition: all 0.3s; 
-    font-weight: 500;
-}
-.step-item.active { 
-    opacity: 1; 
-    font-weight: bold; 
-    color: #0b63d6; 
-}
-.step-circle { 
-    width: 32px; 
-    height: 32px; 
-    border-radius: 50%; 
-    background: #e2e8f0; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-weight: 600; 
-    color: #64748b; 
-}
-.step-item.active .step-circle { 
-    background: #0b63d6; 
-    color: white; 
-    box-shadow: 0 4px 10px rgba(11, 99, 214, 0.3); 
+:root {
+    --primary: #0f172a; /* Slate 900 */
+    --accent: #d97706;  /* Amber 600 - Diubah agar sesuai tema VIP */
+    --gold: #f59e0b;    /* Amber 500 */
 }
 
-/* Slot Card */
-.slot-grid { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
-    gap: 10px; 
-    margin-top: 15px; 
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: #f8fafc;
 }
-.slot-btn { 
-    padding: 10px; 
-    border: 1px solid #e2e8f0; 
-    border-radius: 8px; 
-    text-align: center; 
-    cursor: pointer; 
-    transition: all 0.2s; 
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Wizard Steps */
+.step-indicator-wrapper {
+    position: relative;
+    z-index: 10;
+}
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.6;
+    transition: all 0.4s ease;
+    cursor: default;
+    position: relative;
+    z-index: 2;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #64748b;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.step-item.active {
+    opacity: 1;
+}
+
+.step-item.active .step-circle {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 10px 15px -3px rgba(217, 119, 6, 0.4); /* Shadow Amber */
+}
+
+.step-line {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #e2e8f0;
+    z-index: 1;
+}
+
+.step-line-progress {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+/* Slot Grid Styling */
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.slot-btn {
+    padding: 12px 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     background: white;
-    font-size: 0.9rem;
-}
-.slot-btn:hover:not(.disabled) { 
-    border-color: #0b63d6; 
-    background: #eff6ff; 
-}
-.slot-btn.selected { 
-    background: #0b63d6; 
-    color: white; 
-    border-color: #0b63d6; 
-}
-.slot-btn.disabled { 
-    background: #f1f5f9; 
-    color: #cbd5e1; 
-    cursor: not-allowed; 
-    border-color: #f1f5f9; 
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Selected List */
-.selected-item { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    padding: 10px; 
-    background: #f8fafc; 
-    border-radius: 8px; 
-    margin-bottom: 8px; 
-    border: 1px solid #e2e8f0; 
-    font-size: 0.9rem;
+.slot-btn:hover:not(.disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.slot-btn.selected {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.4);
+}
+
+.slot-btn.disabled {
+    background: #f8fafc;
+    color: #cbd5e1;
+    cursor: not-allowed;
+    border-color: #f1f5f9;
+    box-shadow: none;
+    text-decoration: line-through;
+}
+
+/* Card Selection Hover */
+.package-card {
+    transition: all 0.3s ease;
+}
+.package-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Upload Box */
+.upload-box {
+    border: 2px dashed #cbd5e1;
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f8fafc;
+}
+.upload-box:hover {
+    border-color: var(--accent);
+    background: #fffbeb; /* Amber-50 tint */
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.step-content {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-pulse-red {
+    animation: pulse-red 1s infinite;
+}
+@keyframes pulse-red {
+    0%, 100% { background-color: #ef4444; }
+    50% { background-color: #b91c1c; }
 }
