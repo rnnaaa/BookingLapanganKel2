@@ -5,7 +5,7 @@ date_default_timezone_set('Asia/Jakarta');
 ini_set('display_errors', 0); error_reporting(E_ALL);
 require '../config/database.php';
 
-// --- AUTO-RELEASE LOGIC (Membersihkan hold yang kadaluarsa saat halaman dibuka siapapun) ---
+// --- AUTO-RELEASE LOGIC ---
 mysqli_query($conn, "UPDATE jadwal_detail jd JOIN booking b ON jd.id_booking = b.id_booking SET jd.status='tersedia', jd.id_booking=NULL WHERE b.status='hold' AND b.expired_at < NOW()");
 mysqli_query($conn, "DELETE FROM booking WHERE status='hold' AND expired_at < NOW()");
 
@@ -13,8 +13,8 @@ $is_logged_in = isset($_SESSION['id_user']);
 $user_id = $_SESSION['id_user'] ?? 0;
 $user_nama = $_SESSION['nama'] ?? ''; 
 
-// --- CEK ROLE USER TERBARU (Untuk Status di Kartu VIP) ---
-$user_role = 'user'; // Default
+// --- CEK ROLE USER TERBARU ---
+$user_role = 'user'; 
 if ($is_logged_in) {
     $q_role = mysqli_query($conn, "SELECT role FROM users WHERE id_user = '$user_id'");
     if ($row_role = mysqli_fetch_assoc($q_role)) {
@@ -33,21 +33,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($_POST['action'] === 'hold_slot') {
             $id_waktu = $_POST['id_waktu']; $tanggal  = $_POST['tanggal']; $id_lapangan = $_POST['id_lapangan'];
             
-            // Cek apakah sudah diambil orang lain
             $q_cek = "SELECT 1 FROM jadwal_detail jd JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian LEFT JOIN booking b ON jd.id_booking = b.id_booking WHERE jd.id_jadwal_waktu = '$id_waktu' AND jh.tanggal = '$tanggal' AND jh.id_lapangan = '$id_lapangan' AND (jd.status = 'dibooking' OR (jd.status = 'hold' AND b.expired_at > NOW() AND b.id_user != '$user_id')) LIMIT 1";
             if (mysqli_num_rows(mysqli_query($conn, $q_cek)) > 0) { echo json_encode(['status' => 'error', 'message' => 'Slot baru saja diambil orang lain!']); exit; }
 
             mysqli_begin_transaction($conn);
             $id_booking_hold = $_SESSION['member_hold_booking_id'] ?? 0;
-            $expiry = date('Y-m-d H:i:s', time() + (15 * 60)); // 15 Menit Hold
+            $expiry = date('Y-m-d H:i:s', time() + (15 * 60)); 
 
-            // Validasi ID Booking Hold Session
             if ($id_booking_hold > 0) {
                 $q_valid = mysqli_query($conn, "SELECT id_booking FROM booking WHERE id_booking = '$id_booking_hold' AND status = 'hold'");
                 if (mysqli_num_rows($q_valid) == 0) $id_booking_hold = 0;
             }
 
-            // Buat atau Update Booking Hold
             if ($id_booking_hold == 0) {
                 $stmt_b = $conn->prepare("INSERT INTO booking (id_user, id_lapangan, tipe_booking, tanggal, status, expired_at) VALUES (?, ?, 'member', ?, 'hold', ?)");
                 $stmt_b->bind_param("iiss", $user_id, $id_lapangan, $tanggal, $expiry); $stmt_b->execute(); $id_booking_hold = $conn->insert_id; $_SESSION['member_hold_booking_id'] = $id_booking_hold;
@@ -56,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt_up->bind_param("si", $expiry, $id_booking_hold); $stmt_up->execute();
             }
 
-            // Handle Jadwal Harian & Detail
             $q_h = mysqli_query($conn, "SELECT id_jadwal_harian FROM jadwal_harian WHERE id_lapangan='$id_lapangan' AND tanggal='$tanggal'");
             if (mysqli_num_rows($q_h) == 0) {
                 $dayEnglish = date('l', strtotime($tanggal)); $daysIndo = ['Sunday'=>'Minggu','Monday'=>'Senin','Tuesday'=>'Selasa','Wednesday'=>'Rabu','Thursday'=>'Kamis','Friday'=>'Jumat','Saturday'=>'Sabtu'];
@@ -78,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             mysqli_commit($conn); echo json_encode(['status' => 'success', 'message' => 'Slot di-hold']); exit;
         }
 
-        // 2. UNHOLD SLOT (Lepas satu slot)
+        // 2. UNHOLD SLOT
         if ($_POST['action'] === 'unhold_slot') {
             $id_waktu = $_POST['id_waktu']; $tanggal  = $_POST['tanggal']; $id_lapangan = $_POST['id_lapangan']; $user_id  = $_SESSION['id_user'];
             mysqli_begin_transaction($conn);
@@ -101,20 +97,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             unset($_SESSION['member_expired_at']); echo json_encode(['status' => 'success']); exit;
         }
 
-        // 4. START TIMER (Cek sisa waktu)
+        // 4. START TIMER
         if ($_POST['action'] === 'start_timer') {
             if (!isset($_SESSION['member_expired_at'])) { $_SESSION['member_expired_at'] = date('Y-m-d H:i:s', time() + (15 * 60)); }
             $remaining = strtotime($_SESSION['member_expired_at']) - time();
             echo json_encode(['status' => 'success', 'remaining' => $remaining]); exit;
         }
 
-        // 5. GET SLOTS
+        // 5. GET SLOTS (UPDATE JAM OPERASIONAL DISINI)
         if ($_POST['action'] === 'get_slots') {
-            $id_lapangan = $_POST['id_lapangan']; $tanggal = $_POST['tanggal'];
+            $id_lapangan = $_POST['id_lapangan']; 
+            $tanggal = $_POST['tanggal'];
             $slots = [];
-            $q_waktu = mysqli_query($conn, "SELECT * FROM jadwal_waktu WHERE id_lapangan = '$id_lapangan' ORDER BY jam_mulai ASC");
-            while ($w = mysqli_fetch_assoc($q_waktu)) {
+
+            // Tentukan Hari (1=Senin, 7=Minggu)
+            $dayOfWeek = date('N', strtotime($tanggal)); 
+            
+            // Aturan Jam Operasional
+            // Sabtu (6) & Minggu (7): 07:00 - 24:00
+            // Senin (1) - Jumat (5): 08:00 - 23:00
+            $jam_buka = '08:00:00';
+            $jam_tutup = '23:00:00';
+
+            if ($dayOfWeek >= 6) { // Weekend
+                $jam_buka = '07:00:00';
+                $jam_tutup = '24:00:00'; // atau '23:59:59' tergantung data di DB
+            }
+
+            // Query dengan Filter Jam
+            // Note: Kita asumsikan '24:00:00' di database mungkin tidak ada, jadi kita ambil semua yg >= jam buka
+            // Jika database menggunakan 00:00 untuk 24:00, perlu penyesuaian query.
+            // Di sini kita pakai jam_mulai sebagai patokan.
+            
+            $stmt_waktu = $conn->prepare("SELECT * FROM jadwal_waktu WHERE id_lapangan = ? AND jam_mulai >= ? AND jam_selesai <= ? ORDER BY jam_mulai ASC");
+            // Khusus untuk jam tutup 24:00, kita bisa handle '00:00' jika perlu, 
+            // tapi biasanya di sistem booking jam terakhir itu misal 23:00-00:00.
+            
+            // Jika jam tutup 24:00, kita set query agak longgar di batas atas jika data jam_selesai = '00:00:00'
+            if ($jam_tutup === '24:00:00') {
+                 $stmt_waktu = $conn->prepare("SELECT * FROM jadwal_waktu WHERE id_lapangan = ? AND jam_mulai >= ? ORDER BY jam_mulai ASC");
+                 $stmt_waktu->bind_param("is", $id_lapangan, $jam_buka);
+            } else {
+                 $stmt_waktu->bind_param("iss", $id_lapangan, $jam_buka, $jam_tutup);
+            }
+            
+            $stmt_waktu->execute();
+            $result_waktu = $stmt_waktu->get_result();
+
+            while ($w = $result_waktu->fetch_assoc()) {
                 $status = 'tersedia'; $is_my_hold = false;
+                
                 $q_cek = "SELECT jd.status, b.id_user, b.expired_at FROM jadwal_detail jd JOIN jadwal_harian jh ON jd.id_jadwal_harian = jh.id_jadwal_harian LEFT JOIN booking b ON jd.id_booking = b.id_booking WHERE jd.id_jadwal_waktu = '{$w['id_jadwal_waktu']}' AND jh.tanggal = '$tanggal' AND jh.id_lapangan = '$id_lapangan' LIMIT 1";
                 $res_cek = mysqli_query($conn, $q_cek);
                 if (mysqli_num_rows($res_cek) > 0) {

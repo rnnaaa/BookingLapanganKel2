@@ -10,50 +10,36 @@ document.addEventListener("DOMContentLoaded", function () {
   const USER_ID = window.USER_ID || 0;
 
   function isLoggedIn() {
+    // User dianggap login jika USER_ID ada, bukan 0, dan bukan 1 (User Demo)
     return !(USER_ID === 0 || USER_ID === 1);
   }
 
   // Elemen DOM
-  const cartIcon = document.getElementById("cartIcon");       // Desktop
-  const mobileCartIcon = document.getElementById("mobileCartIcon"); // Mobile (BARU)
+  const cartIcon = document.getElementById("cartIcon");       
+  const mobileCartIcon = document.getElementById("mobileCartIcon"); 
   const sidebar = document.getElementById("sidebarKeranjang");
   const closeSidebar = document.getElementById("closeSidebar");
   const keranjangList = document.getElementById("keranjangList");
   const cartCount = document.getElementById("cartCount");
-  const mobileCartCount = document.getElementById("mobileCartCount"); // Count Mobile
+  const mobileCartCount = document.getElementById("mobileCartCount"); 
   const checkoutBtn = document.getElementById("checkoutBtn");
 
-  // === ELEMEN MODAL LOGIN ===
-  const loginModal = document.getElementById("loginRequiredModal");
-  const btnLoginYes = document.getElementById("btnLoginYes");
-  const btnLoginNo = document.getElementById("btnLoginNo");
-
-  function showLoginModal() {
-    if (loginModal) {
-        loginModal.classList.remove("hidden");
-        // Animasi halus
-        setTimeout(() => {
-            loginModal.classList.remove("opacity-0", "pointer-events-none");
-            const panel = loginModal.querySelector('.modal-panel');
-            if(panel) panel.classList.add('scale-100');
-        }, 10);
-    }
-  }
-
-  function hideLoginModal() {
-    if (loginModal) {
-        loginModal.classList.add("opacity-0", "pointer-events-none");
-        const panel = loginModal.querySelector('.modal-panel');
-        if(panel) panel.classList.remove('scale-100');
-        setTimeout(() => loginModal.classList.add("hidden"), 300);
-    }
-  }
-
-  if (btnLoginYes) btnLoginYes.addEventListener("click", () => window.location.href = loginPage);
-  if (btnLoginNo) btnLoginNo.addEventListener("click", hideLoginModal);
-  if (loginModal) {
-    loginModal.addEventListener("click", (e) => {
-        if (e.target === loginModal) hideLoginModal();
+  // === FUNGSI MENAMPILKAN SWEETALERT LOGIN ===
+  function showLoginAlert() {
+    Swal.fire({
+      title: 'Login Diperlukan',
+      text: "Anda harus login terlebih dahulu untuk melanjutkan proses checkout.",
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonColor: '#0b63d6',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Login Sekarang',
+      cancelButtonText: 'Nanti Saja',
+      reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        window.location.href = loginPage;
+      }
     });
   }
 
@@ -111,7 +97,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   if (cartIcon) cartIcon.addEventListener("click", openSidebar);
-  if (mobileCartIcon) mobileCartIcon.addEventListener("click", openSidebar); // Listener untuk Mobile
+  if (mobileCartIcon) mobileCartIcon.addEventListener("click", openSidebar);
 
   if (closeSidebar) {
     closeSidebar.addEventListener("click", () => {
@@ -139,7 +125,6 @@ document.addEventListener("DOMContentLoaded", function () {
             if (res.status === "ok") {
               e.target.closest(".keranjang-item")?.remove();
               
-              // Update Count Desktop & Mobile
               const newCount = res.count ?? 0;
               if (cartCount) cartCount.textContent = newCount;
               if (mobileCartCount) mobileCartCount.textContent = newCount;
@@ -157,12 +142,14 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // --- 4. CHECKOUT ---
+  // --- 4. CHECKOUT (LOGIKA LOGIN SWEETALERT DI SINI) ---
   if (checkoutBtn) {
     checkoutBtn.addEventListener("click", () => {
+      
+      // CEK LOGIN DULU
       if (!isLoggedIn()) {
-        showLoginModal(); 
-        return;
+        showLoginAlert(); // Panggil fungsi SweetAlert
+        return;           // Hentikan proses checkout
       }
 
       const originalText = checkoutBtn.innerText;
@@ -173,6 +160,7 @@ document.addEventListener("DOMContentLoaded", function () {
       .then(r => r.json())
       .then(res => {
           if (res.status === 'ok') {
+              // Redirect ke halaman pembayaran/sukses
               window.location.href = projectRoot + "/BookingPengguna/" + res.redirect.replace('BookingPengguna/', '');
           } else {
               Swal.fire({
@@ -206,19 +194,12 @@ document.addEventListener("DOMContentLoaded", function () {
                   title: 'Konfirmasi Keluar',
                   text: "Apakah Anda yakin ingin keluar dari akun Anda?",
                   icon: 'warning',
-                  iconColor: '#ef4444',
                   showCancelButton: true,
+                  confirmButtonColor: '#ef4444',
+                  cancelButtonColor: '#64748b',
                   confirmButtonText: 'Ya, Keluar',
                   cancelButtonText: 'Batal',
-                  reverseButtons: true,
-                  customClass: {
-                      popup: 'rounded-2xl font-sans', 
-                      title: 'text-xl font-bold text-slate-800',
-                      htmlContainer: 'text-slate-500',
-                      confirmButton: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1',
-                      cancelButton: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold py-2.5 px-6 rounded-lg shadow-sm mx-1'
-                  },
-                  buttonsStyling: false 
+                  reverseButtons: true
               }).then((result) => {
                   if (result.isConfirmed) {
                       window.location.href = targetUrl;
@@ -228,15 +209,12 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
-  // --- 6. CLOSE SIDEBAR ON OUTSIDE CLICK (PERBAIKAN UTAMA DISINI) ---
+  // --- 6. CLOSE SIDEBAR ON OUTSIDE CLICK ---
   document.addEventListener("click", function (e) {
-    // Cek apakah sidebar sedang aktif
     if (sidebar && sidebar.classList.contains("active")) {
-        // Jika yang diklik BUKAN sidebar, BUKAN cart desktop, DAN BUKAN cart mobile
         if (!e.target.closest("#sidebarKeranjang") && 
             !e.target.closest("#cartIcon") && 
             !e.target.closest("#mobileCartIcon")) {
-            
             sidebar.classList.remove("active");
         }
     }
