@@ -17,9 +17,10 @@ session_start();
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: #f3f4f6; /* Warna background soft */
+        background-color: #f3f4f6;
         padding: 1rem;
         box-sizing: border-box;
+        font-family: 'Inter', sans-serif;
     }
     .auth-card {
         background: white;
@@ -27,16 +28,17 @@ session_start();
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         width: 100%;
-        max-width: 500px; /* Lebar maksimal card */
+        max-width: 500px;
         margin: 0 auto;
     }
     .form-control {
         width: 100%;
-        box-sizing: border-box; /* Agar padding tidak melebarkan input */
+        box-sizing: border-box;
         padding: 0.75rem;
         border: 1px solid #d1d5db;
         border-radius: 0.5rem;
         margin-top: 0.25rem;
+        font-size: 0.95rem;
     }
     .btn-primary {
         width: 100%;
@@ -53,32 +55,21 @@ session_start();
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
     }
-    /* Responsive Mobile */
     @media (max-width: 640px) {
-        .form-grid {
-            grid-template-columns: 1fr; /* Jadi 1 kolom di HP */
-            gap: 0.5rem;
-        }
-        .auth-card {
-            padding: 1.5rem; /* Padding lebih kecil di HP */
-        }
+        .form-grid { grid-template-columns: 1fr; gap: 0.5rem; }
+        .auth-card { padding: 1.5rem; }
     }
     .error-message {
-        color: #dc2626;
-        font-size: 0.875rem;
-        margin-top: 0.25rem;
-        display: none;
+        color: #dc2626; font-size: 0.875rem; margin-top: 0.25rem; display: none;
     }
-    .input-error {
-        border-color: #dc2626 !important;
-    }
-    button:disabled {
-        background-color: #9ca3af;
-        cursor: not-allowed;
-    }
-    .password-wrapper {
-        position: relative;
-    }
+    .input-error { border-color: #dc2626 !important; background-color: #fef2f2; }
+    .input-success { border-color: #22c55e !important; }
+    
+    button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+    
+    .password-wrapper { position: relative; }
+    .password-wrapper input { padding-right: 40px; }
+    
     .password-toggle {
         position: absolute;
         right: 10px;
@@ -87,17 +78,16 @@ session_start();
         background: none;
         border: none;
         cursor: pointer;
-        padding: 0;
+        padding: 5px;
         color: #6b7280;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
-    .auth-footer {
-        text-align: center;
-        margin-top: 1.5rem;
-        font-size: 0.9rem;
-    }
-    .form-group {
-        margin-bottom: 1rem;
-    }
+    .password-toggle:hover { color: #374151; }
+
+    .auth-footer { text-align: center; margin-top: 1.5rem; font-size: 0.9rem; }
+    .form-group { margin-bottom: 1rem; }
   </style>
 </head>
 <body>
@@ -156,12 +146,13 @@ session_start();
             <label for="password">Password</label>
             <div class="password-wrapper">
               <input id="password" name="password" type="password" class="form-control" required>
-              <button type="button" class="password-toggle" data-toggle-password>
+              
+              <button type="button" class="password-toggle" onclick="togglePassword(this)">
                 <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.25rem; height:1.25rem;">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <svg class="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.25rem; height:1.25rem; display: none;">
+                <svg class="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.25rem; height:1.25rem; display:none;">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A.75.75 0 003 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 003.98 8.223zM3.98 15.75A.75.75 0 003 16.5v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM6.02 5.03A.75.75 0 004.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 006.02 5.03zM6.02 18.97A.75.75 0 004.5 19.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM9.02 2.03A.75.75 0 007.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 009.02 2.03zM9.02 21.97A.75.75 0 007.5 22.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM12.02 0A.75.75 0 0010.5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 0zM12.02 24A.75.75 0 0010.5 24.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 24zM15.02 2.03A.75.75 0 0013.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0015.02 2.03zM15.02 21.97A.75.75 0 0013.5 22.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM18.02 5.03A.75.75 0 0016.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0018.02 5.03zM18.02 18.97A.75.75 0 0016.5 19.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM21.02 8.223A.75.75 0 0019.5 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM21.02 15.75A.75.75 0 0019.5 16.5v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727z" />
                 </svg>
               </button>
@@ -175,7 +166,17 @@ session_start();
             <label for="password2">Ulangi Password</label>
             <div class="password-wrapper">
               <input id="password2" name="password2" type="password" class="form-control" required>
-              </div>
+              
+              <button type="button" class="password-toggle" onclick="togglePassword(this)">
+                <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.25rem; height:1.25rem;">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <svg class="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.25rem; height:1.25rem; display:none;">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A.75.75 0 003 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 003.98 8.223zM3.98 15.75A.75.75 0 003 16.5v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM6.02 5.03A.75.75 0 004.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 006.02 5.03zM6.02 18.97A.75.75 0 004.5 19.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM9.02 2.03A.75.75 0 007.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 009.02 2.03zM9.02 21.97A.75.75 0 007.5 22.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM12.02 0A.75.75 0 0010.5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 0zM12.02 24A.75.75 0 0010.5 24.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0012.02 24zM15.02 2.03A.75.75 0 0013.5 2.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0015.02 2.03zM15.02 21.97A.75.75 0 0013.5 22.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM18.02 5.03A.75.75 0 0016.5 5.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 0018.02 5.03zM18.02 18.97A.75.75 0 0016.5 19.75v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM21.02 8.223A.75.75 0 0019.5 9v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727zM21.02 15.75A.75.75 0 0019.5 16.5v.75a.75.75 0 001.5 0v-.75A.75.75 0 00-.52-.727z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -195,19 +196,39 @@ session_start();
 
   <script src="../assets/js/auth.js"></script>
 <script>
+    // FUNGSI TOGGLE PASSWORD (DINAMIS)
+    // Menerima parameter 'btn' agar tahu tombol mana yang diklik
+    function togglePassword(btn) {
+        // Cari elemen input di sebelah tombol
+        const input = btn.previousElementSibling;
+        // Cari icon di dalam tombol
+        const iconEye = btn.querySelector('.icon-eye');
+        const iconSlash = btn.querySelector('.icon-eye-slash');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            iconEye.style.display = 'none';
+            iconSlash.style.display = 'block';
+        } else {
+            input.type = 'password';
+            iconEye.style.display = 'block';
+            iconSlash.style.display = 'none';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         // Elements
         const emailInput = document.getElementById('email');
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
-        const phoneInput = document.getElementById('phone'); // PERUBAHAN 2: Ambil elemen phone
+        const phoneInput = document.getElementById('phone'); 
         const submitBtn = document.getElementById('submitBtn');
         
         const emailError = document.getElementById('emailError');
         const usernameError = document.getElementById('usernameError');
         const passwordError = document.getElementById('passwordError');
         
-        // Validation Flags (Semua harus true agar tombol nyala)
+        // Validation Flags
         let state = {
             isDomainValid: false,
             isEmailAvail: false,
@@ -217,22 +238,36 @@ session_start();
 
         const allowedDomains = ['gmail.com', 'student.polije.ac.id'];
 
-        // === PERUBAHAN 3: EVENT LISTENER KHUSUS NO HP ===
+        // Format No HP
         if(phoneInput) {
             phoneInput.addEventListener('input', function() {
-                // Hapus karakter selain angka
                 this.value = this.value.replace(/[^0-9]/g, '');
-                
-                // Potong jika lebih dari 14 karakter (jika maxlength HTML diabaikan browser tertentu)
                 if (this.value.length > 14) {
                     this.value = this.value.slice(0, 14);
                 }
             });
         }
 
-        // === MASTER CHECKER ===
+        // Toggle Pekerjaan Lainnya
+        const pekerjaanSelect = document.getElementById('pekerjaan');
+        const pekerjaanLainWrapper = document.getElementById('pekerjaan_lain_wrapper');
+        const pekerjaanLainInput = document.getElementById('pekerjaan_lain');
+
+        if(pekerjaanSelect) {
+            pekerjaanSelect.addEventListener('change', function() {
+                if (this.value === 'Lainnya') {
+                    pekerjaanLainWrapper.style.display = 'block';
+                    pekerjaanLainInput.required = true;
+                } else {
+                    pekerjaanLainWrapper.style.display = 'none';
+                    pekerjaanLainInput.required = false;
+                    pekerjaanLainInput.value = '';
+                }
+            });
+        }
+
+        // --- VALIDASI ---
         function updateSubmitButton() {
-            // Cek apakah semua kondisi terpenuhi
             if (state.isDomainValid && state.isEmailAvail && state.isUsernameAvail && state.isPasswordComplex) {
                 submitBtn.disabled = false;
             } else {
@@ -240,7 +275,6 @@ session_start();
             }
         }
 
-        // === 1. VALIDASI EMAIL ===
         function validateEmail() {
             const email = emailInput.value.trim().toLowerCase();
             if(email === '') { hideError(emailInput, emailError); return; }
@@ -248,7 +282,7 @@ session_start();
             const parts = email.split('@');
             if (parts.length === 2 && allowedDomains.includes(parts[1])) {
                 state.isDomainValid = true;
-                checkEmailAvailability(email); // AJAX Check
+                checkEmailAvailability(email); 
             } else {
                 showError(emailInput, emailError, "Gunakan @gmail.com atau @student.polije.ac.id");
                 state.isDomainValid = false;
@@ -273,12 +307,10 @@ session_start();
             });
         }
 
-        // === 2. VALIDASI USERNAME ===
         function validateUsername() {
             const username = usernameInput.value.trim();
             if(username === '') { hideError(usernameInput, usernameError); return; }
             
-            // Cek panjang minimal (opsional)
             if(username.length < 4) {
                 showError(usernameInput, usernameError, "Username minimal 4 karakter.");
                 state.isUsernameAvail = false;
@@ -302,11 +334,8 @@ session_start();
             });
         }
 
-        // === 3. VALIDASI PASSWORD (KOMPLEKSITAS) ===
         function validatePassword() {
             const pass = passwordInput.value;
-            
-            // Regex: Minimal 1 Huruf Kecil, 1 Huruf Besar, 1 Angka
             const hasLower = /[a-z]/.test(pass);
             const hasUpper = /[A-Z]/.test(pass);
             const hasNumber = /\d/.test(pass);
@@ -328,7 +357,6 @@ session_start();
             updateSubmitButton();
         }
 
-        // === HELPER UI ===
         function showError(input, element, msg) {
             element.textContent = msg;
             element.style.display = 'block';
@@ -339,7 +367,6 @@ session_start();
             input.classList.remove('input-error');
         }
 
-        // === EVENT LISTENERS ===
         emailInput.addEventListener('blur', validateEmail);
         emailInput.addEventListener('input', () => { hideError(emailInput, emailError); submitBtn.disabled = true; });
 
@@ -349,7 +376,6 @@ session_start();
         passwordInput.addEventListener('input', validatePassword);
         passwordInput.addEventListener('blur', validatePassword);
         
-        // Init: Matikan tombol saat load
         submitBtn.disabled = true;
     });
   </script>
