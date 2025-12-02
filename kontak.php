@@ -3,11 +3,35 @@
 session_start();
 require 'config/database.php'; 
 
+// ========================================================
+// CHECK LOGIN - AUTO ISI NAMA & EMAIL
+// ========================================================
+// ========================================================
+// CHECK LOGIN - SESUAI LOGIN.PHP KAMU
+// ========================================================
+$isLoggedIn = isset($_SESSION['id_user']);           // ✅ id_user (bukan user_id)
+$userName = $isLoggedIn ? ($_SESSION['nama'] ?? '') : '';     // ✅ nama (bukan user_name)
+$userEmail = $isLoggedIn ? ($_SESSION['user_email'] ?? '') : '';   // ✅ email (bukan user_email)
+$testimonials = [];
+
+// ========================================
+// DEBUG SESSION EMAIL
+// ========================================
+echo "<!-- DEBUG: isLoggedIn = " . ($isLoggedIn ? 'TRUE' : 'FALSE') . " -->";
+echo "<!-- DEBUG: userName = " . htmlspecialchars($_SESSION['nama'] ?? 'TIDAK ADA') . " -->";
+echo "<!-- DEBUG: userEmail = " . htmlspecialchars($_SESSION['user_email'] ?? 'TIDAK ADA') . " -->";
+
+$testimonials = [];
 // ============================================================
 // 2. LOGIKA BACKEND: HANDLE SUBMIT SARAN (AJAX)
 // ============================================================
 // Kita taruh di sini agar tidak ikut me-load Header HTML saat request AJAX
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_saran') {
+    // BLOCK KALAU BELUM LOGIN
+    if (!isset($_SESSION['id_user'])) {
+        echo json_encode(['status' => 'error', 'message' => '❌ Login diperlukan untuk mengirim saran']);
+        exit;
+    }
     
     // Pastikan tidak ada output lain sebelum JSON
     if (ob_get_length()) ob_clean(); 
@@ -43,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ============================================================
 require 'include_user/header.php'; 
 
-// Ambil Data Testimoni Terbaru dari Database
-$testimonials = [];
+// ========================================================
+
 $query = "SELECT * FROM saran ORDER BY created_at DESC LIMIT 6"; 
 $result = mysqli_query($conn, $query);
 
@@ -164,62 +188,138 @@ if ($result) {
                     <p class="text-slate-500 text-sm">Bantu kami meningkatkan layanan dengan memberikan feedback Anda.</p>
                 </div>
                 
-                <form id="saranForm" onsubmit="submitSaran(event)" class="space-y-5">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Nama</label>
-                            <input type="text" name="nama" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" placeholder="Nama Anda" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Email</label>
-                            <input type="email" name="email" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" placeholder="email@anda.com" required>
-                        </div>
-                    </div>
+              <?php if (!$isLoggedIn): ?>
+<div class="p-6 bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl mb-6 text-center">
+    <h3 class="font-bold text-red-800 text-lg mb-2">🔒 Login Diperlukan</h3>
+    <p class="text-red-700 text-sm">Silakan login untuk mengirim saran & masukan</p>
+    <div class="mt-4">
+        <a href="auth/login.php" class="inline-block px-6 py-2.5 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-all">
+            <i class="fa-solid fa-sign-in-alt mr-2"></i>Login Sekarang
+        </a>
+    </div>
+</div>
+<?php endif; ?>
 
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Topik</label>
-                        <select name="kategori" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm cursor-pointer" required>
-                            <option value="" disabled selected>Pilih Topik...</option>
-                            <option value="fasilitas">Fasilitas Lapangan</option>
-                            <option value="pelayanan">Pelayanan Admin</option>
-                            <option value="booking">Website / Booking</option>
-                            <option value="harga">Harga & Promo</option>
-                            <option value="lainnya">Lainnya</option>
-                        </select>
-                    </div>
+<form id="saranForm" 
+      onsubmit="<?php echo $isLoggedIn ? 'submitSaran(event)' : 'return false'; ?>" 
+      class="space-y-5 <?php echo !$isLoggedIn ? 'opacity-60' : ''; ?>"
+      style="<?php echo !$isLoggedIn ? 'pointer-events: none;' : ''; ?>">
+    <!-- NAMA - AUTO ISI KALAU LOGIN -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Nama</label>
+            <input type="text" 
+                   name="nama" 
+                   value="<?php echo $isLoggedIn ? htmlspecialchars($userName) : ''; ?>" 
+                   <?php echo $isLoggedIn ? 'readonly class="w-full px-4 py-3 bg-green-50 border-2 border-green-200 rounded-xl text-green-800 font-medium"' : 'class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"'; ?> 
+                   placeholder="<?php echo $isLoggedIn ? '' : 'Nama Anda'; ?>" 
+                   required>
+            <?php if ($isLoggedIn): ?>
+                <p class="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <i class="fa-solid fa-check-circle"></i> Otomatis dari akun Anda
+                </p>
+            <?php endif; ?>
+        </div>
 
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rating</label>
-                        <div class="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200" id="ratingStars">
-                            <input type="hidden" id="rating" name="rating" value="0" required>
-                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="1" onclick="setRating(1)">★</button>
-                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="2" onclick="setRating(2)">★</button>
-                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="3" onclick="setRating(3)">★</button>
-                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="4" onclick="setRating(4)">★</button>
-                            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="5" onclick="setRating(5)">★</button>
-                            <span class="ml-auto text-xs text-slate-500 font-medium bg-white px-2 py-1 rounded-md shadow-sm" id="ratingText">Pilih Bintang</span>
-                        </div>
-                    </div>
+        <!-- EMAIL - AUTO ISI KALAU LOGIN -->
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Email</label>
+            <input type="email" 
+                   name="email" 
+                   value="<?php echo $isLoggedIn ? htmlspecialchars($userEmail) : ''; ?>" 
+                   <?php echo $isLoggedIn ? 'readonly class="w-full px-4 py-3 bg-green-50 border-2 border-green-200 rounded-xl text-green-800 font-medium"' : 'class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"'; ?> 
+                   placeholder="<?php echo $isLoggedIn ? '' : 'email@anda.com'; ?>" 
+                   required>
+            <?php if ($isLoggedIn): ?>
+                <p class="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <i class="fa-solid fa-check-circle"></i> Otomatis dari akun Anda
+                </p>
+            <?php endif; ?>
+        </div>
+    </div>
 
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pesan</label>
-                        <textarea name="pesan" rows="4" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none" placeholder="Tulis pengalaman Anda disini..." required></textarea>
-                    </div>
+    <!-- TOPIK -->
+    <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Topik</label>
+        <select name="kategori" 
+        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm <?php echo !$isLoggedIn ? 'cursor-not-allowed bg-slate-100' : 'cursor-pointer'; ?>" 
+        <?php echo !$isLoggedIn ? 'disabled' : ''; ?> required>
+            <option value="" disabled selected>Pilih Topik...</option>
+            <option value="fasilitas">Fasilitas Lapangan</option>
+            <option value="pelayanan">Pelayanan Admin</option>
+            <option value="booking">Website / Booking</option>
+            <option value="harga">Harga & Promo</option>
+            <option value="lainnya">Lainnya</option>
+        </select>
+    </div>
 
-                    <div class="flex items-center gap-2 mb-4">
-                        <input type="checkbox" id="anonim" name="anonim" class="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary">
-                        <label for="anonim" class="text-xs text-slate-600 cursor-pointer select-none">Kirim sebagai anonim (Sembunyikan nama)</label>
-                    </div>
+    <!-- RATING -->
+    <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rating</label>
+        <div class="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200" id="ratingStars">
+            <input type="hidden" id="rating" name="rating" value="0" required>
+            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="1" onclick="setRating(1)">★</button>
+            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="2" onclick="setRating(2)">★</button>
+            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="3" onclick="setRating(3)">★</button>
+            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="4" onclick="setRating(4)">★</button>
+            <button type="button" class="text-2xl text-slate-300 hover:text-yellow-400 transition-colors transform hover:scale-110" data-rating="5" onclick="setRating(5)">★</button>
+            <span class="ml-auto text-xs text-slate-500 font-medium bg-white px-2 py-1 rounded-md shadow-sm" id="ratingText">Pilih Bintang</span>
+        </div>
+    </div>
 
-                    <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="resetSaranForm()" class="w-full md:w-auto px-6 py-3 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
-                            Reset
-                        </button>
-                        <button type="submit" id="btnKirim" class="flex-1 px-6 py-3 text-sm font-bold text-white bg-primary hover:bg-primaryDark rounded-xl shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all">
-                            Kirim Masukan
-                        </button>
-                    </div>
-                </form>
+    <!-- PESAN -->
+    <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pesan</label>
+        <textarea name="pesan" rows="4" 
+          class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none <?php echo !$isLoggedIn ? 'cursor-not-allowed bg-slate-100' : ''; ?>" 
+          placeholder="<?php echo $isLoggedIn ? 'Tulis pengalaman Anda disini...' : 'Login untuk mengisi'; ?>" 
+          <?php echo !$isLoggedIn ? 'disabled' : ''; ?> required></textarea>
+         </div>
+
+    <!-- ANONIM -->
+    <div class="flex items-center gap-2 mb-4">
+        <input type="checkbox" id="anonim" name="anonim" 
+       class="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary <?php echo !$isLoggedIn ? 'cursor-not-allowed opacity-50' : ''; ?>" 
+       <?php echo !$isLoggedIn ? 'disabled' : ''; ?>>
+        <label for="anonim" class="text-xs text-slate-600 cursor-pointer select-none">Kirim sebagai anonim (Sembunyikan nama)</label>
+    </div>
+
+    <!-- INFO LOGIN -->
+    <?php if ($isLoggedIn): ?>
+    <div class="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl mb-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div>
+                    <p class="font-semibold text-green-800"><?php echo htmlspecialchars($userName); ?></p>
+                    <p class="text-xs text-green-700"><?php echo htmlspecialchars($userEmail); ?></p>
+                </div>
+            </div>
+            <a href="auth/logout.php" class="text-sm text-green-600 hover:text-green-700 underline flex items-center gap-1">
+                <i class="fa-solid fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- BUTTON -->
+    <div class="flex gap-3 pt-2">
+        <button type="button" 
+        onclick="<?php echo $isLoggedIn ? 'resetSaranForm()' : 'return false'; ?>" 
+        class="w-full md:w-auto px-6 py-3 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all <?php echo !$isLoggedIn ? 'cursor-not-allowed opacity-50' : ''; ?>" 
+        <?php echo !$isLoggedIn ? 'disabled' : ''; ?>>
+            Reset
+        </button>
+        <button type="submit" id="btnKirim" 
+                <?php echo !$isLoggedIn ? 'disabled' : ''; ?>
+                class="flex-1 px-6 py-3 text-sm font-bold text-white rounded-xl shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all 
+                       <?php echo !$isLoggedIn ? 'bg-gray-400 cursor-not-allowed hover:bg-gray-400 shadow-none transform-none' : 'bg-primary hover:bg-primaryDark'; ?>">
+            <?php echo $isLoggedIn ? 'Kirim Masukan' : 'Login Dulu'; ?>
+        </button>
+    </div>
+</form>
 
                 <div id="saranSuccess" class="hidden h-full flex flex-col items-center justify-center text-center animate-fade-in py-10">
                     <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -278,8 +378,8 @@ if ($result) {
 </main>
 
 <script>
-  // 1. DATA TESTIMONI DARI PHP
-  const dbTestimonials = <?= json_encode($testimonials) ?>;
+  // PHP TESTIMONIALS KE JAVASCRIPT
+  const dbTestimonials = <?php echo json_encode($testimonials); ?>;
 
   function setRating(value) {
     const ratingInput = document.getElementById('rating');
@@ -345,8 +445,14 @@ if ($result) {
     `).join('');
   }
 
-  // 2. KIRIM DATA KE DATABASE VIA AJAX
   function submitSaran(event) {
+    // BLOCK KALAU BELUM LOGIN
+    <?php if (!$isLoggedIn): ?>
+    alert('❌ Login diperlukan untuk mengirim saran!');
+    window.location.href = 'auth/login.php';
+    return false;
+    <?php endif; ?>
+    
     event.preventDefault();
     const form = event.target;
     const formData = new FormData(form);
@@ -390,7 +496,7 @@ if ($result) {
   function hideSuccessMessage() {
     document.getElementById('saranSuccess').classList.add('hidden');
     document.getElementById('saranForm').classList.remove('hidden');
-    location.reload(); // Reload untuk memuat testimoni baru
+    location.reload();
   }
 
   document.addEventListener('DOMContentLoaded', function() {
