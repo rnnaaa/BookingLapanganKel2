@@ -210,10 +210,10 @@ function isActive($page_name) {
                 <div class="hidden lg:flex flex-1 justify-center">
                     <ul id="topNav" class="flex gap-8 items-end">
                         <li><a href="<?= $base_url ?>/index.php" class="nav-link px-2 py-1 text-sm <?= isActive('index.php') ?>">Beranda</a></li>
-                        <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm <?= isActive('booking.php') ?>">Lapangan</a></li>
-                        <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm <?= isActive('kontak.php') ?>">Kontak</a></li>
+                        <li><a href="<?= $base_url ?>/BookingPengguna/booking.php" class="nav-link px-2 py-1 text-sm <?= isActive('booking.php') ?>">Lapangan</a></li>                       
                         <li><a href="<?= $base_url ?>/member/member.php" class="nav-link px-2 py-1 text-sm <?= isActive('member.php') ?>">Member</a></li>
                         <li><a href="<?= $base_url ?>/riwayat/riwayat.php" class="nav-link px-2 py-1 text-sm <?= isActive('riwayat.php') ?>">Riwayat</a></li>
+                        <li><a href="<?= $base_url ?>/kontak.php" class="nav-link px-2 py-1 text-sm <?= isActive('kontak.php') ?>">Kontak</a></li>
                         <li>
                             <a href="#" id="cartIcon" class="cart-btn text-gray-700 hover:text-primary relative cursor-pointer" title="Lihat Keranjang">
                                 <i class="fa-solid fa-cart-shopping text-lg"></i>
