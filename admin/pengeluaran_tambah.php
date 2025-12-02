@@ -5,7 +5,7 @@
 // Pastikan session_start() sudah dijalankan (biasanya di auth_check.php)
 // Jika auth_check.php tidak otomatis menjalankan session_start(), pastikan baris ini ada:
 // session_start(); 
-
+require_once 'auth_check.php';
 require_once __DIR__ . '/auth_check.php'; 
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');

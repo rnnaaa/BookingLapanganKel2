@@ -1,6 +1,7 @@
 <?php
 // produk.php
-session_start();
+require_once 'auth_check.php';
+// session_start();
 require_once __DIR__ . '/../config/database.php';
 // Pastikan file config/database.php sudah terhubung ke $conn
 
@@ -12,7 +13,7 @@ $query = mysqli_query($conn, $sql);
 // require_once __DIR__ . '/auth_check.php'; 
 
 include('../includes/header.php');
-include('../includes/topbar.php');
+// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 

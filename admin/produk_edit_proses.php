@@ -1,7 +1,8 @@
 <?php
 // produk_edit_proses.php (Handle Update Produk)
+require_once 'auth_check.php';
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-session_start();
+// session_start();
 date_default_timezone_set('Asia/Jakarta');
 
 require_once __DIR__ . '/../config/database.php';

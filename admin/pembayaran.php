@@ -1,72 +1,187 @@
 <?php
-// pembayaran.php - Daftar pembayaran
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-date_default_timezone_set('Asia/Jakarta');
+// pembayaran.php - FIXED: DATATABLES ERROR 18 (INCORRECT COLUMN COUNT) SOLVED
+require_once 'auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// =================================================================================
+// 1. LOGIKA FILTER & DATE RANGE
+// =================================================================================
+$filter_start  = $_GET['start_date'] ?? date('Y-m-01'); // Default: Awal bulan ini
+$filter_end    = $_GET['end_date']   ?? date('Y-m-t');  // Default: Akhir bulan ini
+$filter_status = $_GET['status']     ?? 'all';          // Default: Semua status
+
+// Buat klausa WHERE dasar untuk tanggal (p.created_at)
+$whereClause = "WHERE p.created_at BETWEEN '$filter_start 00:00:00' AND '$filter_end 23:59:59'";
+
+if ($filter_status !== 'all') {
+    $whereClause .= " AND p.status_verifikasi = '$filter_status'";
+}
+
+// =================================================================================
+// 2. HITUNG STATISTIK DASHBOARD
+// =================================================================================
+$whereStats = "WHERE p.created_at BETWEEN '$filter_start 00:00:00' AND '$filter_end 23:59:59'";
+
+// A. Total Uang Masuk (Valid)
+$qMasuk = mysqli_query($conn, "SELECT SUM(amount) as total FROM pembayaran p $whereStats AND p.status_verifikasi = 'valid'");
+$totalMasuk = mysqli_fetch_assoc($qMasuk)['total'] ?? 0;
+
+// B. Menunggu Verifikasi
+$qPending = mysqli_query($conn, "SELECT COUNT(*) as total FROM pembayaran p $whereStats AND p.status_verifikasi = 'menunggu'");
+$totalPending = mysqli_fetch_assoc($qPending)['total'] ?? 0;
+
+// C. Total Transaksi
+$qCount = mysqli_query($conn, "SELECT COUNT(*) as total FROM pembayaran p $whereStats");
+$totalTransaksi = mysqli_fetch_assoc($qCount)['total'] ?? 0;
+
 include('../includes/header.php');
-include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 
 <div class="content-wrapper animate__animated animate__fadeIn">
+  
   <section class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
-      <h1><i class="fas fa-wallet me-2"></i> Data Pembayaran Pelanggan</h1>
+      <div>
+          <h1><i class="fas fa-wallet me-2"></i> Data Pembayaran</h1>
+          <p class="text-muted mb-0">Periode: <?= date('d M Y', strtotime($filter_start)) ?> s/d <?= date('d M Y', strtotime($filter_end)) ?></p>
+      </div>
+      <a href="pembayaran.php" class="btn btn-outline-secondary btn-sm shadow-sm">
+         <i class="fas fa-sync-alt me-1"></i> Refresh
+      </a>
     </div>
   </section>
 
   <section class="content">
     <div class="container-fluid">
+      
       <?php if (!empty($_SESSION['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-          <?= $_SESSION['success']; ?>
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+          <i class="fas fa-check-circle me-2"></i> <?= $_SESSION['success']; ?>
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success']); ?>
       <?php endif; ?>
 
       <?php if (!empty($_SESSION['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-          <?= $_SESSION['error']; ?>
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+          <i class="fas fa-exclamation-triangle me-2"></i> <?= $_SESSION['error']; ?>
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error']); ?>
       <?php endif; ?>
 
+      <div class="row g-3 mb-4">
+          <div class="col-md-4 col-sm-6">
+              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); color: white;">
+                  <div class="card-body d-flex align-items-center">
+                      <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                          <i class="fas fa-money-check-alt fa-2x"></i>
+                      </div>
+                      <div>
+                          <h6 class="mb-0 opacity-75">Total Terverifikasi</h6>
+                          <h3 class="mb-0 fw-bold">Rp <?= number_format($totalMasuk, 0, ',', '.') ?></h3>
+                          <small class="opacity-75">Periode Ini</small>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <div class="col-md-4 col-sm-6">
+              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #ffc107 0%, #ffdb4d 100%); color: #333;">
+                  <div class="card-body d-flex align-items-center">
+                      <div class="bg-dark bg-opacity-10 rounded-circle p-3 me-3">
+                          <i class="fas fa-hourglass-half fa-2x"></i>
+                      </div>
+                      <div>
+                          <h6 class="mb-0 opacity-75">Menunggu Verifikasi</h6>
+                          <h3 class="mb-0 fw-bold"><?= $totalPending ?></h3>
+                          <small class="opacity-75">Transaksi</small>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <div class="col-md-4 col-sm-12">
+              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #0e5c91 0%, #2196f3 100%); color: white;">
+                  <div class="card-body d-flex align-items-center">
+                      <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                          <i class="fas fa-receipt fa-2x"></i>
+                      </div>
+                      <div>
+                          <h6 class="mb-0 opacity-75">Total Transaksi</h6>
+                          <h3 class="mb-0 fw-bold"><?= $totalTransaksi ?></h3>
+                          <small class="opacity-75">Semua Status</small>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3">
+            <form method="GET" action="pembayaran.php" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1 fw-bold">Dari Tanggal</label>
+                    <input type="date" name="start_date" class="form-control form-control-sm" value="<?= $filter_start ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1 fw-bold">Sampai Tanggal</label>
+                    <input type="date" name="end_date" class="form-control form-control-sm" value="<?= $filter_end ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1 fw-bold">Status Verifikasi</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="all" <?= $filter_status == 'all' ? 'selected' : '' ?>>Semua Status</option>
+                        <option value="menunggu" <?= $filter_status == 'menunggu' ? 'selected' : '' ?>>Menunggu</option>
+                        <option value="valid" <?= $filter_status == 'valid' ? 'selected' : '' ?>>Valid</option>
+                        <option value="tidak_valid" <?= $filter_status == 'tidak_valid' ? 'selected' : '' ?>>Tidak Valid</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-grid">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter me-1"></i> Terapkan Filter</button>
+                </div>
+            </form>
+        </div>
+      </div>
+
       <div class="card shadow-lg border-0">
         <div class="card-header text-white"
-             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%); box-shadow: inset 0 -2px 8px rgba(0,0,0,0.15);">
-          <h3 class="card-title mb-0"><i class="fas fa-money-bill-wave me-2"></i> Daftar Pembayaran Pelanggan</h3>
+             style="background: linear-gradient(90deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);">
+          <h3 class="card-title mb-0"><i class="fas fa-list me-2"></i> Rincian Pembayaran</h3>
         </div>
 
-        <div class="card-body">
-          <table id="tblPembayaran" class="table table-bordered table-striped table-hover align-middle w-100">
-            <thead class="bg-light text-center">
-              <tr>
-                <th>No</th>
-                <th>Nama Pengguna</th>
-                <th>Lapangan</th>
-                <th>Tanggal Booking</th>
-                <th>Tipe Booking</th>
-                <th>Tipe Pembayaran</th>
-                <th>Nominal</th>
-                <th>Metode</th>
-                <th>Bukti</th>
-                <th>Status Verifikasi</th>
-                <th>Verified By</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table id="tblPembayaran" class="table table-bordered table-striped table-hover align-middle w-100 mb-0" style="font-size: 0.9rem;">
+              <thead class="bg-light text-center text-nowrap">
+                <tr>
+                  <th style="width: 3%">No</th>
+                  <th style="width: 12%">Pengguna</th>
+                  <th style="width: 10%">Lapangan</th>
+                  <th style="width: 8%">Tgl Bayar</th>
+                  <th style="width: 5%">Tipe</th>
+                  <th style="width: 5%">Jenis</th>
+                  <th style="width: 10%">Nominal</th>
+                  <th style="width: 8%">Metode</th>
+                  <th style="width: 8%">Bukti</th>
+                  <th style="width: 10%">Status</th>
+                  <th style="width: 10%">Verified By</th>
+                  <th style="width: 8%">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
 <?php
 $no = 1;
 $table_rows = [];
 $modal_details = [];
 $rendered_modals = [];
 
+// QUERY UTAMA DENGAN FILTER
 $sql = "
   SELECT 
     p.*, 
@@ -77,6 +192,7 @@ $sql = "
     b.payment_status,
     b.remaining_amount,
     b.total_amount,
+    b.info_produk, 
     u.nama AS nama_user,
     l.nama_lapangan,
     admin.nama AS verified_by_name
@@ -85,6 +201,7 @@ $sql = "
   LEFT JOIN users u ON b.id_user = u.id_user
   LEFT JOIN lapangan l ON b.id_lapangan = l.id_lapangan
   LEFT JOIN users admin ON p.verified_by = admin.id_user
+  $whereClause
   ORDER BY 
       CASE 
         WHEN p.status_verifikasi = 'menunggu' THEN 1
@@ -97,40 +214,37 @@ $sql = "
 
 $result = mysqli_query($conn, $sql);
 
+// PERBAIKAN UTAMA: JIKA ERROR, TAMPILKAN DI LUAR TABEL. JIKA KOSONG, BIARKAN KOSONG.
 if (!$result) {
-  echo '<tr><td colspan="12" class="text-center text-danger">Error: ' . htmlspecialchars(mysqli_error($conn)) . '</td></tr>';
-} else {
+    echo '</tbody></table><div class="alert alert-danger m-3">Error Database: '.mysqli_error($conn).'</div><table class="d-none"><tbody>';
+} elseif (mysqli_num_rows($result) > 0) {
   while ($r = mysqli_fetch_assoc($result)):
     $status = strtolower($r['status_verifikasi']);
     
-    // Badge Status
+    // Badge Status Verifikasi
     $badge_class = 'bg-warning text-dark'; $icon = 'fa-hourglass-half'; $label = 'Menunggu';
     if ($status === 'valid') {
       $badge_class = 'bg-success'; $icon = 'fa-check-circle'; $label = 'Valid';
       if (strtolower($r['tipe']) === 'dp' && $r['payment_status'] === 'dp_bayar' && floatval($r['remaining_amount']) > 0) {
-        $badge_class = 'bg-info text-dark'; $icon = 'fa-clock'; $label = 'DP - Belum Pelunasan';
+        $badge_class = 'bg-info text-dark'; $icon = 'fa-clock'; $label = 'DP (Sisa)';
       }
     } elseif ($status === 'tidak_valid') {
-      $badge_class = 'bg-danger'; $icon = 'fa-times-circle'; $label = 'Tidak Valid';
+      $badge_class = 'bg-danger'; $icon = 'fa-times-circle'; $label = 'Invalid';
     }
 
     $metode = $r['method'] ? htmlspecialchars(ucfirst(str_replace('_', ' ', $r['method']))) : '<em class="text-muted">-</em>';
-    $nominal = 'Rp ' . number_format($r['amount'], 0, ',', '.');
+    $nominal = '<span class="fw-bold">Rp ' . number_format($r['amount'], 0, ',', '.') . '</span>';
 
-    // --- LOGIKA PENCARIAN FILE BUKTI (TABEL UTAMA) ---
-    $bukti_html = '<em class="text-muted">Belum upload</em>';
-    
+    // LOGIKA BUKTI (THUMBNAIL)
+    $bukti_html = '<span class="text-muted small">No File</span>';
     if (!empty($r['bukti_pembayaran'])) {
       $filename = basename($r['bukti_pembayaran']);
-      
       $path_check = [
           'nested' => __DIR__ . '/../uploads/bukti_pembayaran/' . $filename,
           'root'   => __DIR__ . '/../uploads/' . $filename
       ];
-      
       $web_path = '';
       $found = false;
-
       if (file_exists($path_check['nested'])) {
           $web_path = '../uploads/bukti_pembayaran/' . rawurlencode($filename);
           $found = true;
@@ -138,88 +252,101 @@ if (!$result) {
           $web_path = '../uploads/' . rawurlencode($filename);
           $found = true;
       }
-
+      
       if ($found) {
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
         $is_image = in_array($ext, ['jpg','jpeg','png','gif','webp','bmp']);
-        
         if ($is_image) {
-           // PANGGIL FUNGSI JS UNTUK BUKA MODAL
-           $bukti_html = '<button type="button" onclick="showImagePreview(\'' . htmlspecialchars($web_path) . '\')" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye"></i> Lihat</button>';
+           $bukti_html = '
+             <div class="position-relative" style="width: 50px; height: 50px; margin: 0 auto; cursor: pointer;" onclick="showImagePreview(\'' . htmlspecialchars($web_path) . '\')">
+                <img src="' . htmlspecialchars($web_path) . '" class="img-thumbnail w-100 h-100 object-fit-cover shadow-sm" alt="Bukti">
+                <div class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary" style="font-size: 0.4rem; padding: 0.2em 0.4em;">
+                    <i class="fas fa-search"></i>
+                </div>
+             </div>';
         } else {
-           $bukti_html = '<a href="' . htmlspecialchars($web_path) . '" target="_blank" class="btn btn-outline-primary btn-sm"><i class="fas fa-download"></i> Unduh</a>';
+           $bukti_html = '<a href="' . htmlspecialchars($web_path) . '" target="_blank" class="btn btn-outline-secondary btn-xs"><i class="fas fa-file-download"></i> Unduh</a>';
         }
       } else {
-        $bukti_html = '<em class="text-danger" title="File tidak ditemukan di server">File hilang</em>';
+        $bukti_html = '<span class="text-danger small" title="File fisik tidak ditemukan"><i class="fas fa-exclamation-triangle"></i> Hilang</span>';
       }
     }
-    // ---------------------------------------------
 
     $verified_by = $r['verified_by_name']
-      ? htmlspecialchars($r['verified_by_name']) . '<br><small class="text-muted">' . ($r['verified_at'] ? date('d/m/Y H:i', strtotime($r['verified_at'])) : '') . '</small>'
-      : '<em class="text-muted">-</em>';
+      ? '<div class="small fw-bold">' . htmlspecialchars($r['verified_by_name']) . '</div><div class="text-muted" style="font-size:0.75rem;">' . ($r['verified_at'] ? date('d/m H:i', strtotime($r['verified_at'])) : '') . '</div>'
+      : '<span class="text-muted small">-</span>';
 
     $booking_id = intval($r['id_booking']);
-    $user_display = $r['nama_user'] ? htmlspecialchars($r['nama_user']) : '<em class="text-muted">Walk-in / -</em>';
+    $user_display = $r['nama_user'] ? '<div class="fw-bold">' . htmlspecialchars($r['nama_user']) . '</div>' : '<em class="text-muted">Walk-in</em>';
 
-    // Tombol Aksi
-    $aksi_html = '';
+    // TOMBOL AKSI
+    $btnDetail = '
+    <button class="btn btn-sm text-white w-100 mb-1 shadow-sm" 
+            style="background: linear-gradient(90deg, #0e5c91, #2196f3); border: none;"
+            data-bs-toggle="modal" data-bs-target="#modalDetail' . $booking_id . '">
+        <i class="fas fa-eye me-1"></i> Detail
+    </button>';
+    
+    $aksi_content = '';
     if ($status === 'menunggu') {
-      $aksi_html = '
-        <a href="pembayaran_validasi.php?id=' . intval($r['id_pembayaran']) . '&aksi=valid" class="btn btn-success btn-sm mb-1"
-           onclick="return confirm(\'✅ Validasi pembayaran ini sebagai sah?\')">
-          <i class="fas fa-check"></i> Valid
-        </a>
-        <a href="pembayaran_validasi.php?id=' . intval($r['id_pembayaran']) . '&aksi=tolak" class="btn btn-danger btn-sm mb-1"
-           onclick="return confirm(\'❌ Tolak pembayaran ini?\')">
-          <i class="fas fa-times"></i> Tolak
-        </a>';
+      $aksi_content = '
+        <div class="d-flex gap-1">
+            <a href="pembayaran_validasi.php?id=' . intval($r['id_pembayaran']) . '&aksi=valid" 
+               class="btn btn-success btn-sm flex-fill" onclick="return confirm(\'✅ Validasi pembayaran ini sebagai sah?\')">
+              <i class="fas fa-check"></i>
+            </a>
+            <a href="pembayaran_validasi.php?id=' . intval($r['id_pembayaran']) . '&aksi=tolak" 
+               class="btn btn-danger btn-sm flex-fill" onclick="return confirm(\'❌ Tolak pembayaran ini?\')">
+              <i class="fas fa-times"></i>
+            </a>
+        </div>';
     } else {
-      $aksi_html = '<button class="btn btn-info btn-sm mb-1" data-bs-toggle="modal" data-bs-target="#modalDetail' . $booking_id . '"><i class="fas fa-info-circle"></i> Detail</button>';
-      
       $remaining = floatval($r['remaining_amount']);
-      if ($remaining > 0 && $r['payment_status'] !== 'lunas' && strtolower($r['status_verifikasi']) === 'valid' && ($_SESSION['role'] ?? '') === 'admin') {
-        $aksi_html .= '
-          <a href="pembayaran_validasi.php?aksi=pelunasan&booking_id=' . $booking_id . '" class="btn btn-warning btn-sm"
+      if ($remaining > 0 && $r['payment_status'] !== 'lunas' && $status === 'valid' && ($_SESSION['role'] ?? '') === 'admin') {
+        $aksi_content = '
+          <a href="pembayaran_validasi.php?aksi=pelunasan&booking_id=' . $booking_id . '" 
+             class="btn btn-warning btn-sm w-100 text-dark"
              onclick="return confirm(\'Proses pelunasan booking #' . $booking_id . '?\')">
-            <i class="fas fa-hand-holding-dollar"></i> Lunas
+            <i class="fas fa-money-bill-wave"></i> Lunas
           </a>';
       }
     }
-
-    // Render Baris Tabel
+    $aksi_html = '<div class="d-flex flex-column">' . $btnDetail . $aksi_content . '</div>';
+    
+    // Render Baris
     $table_rows[] = '
               <tr>
                 <td class="text-center">' . $no++ . '</td>
                 <td>' . $user_display . '</td>
-                <td>' . ($r['nama_lapangan'] ? htmlspecialchars($r['nama_lapangan']) : '<em class="text-muted">-</em>') . '</td>
-                <td class="text-center">' . ($r['tanggal'] ? date('d/m/Y', strtotime($r['tanggal'])) : '<em class="text-muted">-</em>') . '</td>
+                <td>' . ($r['nama_lapangan'] ? htmlspecialchars($r['nama_lapangan']) : '-') . '</td>
+                <td class="text-center small">' . ($r['created_at'] ? date('d/m/y H:i', strtotime($r['created_at'])) : '-') . '</td>
                 <td class="text-center">
-                  <span class="badge ' . ($r['tipe_booking'] == 'member' ? 'bg-success' : 'bg-secondary') . '">' . ($r['tipe_booking'] ? htmlspecialchars(ucfirst($r['tipe_booking'])) : '-') . '</span>
+                  <span class="badge ' . ($r['tipe_booking'] == 'member' ? 'bg-success' : 'bg-secondary') . '" style="font-size:0.7rem;">' . ($r['tipe_booking'] ? ucfirst($r['tipe_booking']) : '-') . '</span>
                 </td>
                 <td class="text-center">
-                  <span class="badge ' . (strtolower($r['tipe']) == 'dp' ? 'bg-info' : 'bg-primary') . '">' . htmlspecialchars(ucfirst($r['tipe'])) . '</span>
+                  <span class="badge ' . (strtolower($r['tipe']) == 'dp' ? 'bg-info text-dark' : 'bg-primary') . '" style="font-size:0.7rem;">' . ucfirst($r['tipe']) . '</span>
                 </td>
                 <td class="text-end">' . $nominal . '</td>
-                <td class="text-center">' . $metode . '</td>
+                <td class="text-center small">' . $metode . '</td>
                 <td class="text-center">' . $bukti_html . '</td>
                 <td class="text-center">
-                  <span class="badge ' . $badge_class . '"><i class="fas ' . $icon . ' me-1"></i>' . $label . '</span>
+                  <span class="badge ' . $badge_class . '" style="font-size: 0.75rem;">' . $label . '</span>
                 </td>
                 <td class="text-center">' . $verified_by . '</td>
                 <td class="text-center">' . $aksi_html . '</td>
               </tr>';
 
-    // Data untuk Modal Detail
+    // Data Modal
     if (!in_array($booking_id, $rendered_modals, true)) {
         $rendered_modals[] = $booking_id;
         $modal_details[$booking_id] = [
-            'user_display' => $user_display,
-            'nama_lapangan' => $r['nama_lapangan'] ? htmlspecialchars($r['nama_lapangan']) : '<em class="text-muted">-</em>',
+            'user_display' => $r['nama_user'] ? htmlspecialchars($r['nama_user']) : 'Walk-in',
+            'nama_lapangan' => $r['nama_lapangan'] ? htmlspecialchars($r['nama_lapangan']) : '-',
             'total_amount' => $r['total_amount'] ?? 0,
             'remaining_amount' => $r['remaining_amount'] ?? 0,
             'booking_status' => htmlspecialchars(ucfirst($r['booking_status'])),
             'payment_status' => htmlspecialchars(str_replace('_',' ',ucfirst($r['payment_status']))),
+            'info_produk' => $r['info_produk'] ? htmlspecialchars($r['info_produk']) : '<span class="text-muted fst-italic">Tidak ada info produk</span>',
             'booking_id' => $booking_id,
         ];
     }
@@ -228,8 +355,9 @@ if (!$result) {
 
 echo implode('', $table_rows);
 ?>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -237,15 +365,13 @@ echo implode('', $table_rows);
 </div>
 
 <?php
-// LOOP Modal Detail
+// LOOP Modal Detail (TETAP SAMA)
 foreach ($modal_details as $booking_id => $data):
-    // Ambil data pembayaran
     $stmtPayments = mysqli_prepare($conn, "SELECT * FROM pembayaran WHERE booking_id = ? ORDER BY created_at ASC");
     mysqli_stmt_bind_param($stmtPayments, "i", $booking_id);
     mysqli_stmt_execute($stmtPayments);
     $resPayments = mysqli_stmt_get_result($stmtPayments);
     
-    // Tentukan warna status booking
     $status_color = match(strtolower($data['booking_status'])) {
         'disetujui', 'selesai' => 'success',
         'menunggu' => 'warning',
@@ -256,151 +382,66 @@ foreach ($modal_details as $booking_id => $data):
   <div class="modal fade" id="modalDetail<?= $booking_id ?>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content shadow-lg border-0">
-        
         <div class="modal-header text-white" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
-          <h5 class="modal-title">
-            <i class="fas fa-file-invoice-dollar me-2"></i> Rincian Transaksi #<?= $booking_id ?>
-          </h5>
+          <h5 class="modal-title"><i class="fas fa-file-invoice-dollar me-2"></i> Rincian Transaksi #<?= $booking_id ?></h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-
         <div class="modal-body bg-light">
           <div class="row g-3">
             <div class="col-md-7">
               <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                  <h6 class="card-title text-muted border-bottom pb-2 mb-3">
-                    <i class="fas fa-info-circle me-1"></i> Informasi Booking
-                  </h6>
+                  <h6 class="card-title text-muted border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-1"></i> Informasi Booking</h6>
                   <table class="table table-borderless table-sm mb-0">
-                    <tr>
-                        <td width="30%" class="text-muted"><i class="fas fa-user me-2"></i>Nama</td>
-                        <td class="fw-bold text-dark"><?= $data['user_display'] ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted"><i class="fas fa-futbol me-2"></i>Lapangan</td>
-                        <td class="fw-bold text-primary"><?= $data['nama_lapangan'] ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted"><i class="fas fa-tag me-2"></i>Status</td>
-                        <td>
-                            <span class="badge bg-<?= $status_color ?> rounded-pill px-3">
-                                <?= $data['booking_status'] ?>
-                            </span>
-                        </td>
-                    </tr>
+                    <tr><td width="30%" class="text-muted">Nama</td><td class="fw-bold"><?= $data['user_display'] ?></td></tr>
+                    <tr><td class="text-muted">Lapangan</td><td class="fw-bold text-primary"><?= $data['nama_lapangan'] ?></td></tr>
+                    <tr><td class="text-muted">Produk</td><td class="text-dark"><?= $data['info_produk'] ?></td></tr>
+                    <tr><td class="text-muted">Status</td><td><span class="badge bg-<?= $status_color ?>"><?= $data['booking_status'] ?></span></td></tr>
                   </table>
                 </div>
               </div>
             </div>
-
             <div class="col-md-5">
               <div class="card shadow-sm border-0 h-100" style="background-color: #f8f9fa;">
                 <div class="card-body text-center d-flex flex-column justify-content-center">
-                  <h6 class="text-uppercase text-muted letter-spacing-1" style="font-size: 0.8rem;">Total Tagihan</h6>
+                  <h6 class="text-uppercase text-muted" style="font-size: 0.8rem;">Total Tagihan</h6>
                   <h3 class="fw-bold text-dark mb-3">Rp <?= number_format($data['total_amount'], 0, ',', '.') ?></h3>
-                  
                   <?php if ($data['remaining_amount'] > 0): ?>
                       <div class="p-2 rounded bg-white border border-danger">
-                        <small class="text-danger fw-bold"><i class="fas fa-exclamation-circle me-1"></i> Belum Lunas</small>
+                        <small class="text-danger fw-bold">Belum Lunas</small>
                         <div class="fw-bold text-danger fs-5">Sisa: Rp <?= number_format($data['remaining_amount'], 0, ',', '.') ?></div>
                       </div>
                   <?php else: ?>
-                      <div class="p-2 rounded bg-success text-white">
-                        <i class="fas fa-check-circle me-1"></i> <strong>LUNAS</strong>
-                      </div>
+                      <div class="p-2 rounded bg-success text-white"><strong>LUNAS</strong></div>
                   <?php endif; ?>
                 </div>
               </div>
             </div>
           </div>
-
           <div class="card mt-4 shadow-sm border-0">
-            <div class="card-header bg-white border-bottom">
-              <h6 class="mb-0 text-primary"><i class="fas fa-history me-2"></i> Riwayat Pembayaran</h6>
-            </div>
+            <div class="card-header bg-white border-bottom"><h6 class="mb-0 text-primary">Riwayat Pembayaran</h6></div>
             <div class="card-body p-0">
               <div class="table-responsive">
-                <table class="table table-striped mb-0 align-middle">
-                  <thead class="bg-light text-secondary small">
-                    <tr>
-                      <th class="text-center">#</th>
-                      <th><i class="far fa-calendar-alt me-1"></i> Tanggal</th>
-                      <th class="text-center">Tipe</th>
-                      <th class="text-end">Nominal</th>
-                      <th class="text-center">Status</th>
-                      <th class="text-center">Bukti</th>
-                    </tr>
+                <table class="table table-striped mb-0 align-middle small">
+                  <thead class="bg-light text-secondary">
+                    <tr><th>#</th><th>Tanggal</th><th>Tipe</th><th class="text-end">Nominal</th><th>Status</th></tr>
                   </thead>
-                  <tbody class="small">
-                    <?php 
-                    $i=1; 
+                  <tbody>
+                    <?php $i=1; 
                     if (mysqli_num_rows($resPayments) > 0):
-                        mysqli_data_seek($resPayments, 0); // Reset pointer
-                        while ($pay = mysqli_fetch_assoc($resPayments)):
-                            // --- LOGIKA BUKTI (SAMA SEPERTI SEBELUMNYA) ---
-                            $bukti_html_modal = '<span class="text-muted fst-italic">-</span>';
-                            if (!empty($pay['bukti_pembayaran'])) {
-                                $filename_modal = basename($pay['bukti_pembayaran']);
-                                $path_check_modal = [
-                                    'nested' => __DIR__ . '/../uploads/bukti_pembayaran/' . $filename_modal,
-                                    'root'   => __DIR__ . '/../uploads/' . $filename_modal
-                                ];
-                                $web_path_modal = '';
-                                $found_modal = false;
-
-                                if (file_exists($path_check_modal['nested'])) {
-                                    $web_path_modal = '../uploads/bukti_pembayaran/' . rawurlencode($filename_modal);
-                                    $found_modal = true;
-                                } elseif (file_exists($path_check_modal['root'])) {
-                                    $web_path_modal = '../uploads/' . rawurlencode($filename_modal);
-                                    $found_modal = true;
-                                }
-
-                                if ($found_modal) {
-                                    $ext_modal = strtolower(pathinfo($filename_modal, PATHINFO_EXTENSION));
-                                    $is_image_modal = in_array($ext_modal, ['jpg','jpeg','png','gif','webp','bmp']);
-                                    if ($is_image_modal) {
-                                       $bukti_html_modal = '<button type="button" onclick="showImagePreview(\'' . htmlspecialchars($web_path_modal) . '\')" class="btn btn-xs btn-outline-info rounded-circle" title="Lihat Foto"><i class="fas fa-eye"></i></button>';
-                                    } else {
-                                       $bukti_html_modal = '<a href="' . htmlspecialchars($web_path_modal) . '" target="_blank" class="btn btn-xs btn-outline-secondary rounded-circle" title="Unduh"><i class="fas fa-download"></i></a>';
-                                    }
-                                }
-                            }
-
-                            // Badge Status Pembayaran Kecil
-                            $status_ver_class = match($pay['status_verifikasi']) {
-                                'valid' => 'success',
-                                'menunggu' => 'warning',
-                                'tidak_valid' => 'danger',
-                                default => 'secondary'
-                            };
-                            $icon_ver = match($pay['status_verifikasi']) {
-                                'valid' => 'fa-check',
-                                'menunggu' => 'fa-clock',
-                                'tidak_valid' => 'fa-times',
-                                default => 'fa-question'
-                            };
+                        mysqli_data_seek($resPayments, 0);
+                        while ($pay = mysqli_fetch_assoc($resPayments)): 
+                          $st_cls = match($pay['status_verifikasi']) { 'valid'=>'success', 'menunggu'=>'warning', 'tidak_valid'=>'danger', default=>'secondary' };
                     ?>
                       <tr>
-                        <td class="text-center text-muted"><?= $i++ ?></td>
-                        <td><?= $pay['created_at'] ? date('d/m/y H:i', strtotime($pay['created_at'])) : '-' ?></td>
-                        <td class="text-center">
-                            <span class="badge bg-<?= strtolower($pay['tipe']) == 'dp' ? 'info' : 'primary' ?> bg-opacity-75 text-white" style="font-weight: normal;">
-                                <?= htmlspecialchars($pay['tipe']) ?>
-                            </span>
-                        </td>
-                        <td class="text-end fw-bold text-dark">Rp <?= number_format($pay['amount'],0,',','.') ?></td>
-                        <td class="text-center">
-                            <span class="badge bg-<?= $status_ver_class ?>-subtle text-<?= $status_ver_class ?> border border-<?= $status_ver_class ?>">
-                                <i class="fas <?= $icon_ver ?> me-1"></i> <?= ucfirst($pay['status_verifikasi']) ?>
-                            </span>
-                        </td>
-                        <td class="text-center"><?= $bukti_html_modal ?></td>
+                        <td><?= $i++ ?></td>
+                        <td><?= date('d/m/y H:i', strtotime($pay['created_at'])) ?></td>
+                        <td><?= htmlspecialchars($pay['tipe']) ?></td>
+                        <td class="text-end fw-bold">Rp <?= number_format($pay['amount'],0,',','.') ?></td>
+                        <td><span class="badge bg-<?= $st_cls ?>"><?= ucfirst($pay['status_verifikasi']) ?></span></td>
                       </tr>
-                    <?php endwhile; 
-                    else: ?>
-                        <tr><td colspan="6" class="text-center py-3 text-muted">Belum ada riwayat pembayaran.</td></tr>
+                    <?php endwhile; else: ?>
+                        <tr><td colspan="5" class="text-center text-muted">Belum ada riwayat.</td></tr>
                     <?php endif; ?>
                   </tbody>
                 </table>
@@ -408,36 +449,14 @@ foreach ($modal_details as $booking_id => $data):
             </div>
           </div>
         </div>
-
-        <div class="modal-footer bg-light border-top-0 d-flex justify-content-between">
-            <div>
-                <small class="text-muted fst-italic"><i class="fas fa-shield-alt me-1"></i> Transaksi Aman</small>
-            </div>
-            <div>
-                <button class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>Tutup
-                </button>
-
-                <?php 
-                // --- LOGIKA TOMBOL LUNAS DI MODAL ---
-                // Tampilkan jika sisa > 0 DAN user adalah admin
-                if ($data['remaining_amount'] > 0 && ($_SESSION['role'] ?? '') === 'admin'): 
-                ?>
-                    <a href="pembayaran_validasi.php?aksi=pelunasan&booking_id=<?= $booking_id ?>" 
-                       class="btn btn-warning px-4 fw-bold shadow-sm"
-                       onclick="return confirm('Apakah Anda yakin ingin memproses pelunasan tunai untuk Booking #<?= $booking_id ?>? Total: Rp <?= number_format($data['remaining_amount'],0,',','.') ?>')">
-                        <i class="fas fa-hand-holding-dollar me-2"></i> Proses Pelunasan
-                    </a>
-                <?php endif; ?>
-            </div>
+        <div class="modal-footer bg-light d-flex justify-content-between">
+           <small class="text-muted"><i class="fas fa-shield-alt"></i> Transaksi Aman</small>
+           <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
         </div>
       </div>
     </div>
   </div>
-<?php
-    mysqli_stmt_close($stmtPayments);
-endforeach;
-?>
+<?php mysqli_stmt_close($stmtPayments); endforeach; ?>
 
 <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
   <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -457,15 +476,10 @@ endforeach;
 <script>
   setTimeout(function(){ $('.alert').fadeOut('slow'); }, 5000);
 
-  // Fungsi untuk menampilkan gambar di modal
   function showImagePreview(imageSrc) {
     const modalEl = document.getElementById('imagePreviewModal');
     const imageEl = document.getElementById('previewImage');
-    
-    // Set sumber gambar
     imageEl.src = imageSrc;
-    
-    // Tampilkan modal menggunakan Bootstrap API
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
   }

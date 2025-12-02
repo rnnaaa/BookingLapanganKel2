@@ -1,8 +1,7 @@
 <?php
-require_once 'auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
-// include('../includes/topbar.php');
+include('../includes/topbar.php');
 include('../includes/sidebar.php');
 
 // === STATISTIK RINGKAS ===

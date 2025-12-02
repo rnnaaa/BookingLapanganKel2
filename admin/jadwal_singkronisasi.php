@@ -1,11 +1,12 @@
 <?php
 //jadwal_singkronisasi.php
+require_once 'auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 include('../includes/header.php');
-include('../includes/topbar.php');
+// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 
 // === Ambil log terakhir ===

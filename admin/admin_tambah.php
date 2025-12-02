@@ -1,11 +1,12 @@
 <?php
+require_once 'auth_check.php';
 ob_start(); // aktifkan output buffering agar header() bisa dipanggil setelah output
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once __DIR__ . '/../config/database.php';
 include('../includes/header.php');
-include('../includes/topbar.php');
+// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 date_default_timezone_set('Asia/Jakarta');
 
