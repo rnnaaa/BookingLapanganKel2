@@ -391,26 +391,7 @@ require '../include_user/header.php';
       </div>
     </div>
   </main>
-  <div id="loginRequiredModal" class="fixed inset-0 z-[9999] flex items-center justify-center hidden bg-black/60 backdrop-blur-sm transition-all duration-300 opacity-0 pointer-events-none">
-    <div class="bg-white rounded-2xl shadow-2xl w-[90%] max-w-[320px] p-6 text-center transform scale-95 transition-transform duration-300" id="loginModalContent">
-        
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Login Diperlukan</h3>
-        
-        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-            Anda harus login terlebih dahulu untuk melanjutkan checkout. Apakah Anda ingin login sekarang?
-        </p>
-        
-        <div class="flex flex-col gap-3">
-            <button id="btnLoginYes" class="w-full bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-200">
-                IYA, LOGIN
-            </button>
-            
-            <button id="btnLoginNo" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all">
-                TIDAK
-            </button>
-        </div>
-    </div>
-  </div>
+  
 
   <?php 
 require '../include_user/footer.php'; 

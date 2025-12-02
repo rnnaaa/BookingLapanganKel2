@@ -135,16 +135,22 @@ function isActive($page_name) {
         .slot-card.available:hover .time { @apply text-primary; }
         .slot-card.booked { @apply bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed; }
         
-        /* Animasi Dropdown Mobile */
+        /* PERBAIKAN BUG GHOST CLICK:
+           Menambahkan visibility dan pointer-events 
+        */
         #mobileNav {
-            transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out, visibility 0.3s;
             max-height: 0;
             opacity: 0;
+            visibility: hidden;      /* Agar tidak terbaca reader/keyboard saat tutup */
+            pointer-events: none;    /* Agar klik tembus ke bawah saat tutup */
             overflow: hidden;
         }
         #mobileNav.open {
-            max-height: 500px;
+            max-height: 100vh;
             opacity: 1;
+            visibility: visible;     /* Munculkan kembali */
+            pointer-events: auto;    /* Aktifkan klik */
         }
 
         @media (max-width: 640px) {
@@ -188,13 +194,13 @@ function isActive($page_name) {
         <div class="max-w-7xl mx-auto px-4">
             <nav class="flex items-center justify-between h-20">
                 
-                <a href="<?= $base_url ?>/index.php" class="flex items-center gap-2 sm:gap-3 group">
-                    <div class="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center transform transition-all duration-500 group-hover:scale-110">
+                <a href="<?= $base_url ?>/index.php" class="flex items-center gap-2 group mr-auto">
+                    <div class="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center transform transition-all duration-500 group-hover:scale-110 shrink-0">
                         <img src="<?= $base_url ?>/assets/images/LogoRush.png" alt="Logo" class="w-full h-full object-contain rounded-xl shadow-sm">
                     </div>
                     <div class="flex flex-col justify-center">
-                        <div class="font-poppins font-bold text-slate-800 leading-tight">
-                            <span class="block sm:hidden text-sm sm:text-lg">Rush Badminton</span>
+                        <div class="font-poppins font-bold text-slate-800 leading-tight whitespace-nowrap">
+                            <span class="block sm:hidden text-base">Rush Badminton</span>
                             <span class="hidden sm:block text-lg">Rush Badminton Academy</span>
                         </div>
                         <div class="text-xs text-slate-500 -mt-0.5 hidden sm:block">Booking Lapangan Online</div>
@@ -251,10 +257,10 @@ function isActive($page_name) {
                     <?php endif; ?>
                 </div>
 
-                <div class="flex items-center gap-4 lg:hidden">
-                    <a href="#" id="mobileCartIcon" class="relative text-slate-700 hover:text-primary transition-colors">
+                <div class="flex items-center gap-3 sm:gap-4 lg:hidden ml-2">
+                    <a href="#" id="mobileCartIcon" class="relative text-slate-700 hover:text-primary transition-colors p-1">
                         <i class="fa-solid fa-cart-shopping text-xl"></i>
-                        <span id="mobileCartCount" class="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                        <span id="mobileCartCount" class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
                             <?= count($_SESSION['keranjang'] ?? []) ?>
                         </span>
                     </a>
