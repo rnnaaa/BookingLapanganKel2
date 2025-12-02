@@ -16,6 +16,20 @@ $error = null;
 // FUNGSI BANTUAN
 // ==============================================
 
+function getJenisPembayaran($conn, $id_booking) {
+    $sql = "SELECT tipe, amount FROM pembayaran WHERE booking_id = ? ORDER BY id_pembayaran";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $id_booking);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    
+    $hasDP = false;
+    while ($row = $res->fetch_assoc()) {
+        if ($row['tipe'] === 'DP') $hasDP = true;
+    }
+    return $hasDP ? 'dp' : 'lunas';
+}
+
 function generateRegulerId($tanggal, $jam_mulai) {
     $day = substr($tanggal, 8, 2);
     $month = substr($tanggal, 5, 2);
@@ -82,9 +96,12 @@ function ensureJadwalDetailExists($conn, $id_jadwal_harian, $lapangan_id) {
     $stmt->execute();
 }
 
-function getStatusInfo($status_booking, $status_pembatalan, $payment_status) {
-    // 6 STATUS SYSTEM SESUAI REQUIREMENT
+function getStatusInfo($status_booking, $status_pembatalan, $payment_status, $tanggal, $jam_mulai) {
+    // AUTO REJECT jika sudah lewat H-12 dan status masih pending
     if ($status_pembatalan === 'pending') {
+        if (!validateH12Jam($tanggal, $jam_mulai)) {
+            return ['status' => 'Pembatalan Ditolak (Lewat Waktu)', 'class' => 'ditolak'];
+        }
         return ['status' => 'Menunggu Pengajuan', 'class' => 'orange'];
     } elseif ($status_pembatalan === 'approved') {
         return ['status' => 'Pembatalan Disetujui', 'class' => 'primary'];
@@ -95,7 +112,7 @@ function getStatusInfo($status_booking, $status_pembatalan, $payment_status) {
     } elseif ($status_booking === 'ditolak') {
         return ['status' => 'Ditolak', 'class' => 'ditolak'];
     } elseif ($payment_status === 'belum_bayar' || $payment_status === 'menunggu_verifikasi') {
-        return ['status' => 'Menunggu', 'class' => 'menunggu'];
+        return ['status' => 'Menunggu Pembayaran', 'class' => 'menunggu'];
     } else {
         return ['status' => 'Menunggu', 'class' => 'menunggu'];
     }
@@ -113,109 +130,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
         exit;
     }
 
-if ($_GET['action'] === 'get_available_sessions') {
-    $lapangan_id = (int)($_GET['lapangan_id'] ?? 0);
-    $tanggal = $_GET['selected_date'] ?? date('Y-m-d');
-    $booking_id = (int)($_GET['booking_id'] ?? 0);
+    if ($_GET['action'] === 'get_available_sessions') {
+        $lapangan_id = (int)($_GET['lapangan_id'] ?? 0);
+        $tanggal = $_GET['selected_date'] ?? date('Y-m-d');
+        $booking_id = (int)($_GET['booking_id'] ?? 0);
 
-    // Debug logging
-    error_log("get_available_sessions called: lapangan_id=$lapangan_id, tanggal=$tanggal, booking_id=$booking_id");
-
-    if ($lapangan_id <= 0) {
-        error_log("Invalid lapangan_id: $lapangan_id");
-        echo json_encode(['status' => 'error', 'message' => 'Lapangan tidak valid']);
-        exit;
-    }
-
-    // Validasi tanggal
-    $today = date('Y-m-d');
-    $max_date = date('Y-m-d', strtotime('+7 days'));
-    
-    if ($tanggal < $today) {
-        echo json_encode([
-            'status' => 'error', 
-            'message' => 'Tidak bisa memilih tanggal yang sudah lewat'
-        ]);
-        exit;
-    }
-    
-    if ($tanggal > $max_date) {
-        echo json_encode([
-            'status' => 'error', 
-            'message' => 'Tanggal booking maksimal 7 hari dari sekarang'
-        ]);
-        exit;
-    }
-
-    $conn->begin_transaction();
-
-    try {
-        // Pastikan jadwal harian ada
-        $id_jadwal_harian = ensureJadwalHarianExists($conn, $lapangan_id, $tanggal);
-        ensureJadwalDetailExists($conn, $id_jadwal_harian, $lapangan_id);
-
-        // Query yang lebih simple dan reliable
-        $sql = "
-            SELECT 
-                jw.id_jadwal_waktu,
-                jw.jam_mulai,
-                jw.jam_selesai,
-                l.harga_per_jam AS harga,
-                COALESCE(jd.status, 'available') as jadwal_status
-            FROM jadwal_waktu jw
-            JOIN lapangan l ON jw.id_lapangan = l.id_lapangan
-            LEFT JOIN jadwal_detail jd ON jd.id_jadwal_waktu = jw.id_jadwal_waktu 
-                AND jd.id_jadwal_harian = ?
-            WHERE jw.id_lapangan = ?
-              AND jw.aktif = 1
-              AND (jd.status IS NULL OR jd.status = 'available' OR jd.id_booking = ?)
-            ORDER BY jw.jam_mulai ASC
-        ";
-
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
-        }
-        
-        $stmt->bind_param("iii", $id_jadwal_harian, $lapangan_id, $booking_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        $sessions = [];
-        while ($row = $result->fetch_assoc()) {
-            $sessions[] = [
-                'id_jadwal_waktu' => $row['id_jadwal_waktu'],
-                'jam_mulai' => substr($row['jam_mulai'], 0, 5),
-                'jam_selesai' => substr($row['jam_selesai'], 0, 5),
-                'harga' => (int)$row['harga'],
-                'status' => $row['jadwal_status']
-            ];
+        if ($lapangan_id <= 0) {
+            echo json_encode(['status' => 'error', 'message' => 'Lapangan tidak valid']);
+            exit;
         }
 
-        $conn->commit();
+        // Validasi tanggal
+        $today = date('Y-m-d');
+        $max_date = date('Y-m-d', strtotime('+7 days'));
         
-        error_log("Sessions found: " . count($sessions) . " for date $tanggal");
+        if ($tanggal < $today) {
+            echo json_encode(['status' => 'error', 'message' => 'Tidak bisa memilih tanggal yang sudah lewat']);
+            exit;
+        }
         
-        echo json_encode([
-            'status' => 'success',
-            'available_sessions' => $sessions,
-            'debug' => [
-                'lapangan_id' => $lapangan_id,
-                'tanggal' => $tanggal,
-                'total_sessions' => count($sessions)
-            ]
-        ]);
+        if ($tanggal > $max_date) {
+            echo json_encode(['status' => 'error', 'message' => 'Tanggal booking maksimal 7 hari dari sekarang']);
+            exit;
+        }
 
-    } catch (Exception $e) {
-        $conn->rollback();
-        error_log("Error in get_available_sessions: " . $e->getMessage());
-        echo json_encode([
-            'status' => 'error', 
-            'message' => 'System error: ' . $e->getMessage()
-        ]);
+        try {
+            // QUERY untuk mengambil semua jam termasuk yang dibooking
+            $sql = "
+                SELECT 
+                    jw.id_jadwal_waktu,
+                    jw.jam_mulai,
+                    jw.jam_selesai,
+                    l.harga_per_jam AS harga,
+                    COALESCE(jd.status, 'available') as status_jadwal,
+                    jd.id_booking,
+                    jd.id_member_jadwal
+                FROM jadwal_waktu jw
+                JOIN lapangan l ON jw.id_lapangan = l.id_lapangan
+                LEFT JOIN jadwal_detail jd ON jd.id_jadwal_waktu = jw.id_jadwal_waktu 
+                    AND jd.id_jadwal_harian = (
+                        SELECT id_jadwal_harian FROM jadwal_harian 
+                        WHERE id_lapangan = ? AND tanggal = ?
+                    )
+                WHERE jw.id_lapangan = ?
+                AND jw.aktif = 1
+                ORDER BY jw.jam_mulai ASC
+            ";
+
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                throw new Exception("Prepare failed: " . $conn->error);
+            }
+            
+            $stmt->bind_param("isi", $lapangan_id, $tanggal, $lapangan_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $sessions = [];
+            while ($row = $result->fetch_assoc()) {
+                // Tampilkan semua jam, tapi bedakan status
+                $isAvailable = $row['status_jadwal'] === 'available';
+                $isOwnBooking = ($row['id_booking'] == $booking_id);
+                
+                $sessions[] = [
+                    'id_jadwal_waktu' => $row['id_jadwal_waktu'],
+                    'jam_mulai' => substr($row['jam_mulai'], 0, 5),
+                    'jam_selesai' => substr($row['jam_selesai'], 0, 5),
+                    'harga' => (int)$row['harga'],
+                    'status' => $row['status_jadwal'],
+                    'available' => $isAvailable || $isOwnBooking,
+                    'disabled' => !$isAvailable && !$isOwnBooking,
+                    'disabled_reason' => (!$isAvailable && !$isOwnBooking) ? 'Sudah dibooking' : ''
+                ];
+            }
+
+            echo json_encode([
+                'status' => 'success',
+                'available_sessions' => $sessions
+            ]);
+
+        } catch (Exception $e) {
+            error_log("ERROR in get_available_sessions: " . $e->getMessage());
+            echo json_encode([
+                'status' => 'error', 
+                'message' => 'System error: ' . $e->getMessage()
+            ]);
+        }
+        exit;
     }
-    exit;
-}
 
     if ($_GET['action'] === 'get_member_sessions') {
         $member_id = (int)($_GET['member_id'] ?? 0);
@@ -260,7 +262,8 @@ if ($_GET['action'] === 'get_available_sessions') {
                 'jam_mulai' => substr($row['jam_mulai'], 0, 5),
                 'jam_selesai' => substr($row['jam_selesai'], 0, 5),
                 'status_jadwal' => $row['status_jadwal'],
-                'nama_lapangan' => $row['nama_lapangan']
+                'nama_lapangan' => $row['nama_lapangan'],
+                'can_change' => validateH12Jam($row['tanggal_booking'], $row['jam_mulai'])
             ];
         }
 
@@ -272,20 +275,31 @@ if ($_GET['action'] === 'get_available_sessions') {
     }
 
     if ($_GET['action'] === 'get_user_info') {
-        $stmt = $conn->prepare("SELECT username, nama FROM users WHERE id_user = ?");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        header('Content-Type: application/json');
         
-        if ($result->num_rows > 0) {
-            $user = $result->fetch_assoc();
-            echo json_encode([
-                'status' => 'success',
-                'username' => $user['username'],
-                'nama' => $user['nama']
-            ]);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'User tidak ditemukan']);
+        if (!$is_logged_in) {
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+            exit;
+        }
+
+        try {
+            $stmt = $conn->prepare("SELECT username, nama FROM users WHERE id_user = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows > 0) {
+                $user = $result->fetch_assoc();
+                echo json_encode([
+                    'status' => 'success',
+                    'username' => $user['username'],
+                    'nama' => $user['nama']
+                ]);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'User tidak ditemukan']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => 'System error: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -320,7 +334,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmt = $conn->prepare("
             SELECT db.id_detail_booking, b.id_booking, b.tanggal AS tanggal_lama, b.id_lapangan,
                    jw.jam_mulai AS jam_lama, jw.jam_selesai AS jam_selesai_lama,
-                   jw2.jam_mulai AS jam_baru, jw2.jam_selesai AS jam_selesai_baru
+                   jw2.jam_mulai AS jam_baru, jw2.jam_selesai AS jam_selesai_baru,
+                   jw.id_jadwal_waktu as old_jadwal_waktu
             FROM detail_booking db
             JOIN booking b ON db.id_booking = b.id_booking
             JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu
@@ -364,8 +379,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         ");
         $stmt->bind_param("si", $new_date, $new_jadwal_waktu);
         $stmt->execute();
-        $status = $stmt->get_result()->fetch_row()[0] ?? 'available';
-        if ($status !== 'available') throw new Exception('Jadwal sudah dipesan orang lain');
+        $row = $stmt->get_result()->fetch_assoc();
+        $status = $row['status'] ?? 'available';
+        
+        if ($status !== 'available') {
+            throw new Exception('Jadwal sudah dipesan orang lain');
+        }
 
         // Release jadwal lama
         $stmt = $conn->prepare("
@@ -374,8 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             SET jd.id_booking = NULL, jd.status = 'available'
             WHERE jh.tanggal = ? AND jd.id_jadwal_waktu = ?
         ");
-        $old_jadwal_waktu = $data['id_jadwal_waktu'] ?? 0;
-        $stmt->bind_param("si", $data['tanggal_lama'], $old_jadwal_waktu);
+        $stmt->bind_param("si", $data['tanggal_lama'], $data['old_jadwal_waktu']);
         $stmt->execute();
 
         // Booking jadwal baru
@@ -419,13 +437,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// 2. AJUKAN PEMBATALAN - SESUAI FITUR NO.6
 // 2. AJUKAN PEMBATALAN - FIXED VERSION
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ajukan_pembatalan') {
     header('Content-Type: application/json');
-    
-    // Log incoming request
-    error_log("ajukan_pembatalan called: " . print_r($_POST, true));
     
     if (!$is_logged_in) {
         echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
@@ -436,8 +450,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ajuka
     $nama_penerima = trim($_POST['nama_penerima'] ?? '');
     $no_rekening = trim($_POST['no_rekening'] ?? '');
     $bank_ewallet = trim($_POST['bank_ewallet'] ?? '');
-
-    error_log("Processing cancellation: id_sesi=$id_sesi, nama_penerima=$nama_penerima");
 
     if ($id_sesi <= 0 || empty($nama_penerima) || empty($no_rekening) || empty($bank_ewallet)) {
         echo json_encode(['status' => 'error', 'message' => 'Data rekening harus diisi lengkap']);
@@ -497,24 +509,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ajuka
         // Insert pengajuan pembatalan
         $stmt = $conn->prepare("
             INSERT INTO pembatalan_booking 
-            (id_detail_booking, id_user, nama_pengaju, nomor_rekening, atas_nama, jumlah_refund, status, requested_at) 
-            VALUES (?, ?, ?, ?, ?, 0, 'pending', NOW())
+            (id_detail_booking, id_user, nama_pengaju, nomor_rekening, bank_ewallet, atas_nama, jumlah_refund, status, requested_at) 
+            VALUES (?, ?, ?, ?, ?, ?, 0, 'pending', NOW())
         ");
         
         if (!$stmt) {
             throw new Exception("Prepare insert failed: " . $conn->error);
         }
         
-        $stmt->bind_param("iisss", 
+        $stmt->bind_param("iissss", 
             $id_sesi, 
             $user_id, 
             $user_info['nama'] ?? 'User', 
-            $no_rekening, 
+            $no_rekening,
+            $bank_ewallet,
             $nama_penerima
         );
         
         if ($stmt->execute()) {
-            error_log("Cancellation request inserted successfully for session: $id_sesi");
             echo json_encode([
                 'status' => 'success', 
                 'message' => 'Pengajuan berhasil dikirim. Mohon cek berkala'
@@ -556,6 +568,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (is_string($member_session_ids)) {
         $member_session_ids = explode(',', $member_session_ids);
     }
+    $member_session_ids = array_map('intval', $member_session_ids);
 
     $conn->begin_transaction();
 
@@ -575,11 +588,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         $member_data = $result_member->fetch_assoc();
+        
         if ($member_data['status'] !== 'aktif') {
-            throw new Exception('Membership tidak aktif');
+            throw new Exception('Membership belum aktif');
         }
 
-        // Validasi batas tanggal member (tidak boleh melebihi tanggal_berakhir)
+        // Validasi batas tanggal member
         if ($new_date > $member_data['tanggal_berakhir']) {
             throw new Exception('Tanggal booking tidak boleh melebihi periode membership');
         }
@@ -643,8 +657,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $jam_baru_mulai = $new_time_data['jam_mulai'];
         $jam_baru_selesai = $new_time_data['jam_selesai'];
 
+        // Pastikan jadwal baru tersedia
         $id_jadwal_harian_baru = ensureJadwalHarianExists($conn, $lapangan_id, $new_date);
         ensureJadwalDetailExists($conn, $id_jadwal_harian_baru, $lapangan_id);
+
+        // Cek apakah slot baru available
+        $stmt_check = $conn->prepare("
+            SELECT status FROM jadwal_detail 
+            WHERE id_jadwal_harian = ? AND id_jadwal_waktu = ?
+        ");
+        $stmt_check->bind_param("ii", $id_jadwal_harian_baru, $selected_session);
+        $stmt_check->execute();
+        $check_result = $stmt_check->get_result();
+        $status_baru = $check_result->num_rows > 0 ? $check_result->fetch_assoc()['status'] : 'available';
+        
+        if ($status_baru !== 'available') {
+            throw new Exception('Jadwal yang dipilih sudah tidak tersedia');
+        }
 
         // Update setiap sesi member
         foreach ($member_session_ids as $session_id) {
@@ -710,70 +739,185 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
+// 4. AJUKAN PEMBATALAN MEMBER
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ajukan_batal_member') {
+    header('Content-Type: application/json');
+    
+    if (!$is_logged_in) {
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $member_id = (int)($_POST['member_id'] ?? 0);
+    $nama_penerima = trim($_POST['nama_penerima'] ?? '');
+    $no_rekening = trim($_POST['no_rekening'] ?? '');
+    $bank_ewallet = trim($_POST['bank_ewallet'] ?? '');
+
+    if ($member_id <= 0 || empty($nama_penerima) || empty($no_rekening) || empty($bank_ewallet)) {
+        echo json_encode(['status' => 'error', 'message' => 'Data rekening harus diisi lengkap']);
+        exit;
+    }
+
+    try {
+        // Cek member
+        $stmt = $conn->prepare("
+            SELECT m.id_member, m.status, m.tanggal_mulai, u.nama
+            FROM member m
+            JOIN users u ON m.id_user = u.id_user
+            WHERE m.id_member = ? AND m.id_user = ?
+        ");
+        $stmt->bind_param("ii", $member_id, $user_id);
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_assoc();
+
+        if (!$data) {
+            echo json_encode(['status' => 'error', 'message' => 'Member tidak ditemukan']);
+            exit;
+        }
+
+        if ($data['status'] !== 'aktif') {
+            echo json_encode(['status' => 'error', 'message' => 'Hanya membership aktif yang bisa dibatalkan']);
+            exit;
+        }
+
+        // Validasi H-12 jam dari tanggal mulai
+        $tanggal_mulai = $data['tanggal_mulai'];
+        $tanggal_mulai_obj = new DateTime($tanggal_mulai);
+        $deadline = (clone $tanggal_mulai_obj)->sub(new DateInterval('PT12H'));
+        $now = new DateTime('now', new DateTimeZone('Asia/Jakarta'));
+        
+        if ($now > $deadline) {
+            echo json_encode(['status' => 'error', 'message' => 'Waktu pengajuan pembatalan telah habis (H-12 jam sebelum tanggal mulai)']);
+            exit;
+        }
+
+        // Cek sudah pernah diajukan belum
+        $stmt_check = $conn->prepare("SELECT id FROM pembatalan_member WHERE id_member = ?");
+        $stmt_check->bind_param("i", $member_id);
+        $stmt_check->execute();
+        if ($stmt_check->get_result()->num_rows > 0) {
+            echo json_encode(['status' => 'error', 'message' => 'Pengajuan pembatalan sudah pernah dikirim']);
+            exit;
+        }
+
+        // Insert pengajuan pembatalan
+        $stmt = $conn->prepare("
+            INSERT INTO pembatalan_member 
+            (id_member, id_user, nama_pengaju, nomor_rekening, bank_ewallet, atas_nama, status, requested_at) 
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())
+        ");
+        
+        $stmt->bind_param("iissss", 
+            $member_id, 
+            $user_id, 
+            $data['nama'], 
+            $no_rekening,
+            $bank_ewallet,
+            $nama_penerima
+        );
+        
+        if ($stmt->execute()) {
+            echo json_encode([
+                'status' => 'success', 
+                'message' => 'Pengajuan pembatalan membership berhasil dikirim'
+            ]);
+        } else {
+            throw new Exception("Execute failed: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in ajukan_batal_member: " . $e->getMessage());
+        echo json_encode([
+            'status' => 'error', 
+            'message' => 'System error: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
 // ==============================================
 // BACKEND DATA PREPARATION
 // ==============================================
 
 if ($is_logged_in) {
     try {
-        // Query untuk booking reguler (per sesi)
-$stmtBookings = $conn->prepare("
-    SELECT 
-        db.id_detail_booking AS id_sesi,
-        b.id_booking,
-        b.tanggal,
-        b.status AS status_booking,
-        b.payment_status,
-        b.total_amount,
-        l.nama_lapangan,
-        l.id_lapangan,
-        jw.jam_mulai,
-        jw.jam_selesai,
-        COALESCE(h.cnt, 0) AS sudah_ubah,
-        p.status AS status_pembatalan,
-        p.bukti_refund,
-        b.created_at
-    FROM detail_booking db
-    JOIN booking b ON db.id_booking = b.id_booking
-    JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu
-    JOIN lapangan l ON b.id_lapangan = l.id_lapangan
-    LEFT JOIN (
-        SELECT id_detail_booking, COUNT(*) AS cnt 
-        FROM history_ubah_jadwal 
-        WHERE tipe = 'reguler' 
-        GROUP BY id_detail_booking
-    ) h ON db.id_detail_booking = h.id_detail_booking
-    LEFT JOIN pembatalan_booking p ON db.id_detail_booking = p.id_detail_booking
-    WHERE b.id_user = ? AND b.tipe_booking = 'reguler'
-    ORDER BY b.created_at DESC, b.tanggal DESC, jw.jam_mulai DESC
-");
+        // Query untuk booking reguler - FIXED dengan harga yang benar
+        $stmtBookings = $conn->prepare("
+            SELECT 
+                db.id_detail_booking AS id_sesi,
+                b.id_booking,
+                b.tanggal,
+                b.status AS status_booking,
+                b.payment_status,
+                b.dp_amount,
+                b.total_amount,
+                b.remaining_amount,
+                l.nama_lapangan,
+                l.id_lapangan,
+                jw.jam_mulai,
+                jw.jam_selesai,
+                db.harga AS harga_sesi,
+                COALESCE(h.cnt, 0) AS sudah_ubah,
+                p.status AS status_pembatalan,
+                p.bukti_refund,
+                b.created_at,
+                u.username,
+                u.nama as nama_user
+            FROM detail_booking db
+            JOIN booking b ON db.id_booking = b.id_booking
+            JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu
+            JOIN lapangan l ON b.id_lapangan = l.id_lapangan
+            JOIN users u ON b.id_user = u.id_user
+            LEFT JOIN (
+                SELECT id_detail_booking, COUNT(*) AS cnt 
+                FROM history_ubah_jadwal 
+                WHERE tipe = 'reguler' 
+                GROUP BY id_detail_booking
+            ) h ON db.id_detail_booking = h.id_detail_booking
+            LEFT JOIN pembatalan_booking p ON db.id_detail_booking = p.id_detail_booking
+            WHERE b.id_user = ? AND b.tipe_booking = 'reguler'
+            ORDER BY b.created_at DESC, b.id_booking DESC, db.id_detail_booking
+        ");
         $stmtBookings->bind_param("i", $user_id);
         $stmtBookings->execute();
         $resultBookings = $stmtBookings->get_result();
         $bookings = $resultBookings->fetch_all(MYSQLI_ASSOC);
         $stmtBookings->close();
 
-        // Query untuk member bookings
- $stmtMember = $conn->prepare("
-    SELECT 
-        m.id_member, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, 
-        m.bukti_pembayaran, m.method, m.total_bayar, m.status, l.nama_lapangan, l.id_lapangan,
-        COUNT(DISTINCT mj.id_member_jadwal) as total_sessions,
-        COUNT(DISTINCT h.id_ubah_jadwal) as sudah_ubah,
-        GROUP_CONCAT(DISTINCT CONCAT(
-            DATE_FORMAT(mj.tanggal_booking, '%d/%m/%Y'), 
-            ' ', 
-            mj.jam_mulai, '-', mj.jam_selesai
-        ) SEPARATOR '; ') as jadwal,
-        m.created_at
-    FROM member m
-    JOIN lapangan l ON m.id_lapangan = l.id_lapangan
-    LEFT JOIN member_jadwal mj ON m.id_member = mj.id_member
-    LEFT JOIN history_ubah_jadwal h ON m.id_member = h.id_member AND h.tipe = 'member'
-    WHERE m.id_user = ?
-    GROUP BY m.id_member
-    ORDER BY m.created_at DESC, m.tanggal_mulai DESC
-");
+        // Query untuk member bookings - FIXED dengan status yang benar
+        $stmtMember = $conn->prepare("
+            SELECT 
+                m.id_member, 
+                m.durasi_bulan, 
+                m.tanggal_mulai, 
+                m.tanggal_berakhir, 
+                m.bukti_pembayaran, 
+                m.method, 
+                m.total_bayar, 
+                m.status, 
+                l.nama_lapangan, 
+                l.id_lapangan,
+                u.username,
+                u.nama as nama_user,
+                COUNT(DISTINCT mj.id_member_jadwal) as total_sessions,
+                COUNT(DISTINCT h.id_ubah_jadwal) as sudah_ubah,
+                GROUP_CONCAT(DISTINCT CONCAT(
+                    DATE_FORMAT(mj.tanggal_booking, '%d/%m/%Y'), 
+                    ' ', 
+                    TIME_FORMAT(mj.jam_mulai, '%H:%i'), 
+                    '-', 
+                    TIME_FORMAT(mj.jam_selesai, '%H:%i')
+                ) SEPARATOR '; ') as jadwal,
+                m.created_at
+            FROM member m
+            JOIN lapangan l ON m.id_lapangan = l.id_lapangan
+            JOIN users u ON m.id_user = u.id_user
+            LEFT JOIN member_jadwal mj ON m.id_member = mj.id_member
+            LEFT JOIN history_ubah_jadwal h ON m.id_member = h.id_member AND h.tipe = 'member'
+            WHERE m.id_user = ?
+            GROUP BY m.id_member
+            ORDER BY m.created_at DESC, m.tanggal_mulai DESC
+        ");
         $stmtMember->bind_param("i", $user_id);
         $stmtMember->execute();
         $resultMember = $stmtMember->get_result();
@@ -832,8 +976,14 @@ $stmtBookings = $conn->prepare("
         <?php else: ?>
             <?php foreach ($bookings as $booking): ?>
                 <?php
-                // LOGIKA 6 STATUS SESUAI REQUIREMENT
-                $status_info = getStatusInfo($booking['status_booking'], $booking['status_pembatalan'], $booking['payment_status']);
+                // LOGIKA 6 STATUS SESUAI REQUIREMENT dengan auto reject
+                $status_info = getStatusInfo(
+                    $booking['status_booking'], 
+                    $booking['status_pembatalan'], 
+                    $booking['payment_status'],
+                    $booking['tanggal'],
+                    $booking['jam_mulai']
+                );
                 $final_status = $status_info['status'];
                 $status_class = $status_info['class'];
 
@@ -842,43 +992,110 @@ $stmtBookings = $conn->prepare("
                 $canBatal = false;
                 $deadline = "";
                 $countdownText = "";
+                $disableReason = "";
 
                 if (in_array($booking['status_booking'], ['menunggu', 'disetujui']) && empty($booking['status_pembatalan'])) {
-    // Tombol Ubah Jadwal
-    if ($booking['sudah_ubah'] == 0 && validateH5Jam($booking['tanggal'], $booking['jam_mulai'])) {
-        $canEdit = true;
-        
-        // Bersihkan format waktu sebelum parsing
-        $timePart = trim($booking['jam_mulai']);
-        // Hapus detik jika sudah ada
-        if (substr_count($timePart, ':') >= 2) {
-            $timeParts = explode(':', $timePart);
-            $timePart = $timeParts[0] . ':' . $timeParts[1];
-        }
-        
-        $datetimeString = "{$booking['tanggal']} {$timePart}:00";
-        
-        try {
-            $bt = new DateTime($datetimeString, new DateTimeZone('Asia/Jakarta'));
-            $deadline = (clone $bt)->sub(new DateInterval('PT5H'))->format('c');
-            $countdownText = "Bisa diubah sebelum H-5 jam";
-        } catch (Exception $e) {
-            echo "Error parsing datetime: " . $e->getMessage();
-            $canEdit = false;
-        }
-    }
-
+                    // Tombol Ubah Jadwal
+                    if ($booking['sudah_ubah'] == 0 && validateH5Jam($booking['tanggal'], $booking['jam_mulai'])) {
+                        $canEdit = true;
+                        $deadline = date('c', strtotime("{$booking['tanggal']} {$booking['jam_mulai']} -5 hours"));
+                        $countdownText = "Bisa diubah sebelum H-5 jam";
+                    } else {
+                        if ($booking['sudah_ubah'] > 0) {
+                            $disableReason = "Sudah pernah diubah";
+                        } else {
+                            $disableReason = "Sudah lewat batas H-5 jam";
+                        }
+                    }
 
                     // Tombol Ajukan Pembatalan
                     if (validateH12Jam($booking['tanggal'], $booking['jam_mulai'])) {
                         $canBatal = true;
-                        if (empty($countdownText)) {
-                            $bt = new DateTime("{$booking['tanggal']} {$booking['jam_mulai']}:00", new DateTimeZone('Asia/Jakarta'));
-                            $deadline = (clone $bt)->sub(new DateInterval('PT12H'))->format('c');
+                        if (empty($deadline)) {
+                            $deadline = date('c', strtotime("{$booking['tanggal']} {$booking['jam_mulai']} -12 hours"));
                             $countdownText = "Bisa dibatalkan sebelum H-12 jam";
+                        }
+                    } else {
+                        if (empty($disableReason)) {
+                            $disableReason = "Sudah lewat batas H-12 jam";
                         }
                     }
                 }
+// Dalam bagian POST ajukan_pembatalan
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ajukan_pembatalan') {
+    header('Content-Type: application/json');
+    
+    if (!$is_logged_in) {
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $id_sesi = (int)($_POST['id_sesi'] ?? 0);
+    $nama_penerima = trim($_POST['nama_penerima'] ?? '');
+    $no_rekening = trim($_POST['no_rekening'] ?? '');
+    $bank_ewallet = trim($_POST['bank_ewallet'] ?? '');
+
+    // Validasi input
+    if ($id_sesi <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'ID sesi tidak valid']);
+        exit;
+    }
+
+    if (empty($nama_penerima) || strlen($nama_penerima) < 3) {
+        echo json_encode(['status' => 'error', 'message' => 'Nama penerima minimal 3 karakter']);
+        exit;
+    }
+
+    // Validasi nomor rekening hanya angka
+    if (empty($no_rekening) || !preg_match('/^[0-9]+$/', $no_rekening)) {
+        echo json_encode(['status' => 'error', 'message' => 'Nomor rekening hanya boleh berisi angka']);
+        exit;
+    }
+
+    // Validasi panjang nomor rekening
+    if (strlen($no_rekening) < 8 || strlen($no_rekening) > 20) {
+        echo json_encode(['status' => 'error', 'message' => 'Nomor rekening harus 8-20 digit']);
+        exit;
+    }
+
+    if (empty($bank_ewallet)) {
+        echo json_encode(['status' => 'error', 'message' => 'Bank/E-Wallet harus dipilih']);
+        exit;
+    }
+
+    try {
+        // ... sisa kode yang sama ...
+        
+    } catch (Exception $e) {
+        error_log("Error in ajukan_pembatalan: " . $e->getMessage());
+        echo json_encode([
+            'status' => 'error', 
+            'message' => 'System error: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+                // Hitung total pembayaran yang benar
+                $stmt_pay = $conn->prepare("SELECT tipe, SUM(amount) as total FROM pembayaran WHERE booking_id = ? GROUP BY tipe");
+                $stmt_pay->bind_param("i", $booking['id_booking']);
+                $stmt_pay->execute();
+                $payments_result = $stmt_pay->get_result();
+                
+                $total_dp = 0;
+                $total_lunas = 0;
+                $ada_DP = false;
+                
+                while ($p = $payments_result->fetch_assoc()) {
+                    if ($p['tipe'] === 'DP') {
+                        $total_dp = $p['total'];
+                        $ada_DP = true;
+                    } elseif ($p['tipe'] === 'pelunasan') {
+                        $total_lunas = $p['total'];
+                    }
+                }
+                
+                $total_bayar = $total_dp + $total_lunas;
+                $total_normal = $booking['harga_sesi']; // Harga per sesi
                 ?>
 
                 <div class="card" data-sesi="<?= $booking['id_sesi'] ?>">
@@ -896,51 +1113,81 @@ $stmtBookings = $conn->prepare("
                     <div class="card-body">
                         <p><strong>Tanggal:</strong> <?= date('l, j F Y', strtotime($booking['tanggal'])) ?></p>
                         <p><strong>Jam:</strong> <?= substr($booking['jam_mulai'], 0, 5) . ' - ' . substr($booking['jam_selesai'], 0, 5) ?></p>
-                        <p><strong>Total:</strong> Rp <?= number_format($booking['total_amount'] ?? 0, 0, ',', '.') ?></p>
+                        <p><strong>Pemesan:</strong> <?= htmlspecialchars($booking['nama_user']) ?> (@<?= htmlspecialchars($booking['username']) ?>)</p>
+                        
+                        <?php if ($ada_DP): ?>
+                            <p><strong>Pembayaran:</strong> 
+                                <span style="color:#e67e22;font-weight:bold">DP Rp <?= number_format($total_dp, 0, ',', '.') ?></span>
+                            </p>
+                            <?php if ($total_lunas > 0): ?>
+                                <p style="color:#27ae60;margin-top:4px">
+                                    <small>+ Pelunasan: <strong>Rp <?= number_format($total_lunas, 0, ',', '.') ?></strong></small>
+                                </p>
+                            <?php else: ?>
+                                <p style="color:#c0392b;margin-top:4px">
+                                    <small>Sisa pelunasan: <strong>Rp <?= number_format($total_normal - $total_dp, 0, ',', '.') ?></strong></small>
+                                </p>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <p><strong>Total Lunas:</strong> 
+                                <span style="color:#27ae60;font-weight:bold">Rp <?= number_format($total_bayar, 0, ',', '.') ?></span>
+                            </p>
+                        <?php endif; ?>
                     </div>
 
                     <div class="card-footer">
                         <?php if ($canEdit || $canBatal): ?>
                             <div class="countdown-timer" data-deadline="<?= $deadline ?>">
-                                <small>Tersisa: <span class="timer">menghitung...</span></small>
+                                <small><?= $countdownText ?>: <span class="timer">menghitung...</span></small>
                             </div>
-                        <?php else: ?>
+                        <?php elseif (!empty($disableReason)): ?>
                             <div class="countdown-timer expired">
-                                <small>Tidak dapat diubah/dibatalkan</small>
+                                <small><?= $disableReason ?></small>
                             </div>
                         <?php endif; ?>
 
                         <div class="action-buttons">
                             <button class="btn-detail" onclick="showDetail(
                                 '<?= $booking['id_booking'] ?>',
-                                '<?= htmlspecialchars($booking['nama_lapangan']) ?>',
+                                '<?= htmlspecialchars($booking['nama_lapangan'], ENT_QUOTES) ?>',
                                 '<?= $booking['tanggal'] ?>',
                                 '<?= substr($booking['jam_mulai'], 0, 5) . '-' . substr($booking['jam_selesai'], 0, 5) ?>',
-                                '<?= number_format($booking['total_amount'] ?? 0, 0, ',', '.') ?>',
+                                '<?= number_format($total_normal, 0, ',', '.') ?>',
                                 '<?= $final_status ?>',
-                                '<?= htmlspecialchars($booking['alasan_penolakan'] ?? '') ?>',
-                                '<?= generateRegulerId($booking['tanggal'], $booking['jam_mulai']) ?>'
+                                '<?= htmlspecialchars($booking['alasan_penolakan'] ?? '', ENT_QUOTES) ?>',
+                                '<?= generateRegulerId($booking['tanggal'], $booking['jam_mulai']) ?>',
+                                '<?= $booking['payment_status'] ?>',
+                                '<?= $total_dp ?>',
+                                '<?= max(0, $total_normal - $total_dp) ?>',
+                                '<?= $booking['username'] ?>',
+                                '<?= htmlspecialchars($booking['nama_user'], ENT_QUOTES) ?>'
                             )">Lihat Detail</button>
 
                             <?php if ($canEdit): ?>
-                                <button class="btn-ubah" onclick="ubahRegulerSesi(<?= $booking['id_sesi'] ?>, '<?= $booking['id_lapangan'] ?>', '<?= $booking['tanggal'] ?>', '<?= substr($booking['jam_mulai'], 0, 5) ?>', '<?= htmlspecialchars($booking['nama_lapangan']) ?>')">
+                                <button class="btn-ubah" onclick="ubahRegulerSesi(<?= $booking['id_sesi'] ?>, '<?= $booking['id_lapangan'] ?>', '<?= $booking['tanggal'] ?>', '<?= substr($booking['jam_mulai'], 0, 5) ?>', '<?= htmlspecialchars($booking['nama_lapangan'], ENT_QUOTES) ?>')">
                                     Ubah Jadwal
                                 </button>
                             <?php else: ?>
-                                <button class="btn-ubah disabled" disabled onclick="showDisabledMessage('ubah')">Ubah Jadwal</button>
+                                <button class="btn-ubah disabled" onclick="showAlert('<?= $disableReason ?>')">Ubah Jadwal</button>
                             <?php endif; ?>
 
-                            <?php if ($canBatal && empty($booking['status_pembatalan'])): ?>
-                                <button class="btn-batal" onclick="ajukanBatal(<?= $booking['id_sesi'] ?>, '<?= $booking['tanggal'] ?>', '<?= substr($booking['jam_mulai'], 0, 5) ?>')">
-                                    Ajukan Pembatalan
-                                </button>
-                            <?php elseif ($booking['status_pembatalan'] === 'pending'): ?>
-                                <button class="btn-batal disabled">Menunggu Konfirmasi</button>
-                            <?php elseif ($booking['status_pembatalan'] === 'approved'): ?>
-                                <button class="btn-batal disabled">Telah Direfund</button>
-                            <?php else: ?>
-                                <button class="btn-batal disabled" disabled onclick="showDisabledMessage('batal')">Batalkan</button>
-                            <?php endif; ?>
+    <?php if ($canBatal && empty($booking['status_pembatalan'])): ?>
+        <button class="btn-batal" onclick="ajukanBatal(
+            <?= $booking['id_sesi'] ?>, 
+            '<?= $booking['tanggal'] ?>', 
+            '<?= substr($booking['jam_mulai'], 0, 5) ?>', 
+            '<?= htmlspecialchars($booking['nama_lapangan'], ENT_QUOTES) ?>', 
+            '<?= substr($booking['jam_selesai'], 0, 5) ?>'
+        )">
+            Ajukan Pembatalan
+        </button>
+    <?php elseif ($booking['status_pembatalan'] === 'pending'): ?>
+        <button class="btn-batal disabled">Menunggu Konfirmasi</button>
+    <?php elseif ($booking['status_pembatalan'] === 'approved'): ?>
+        <button class="btn-batal disabled">Telah Direfund</button>
+    <?php else: ?>
+        <button class="btn-batal disabled" onclick="showAlert('<?= $disableReason ?>')">Batalkan</button>
+    <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -963,8 +1210,14 @@ $stmtBookings = $conn->prepare("
                 $ubahCount = $member['sudah_ubah'] ?? 0;
                 $maxUbah = 3;
                 $canUbah = ($ubahCount < $maxUbah) && ($member['status'] === 'aktif');
-                $countdownText = $canUbah ? 'Dapat diubah' : 'Tidak dapat diubah';
-                $statusClass = $member['status'] === 'aktif' ? 'disetujui' : 'ditolak';
+                $statusClass = $member['status'] === 'aktif' ? 'disetujui' : 
+                              ($member['status'] === 'pending' ? 'menunggu' : 'ditolak');
+                
+                // Hitung H-12 jam dari tanggal mulai
+                $tanggal_mulai = new DateTime($member['tanggal_mulai']);
+                $deadline = (clone $tanggal_mulai)->sub(new DateInterval('PT12H'));
+                $now = new DateTime('now', new DateTimeZone('Asia/Jakarta'));
+                $canBatalMember = ($member['status'] === 'aktif') && ($now <= $deadline);
                 ?>
                 
                 <div class="card" data-member="<?= $member['id_member'] ?>">
@@ -974,7 +1227,7 @@ $stmtBookings = $conn->prepare("
                                 <?= htmlspecialchars($member['nama_lapangan']) ?> 
                                 <span class="user-type member">MEMBER</span>
                             </h3>
-                            <p class="booking-id">ID: <?= $member['unique_id'] ?? '#' . $member['id_member'] ?></p>
+                            <p class="booking-id">ID: <?= $member['unique_id'] ?? 'MMBR' . $member['id_member'] ?></p>
                         </div>
                         <span class="status <?= $statusClass ?>">
                             <?= ucfirst($member['status']) ?>
@@ -983,8 +1236,9 @@ $stmtBookings = $conn->prepare("
                     <div class="card-body">
                         <p><strong>Durasi:</strong> <?= $member['durasi_bulan'] ?> bulan</p>
                         <p><strong>Periode:</strong> 
-                            <?= (new DateTime($member['tanggal_mulai']))->format('d M Y') . ' - ' . (new DateTime($member['tanggal_berakhir']))->format('d M Y') ?>
+                            <?= date('d M Y', strtotime($member['tanggal_mulai'])) . ' - ' . date('d M Y', strtotime($member['tanggal_berakhir'])) ?>
                         </p>
+                        <p><strong>Pemesan:</strong> <?= htmlspecialchars($member['nama_user']) ?> (@<?= htmlspecialchars($member['username']) ?>)</p>
                         <p><strong>Total Bayar:</strong> Rp <?= number_format($member['total_bayar'], 0, ',', '.') ?></p>
                         <p><strong>Sisa Ubah Jadwal:</strong> <?= $maxUbah - $ubahCount ?> dari <?= $maxUbah ?> kali</p>
                         <?php if ($member['total_sessions'] ?? 0 > 0): ?>
@@ -993,7 +1247,7 @@ $stmtBookings = $conn->prepare("
                     </div>
                     <div class="card-footer">
                         <div class="countdown <?= !$canUbah ? 'expired' : '' ?>">
-                            <?= $countdownText ?>
+                            <?= $canUbah ? 'Dapat diubah' : 'Kuota habis' ?>
                         </div>
                         <div class="action-buttons">
                             <button class="btn-detail" onclick="showMemberDetail(
@@ -1007,25 +1261,30 @@ $stmtBookings = $conn->prepare("
                                 '<?= htmlspecialchars($member['jadwal'] ?? 'Belum ada jadwal', ENT_QUOTES) ?>',
                                 '<?= $ubahCount ?>',
                                 '<?= $maxUbah ?>',
-                                '<?= $member['unique_id'] ?? 'MMBR' . $member['id_member'] ?>'
+                                '<?= $member['unique_id'] ?? 'MMBR' . $member['id_member'] ?>',
+                                '<?= htmlspecialchars($member['username'], ENT_QUOTES) ?>',
+                                '<?= htmlspecialchars($member['nama_user'], ENT_QUOTES) ?>'
                             )">
                                 <i class="fa-solid fa-eye"></i> Lihat Detail
                             </button>
                             
-                            <?php if ($canUbah): ?>
-                                <button class="btn-ubah" 
-                                    onclick="showUbahJadwalMember(
-                                        '<?= $member['id_member'] ?>',
-                                        '<?= htmlspecialchars($member['nama_lapangan']) ?>',
-                                        '<?= $maxUbah - $ubahCount ?>',
-                                        '<?= $member['id_lapangan'] ?>'
-                                    )">
+                            <?php if ($member['status'] === 'aktif' && $canUbah): ?>
+                                <button class="btn-ubah" onclick="showUbahJadwalMember(<?= $member['id_member'] ?>, '<?= $member['id_lapangan'] ?>', '<?= htmlspecialchars($member['nama_lapangan'], ENT_QUOTES) ?>')">
                                     <i class="fa-solid fa-calendar-alt"></i> Ubah Jadwal
                                 </button>
                             <?php else: ?>
-                                <button class="btn-ubah disabled" 
-                                    onclick="showDisabledReason('<?= $member['status'] !== 'aktif' ? 'member_not_active' : 'quota_exceeded' ?>')">
+                                <button class="btn-ubah disabled" onclick="showAlert('<?= $member['status'] !== 'aktif' ? 'Menunggu approve admin' : 'Kuota ubah jadwal habis' ?>')">
                                     <i class="fa-solid fa-calendar-alt"></i> Ubah Jadwal
+                                </button>
+                            <?php endif; ?>
+
+                            <?php if ($canBatalMember): ?>
+                                <button class="btn-batal" onclick="ajukanBatalMembership(<?= $member['id_member'] ?>, '<?= $member['tanggal_mulai'] ?>')">
+                                    <i class="fa-solid fa-ban"></i> Batalkan Member
+                                </button>
+                            <?php else: ?>
+                                <button class="btn-batal disabled" onclick="showAlert('<?= $member['status'] !== 'aktif' ? 'Membership belum aktif' : 'Sudah lewat batas H-12 jam' ?>')">
+                                    <i class="fa-solid fa-ban"></i> Batalkan Member
                                 </button>
                             <?php endif; ?>
                         </div>
@@ -1033,6 +1292,304 @@ $stmtBookings = $conn->prepare("
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
+    </div>
+
+<!-- MODAL AJUKAN PEMBATALAN -->
+<div id="modalBatal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Ajukan Pembatalan</h3>
+        <form id="formPembatalan">
+            <input type="hidden" id="id_sesi_batal">
+            
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="username_batal" value="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>Tanggal Booking</label>
+                <input type="text" id="tanggal_batal" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>Jam Booking</label>
+                <input type="text" id="jam_batal" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>Lapangan</label>
+                <input type="text" id="lapangan_batal" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>Atas Nama Penerima Refund <span class="required">*</span></label>
+                <input type="text" id="nama_penerima" placeholder="Nama pemilik rekening/ewallet" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Nomor Rekening/E-Wallet <span class="required">*</span></label>
+                <input type="text" id="no_rekening" 
+                       placeholder="Contoh: 1234567890" 
+                       pattern="[0-9]+"
+                       title="Hanya angka yang diperbolehkan"
+                       minlength="8"
+                       maxlength="20"
+                       required>
+                <small class="form-text text-muted">Hanya angka, minimal 8 digit</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Bank/E-Wallet <span class="required">*</span></label>
+                <select id="bank_ewallet" required>
+                    <option value="">Pilih Bank/E-Wallet</option>
+                    <option value="BCA">BCA</option>
+                    <option value="BRI">BRI</option>
+                    <option value="BNI">BNI</option>
+                    <option value="Mandiri">Mandiri</option>
+                    <option value="Dana">Dana</option>
+                    <option value="OVO">OVO</option>
+                    <option value="Gopay">Gopay</option>
+                    <option value="ShopeePay">ShopeePay</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeModal()">Batal</button>
+                <button type="submit" class="btn-submit">Kirim Pengajuan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+    <!-- MODAL AJUKAN PEMBATALAN MEMBER -->
+    <div id="modalBatalMember" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Ajukan Pembatalan Membership</h3>
+            <form id="formPembatalanMember">
+                <input type="hidden" id="id_member_batal">
+                
+                <div class="form-group">
+                    <label>Tanggal Mulai Member</label>
+                    <input type="text" id="tanggal_mulai_member" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Atas Nama Penerima Refund <span class="required">*</span></label>
+                    <input type="text" id="nama_penerima_member" placeholder="Nama pemilik rekening/ewallet" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Nomor Rekening/E-Wallet <span class="required">*</span></label>
+                    <input type="text" id="no_rekening_member" placeholder="Contoh: 1234567890" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Bank/E-Wallet <span class="required">*</span></label>
+                    <select id="bank_ewallet_member" required>
+                        <option value="">Pilih Bank/E-Wallet</option>
+                        <option value="BCA">BCA</option>
+                        <option value="BRI">BRI</option>
+                        <option value="BNI">BNI</option>
+                        <option value="Mandiri">Mandiri</option>
+                        <option value="Dana">Dana</option>
+                        <option value="OVO">OVO</option>
+                        <option value="Gopay">Gopay</option>
+                        <option value="ShopeePay">ShopeePay</option>
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModalMember()">Batal</button>
+                    <button type="submit" class="btn-submit">Kirim Pengajuan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL UBAH JADWAL REGULER -->
+    <div id="modalUbahReguler" class="modal large">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Ubah Jadwal Reguler</h3>
+            <form id="formUbahReguler">
+                <input type="hidden" id="id_sesi_ubah">
+                <input type="hidden" id="id_lapangan_ubah">
+                
+                <div class="form-group">
+                    <label>Lapangan</label>
+                    <input type="text" id="nama_lapangan_ubah" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tanggal Lama</label>
+                    <input type="text" id="tanggal_lama" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Jam Lama</label>
+                    <input type="text" id="jam_lama" readonly>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Pilih Tanggal Baru <span class="required">*</span></label>
+                        <input type="date" id="new_date" min="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d', strtotime('+7 days')) ?>" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Pilih Jam Baru <span class="required">*</span></label>
+                    <div id="session-list" class="session-grid">
+                        <p>Pilih tanggal terlebih dahulu</p>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModalUbah()">Batal</button>
+                    <button type="submit" class="btn-submit">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL UBAH JADWAL MEMBER -->
+    <div id="modalUbahMember" class="modal large">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Ubah Jadwal Member</h3>
+            <form id="formUbahMember">
+                <input type="hidden" id="id_member_ubah">
+                <input type="hidden" id="id_lapangan_member_ubah">
+                
+                <div class="form-group">
+                    <label>Lapangan</label>
+                    <input type="text" id="nama_lapangan_member" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Pilih Sesi yang Akan Diubah</label>
+                    <div id="member-session-list" class="session-list">
+                        <p>Memuat sesi...</p>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Pilih Tanggal Baru <span class="required">*</span></label>
+                        <input type="date" id="new_date_member" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Pilih Jam Baru <span class="required">*</span></label>
+                    <div id="member-session-list-new" class="session-grid">
+                        <p>Pilih tanggal terlebih dahulu</p>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModalUbahMember()">Batal</button>
+                    <button type="submit" class="btn-submit">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL BOOKING -->
+    <div id="modalDetail" class="modal large">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Detail Booking</h3>
+            <div class="detail-content">
+                <div class="detail-section">
+                    <h4>Informasi Booking</h4>
+                    <table>
+                        <tr><td>ID Booking</td><td id="detail-id">-</td></tr>
+                        <tr><td>Lapangan</td><td id="detail-lapangan">-</td></tr>
+                        <tr><td>Tanggal</td><td id="detail-tanggal">-</td></tr>
+                        <tr><td>Jam</td><td id="detail-jam">-</td></tr>
+                        <tr><td>Pemesan</td><td id="detail-pemesan">-</td></tr>
+                        <tr><td>Status</td><td id="detail-status">-</td></tr>
+                    </table>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>Informasi Pembayaran</h4>
+                    <table>
+                        <tr><td>Total Harga</td><td id="detail-total">-</td></tr>
+                        <tr><td>Status Pembayaran</td><td id="detail-payment-status">-</td></tr>
+                        <tr><td>DP Dibayar</td><td id="detail-dp">-</td></tr>
+                        <tr><td>Sisa Pelunasan</td><td id="detail-sisa">-</td></tr>
+                    </table>
+                </div>
+                
+                <div id="qr-section" class="detail-section" style="display:none;">
+                    <h4>QR Code Check-in</h4>
+                    <div id="qrcode"></div>
+                    <p><small>Tunjukkan QR ini saat check-in di lokasi</small></p>
+                </div>
+                
+                <div id="refund-section" class="detail-section" style="display:none;">
+                    <h4>Informasi Refund</h4>
+                    <table>
+                        <tr><td>Status Refund</td><td id="detail-refund-status">-</td></tr>
+                        <tr><td>Bukti Transfer</td><td id="detail-bukti-refund">-</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL MEMBER -->
+    <div id="modalDetailMember" class="modal large">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Detail Membership</h3>
+            <div class="detail-content">
+                <div class="detail-section">
+                    <h4>Informasi Member</h4>
+                    <table>
+                        <tr><td>ID Member</td><td id="detail-member-id">-</td></tr>
+                        <tr><td>Lapangan</td><td id="detail-member-lapangan">-</td></tr>
+                        <tr><td>Pemesan</td><td id="detail-member-pemesan">-</td></tr>
+                        <tr><td>Durasi</td><td id="detail-member-durasi">-</td></tr>
+                        <tr><td>Periode</td><td id="detail-member-periode">-</td></tr>
+                        <tr><td>Status</td><td id="detail-member-status">-</td></tr>
+                    </table>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>Informasi Pembayaran</h4>
+                    <table>
+                        <tr><td>Total Bayar</td><td id="detail-member-total">-</td></tr>
+                        <tr><td>Metode</td><td id="detail-member-metode">-</td></tr>
+                    </table>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>Jadwal Sesi</h4>
+                    <div id="detail-member-jadwal" class="jadwal-list">
+                        <!-- Daftar jadwal akan dimasukkan di sini -->
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>Riwayat Ubah Jadwal</h4>
+                    <table>
+                        <tr><td>Sudah Diubah</td><td id="detail-member-sudah-ubah">-</td></tr>
+                        <tr><td>Sisa Kuota</td><td id="detail-member-sisa-kuota">-</td></tr>
+                    </table>
+                </div>
+                
+                <div id="qr-section-member" class="detail-section" style="display:none;">
+                    <h4>QR Code Member</h4>
+                    <div id="qrcode-member"></div>
+                    <p><small>Tunjukkan QR ini saat menggunakan fasilitas member</small></p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- JavaScript -->

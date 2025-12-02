@@ -25,20 +25,14 @@ try {
     logCron("=== STARTING CRON AUTO REJECT ===");
     
     // Include config database - PASTIKAN PATH BENAR
-    $config_path = __DIR__ . '/config/database.php';
+    $config_path = __DIR__ . '/../config/database.php'; // Fix path ke atas jika di subfolder
     if (!file_exists($config_path)) {
         throw new Exception("Database config not found: $config_path");
     }
     
     require_once $config_path;
     
-    // Create database connection manually untuk avoid class issues
-    // GANTI DENGAN DATABASE CREDENTIALS KAMU:
-    $host = 'localhost'; // Ganti dengan host kamu
-    $dbname = 'bookinglapanganb2'; // Ganti dengan nama database kamu
-    $username = 'root'; // Ganti dengan username database kamu
-    $password = ''; // Ganti dengan password database kamu
-    
+    // Create database connection using config (asumsi config punya $host, $dbname, dll)
     $conn = new mysqli($host, $username, $password, $dbname);
     
     // Check connection
@@ -48,7 +42,7 @@ try {
     
     logCron("Database connected successfully");
     
-    // Calculate 24 hours ago - FIX VARIABLE NAME
+    // Calculate 24 hours ago
     $twentyfour_hours_ago = date('Y-m-d H:i:s', strtotime('-24 hours'));
     
     logCron("Looking for cancellation requests older than: $twentyfour_hours_ago");
