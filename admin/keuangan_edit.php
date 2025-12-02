@@ -1,7 +1,8 @@
 <?php
 // keuangan_edit.php
+require_once 'auth_check.php';
 require_once __DIR__ . '/../config/database.php';
-session_start();
+// session_start();
 
 // Cek ID
 if (!isset($_GET['id'])) {
@@ -61,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 include('../includes/header.php');
-include('../includes/topbar.php');
+// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 

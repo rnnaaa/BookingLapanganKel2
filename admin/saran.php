@@ -1,12 +1,13 @@
 <?php
 // saran.php
-session_start();
+require_once 'auth_check.php';
+// session_start();
 require_once __DIR__ . '/../config/database.php';
 // Anda mungkin perlu otentikasi (auth_check) di sini
 // require_once __DIR__ . '/auth_check.php'; 
 
 include('../includes/header.php');
-include('../includes/topbar.php');
+// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 
 // Ambil semua data saran

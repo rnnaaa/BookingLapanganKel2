@@ -1,4 +1,5 @@
 <?php
+require_once 'auth_check.php';
 require_once '../config/database.php';
 
 if (isset($_POST['id_member'])) {

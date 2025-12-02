@@ -1,5 +1,6 @@
 <?php
 // booking_get_slot.php - UPDATED FOR EDIT FEATURE
+require_once 'auth_check.php';
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
 

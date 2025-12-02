@@ -1,25 +1,24 @@
 <footer class="main-footer text-sm d-flex justify-content-between align-items-center flex-wrap">
   <div class="footer-left">
-    <!-- <strong>Copyright &copy; 2021 - <?= date('Y'); ?>  -->
       <a href="#" class="text-primary">Badmintoon</a>.
     </strong> 
-    <!-- All rights reserved. -->
   </div>
-
-  <!-- <div class="footer-right text-muted">
-    <b>Version</b> 3.2.0
-  </div> -->
 </footer>
-
 
 <aside class="control-sidebar control-sidebar-dark"></aside>
 </div>
-<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-<script src="../public/asseth/tampilan_admin/plugins/jquery-ui/jquery-ui.min.js"></script>
-<script>$.widget.bridge('uibutton', $.ui.button)</script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+
+<script src="../public/asseth/tampilan_admin/plugins/jquery-ui/jquery-ui.min.js"></script>
+<script>
+  $.widget.bridge('uibutton', $.ui.button)
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
 <script src="../public/asseth/tampilan_admin/plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script>
+
 <script src="../public/asseth/tampilan_admin/dist/js/adminlte.min.js"></script>
 
 <link rel="stylesheet" href="../public/asseth/tampilan_admin/plugins/select2/css/select2.min.css">
@@ -42,7 +41,27 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"/>
 
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Script ini akan mencari elemen yang menggunakan sintaks Bootstrap 5 (data-bs-...)
+    // dan menambahkannya dengan sintaks Bootstrap 4 (data-...) agar tetap jalan.
+    
+    // Convert data-bs-toggle -> data-toggle
+    $('[data-bs-toggle]').each(function() {
+        $(this).attr('data-toggle', $(this).attr('data-bs-toggle'));
+    });
+    
+    // Convert data-bs-target -> data-target
+    $('[data-bs-target]').each(function() {
+        $(this).attr('data-target', $(this).attr('data-bs-target'));
+    });
+    
+    // Convert data-bs-dismiss -> data-dismiss
+    $('[data-bs-dismiss]').each(function() {
+        $(this).attr('data-dismiss', $(this).attr('data-bs-dismiss'));
+    });
+});
+</script>
 
 <script>
 $(function () {
@@ -91,7 +110,7 @@ $(function () {
   }
 });
 
-// TOASTR
+// TOASTR NOTIFICATION
 <?php if (!empty($_SESSION['toast_success'])): ?>
   toastr.success("<?= $_SESSION['toast_success'] ?>", "Sukses!");
   <?php unset($_SESSION['toast_success']); ?>
@@ -164,24 +183,16 @@ $(function () {
     transform: translateY(0);
   }
 
-  /* --- PERBAIKAN UNTUK HEADER TABEL DATATABLES (WARNA SOLID #1874AD) --- */
   table.dataTable thead th {
-    /* Menggunakan warna solid #1874ad */
     background-color: #1874ad !important;
-    /* Menghapus properti background gradient */
     background: #1874ad !important; 
-    /* Atur warna teks menjadi putih agar terlihat jelas */
     color: white !important;
-    /* Atur border-color untuk konsistensi */
     border-color: #1874ad !important;
   }
-
-  /* Opsional: Jika Anda ingin mengatur hover/active state juga */
   table.dataTable thead th.sorting:hover {
-    background-color: #11689b !important; /* Warna sedikit lebih gelap saat hover */
+    background-color: #11689b !important;
     background: #11689b !important;
   }
-  /* ------------------------------------------------ */
 </style>
 
 <div id="tableLoader">

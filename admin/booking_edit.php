@@ -1,5 +1,6 @@
 <?php
 // booking_edit.php - FULL FEATURE (Reschedule & Status)
+require_once 'auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 
 // Pastikan session dimulai
@@ -156,7 +157,7 @@ $data = $stmt->get_result()->fetch_assoc();
 $qLap = $conn->query("SELECT id_lapangan, nama_lapangan, harga_per_jam FROM lapangan WHERE status='aktif'");
 
 include('../includes/header.php');
-include('../includes/topbar.php');
+// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 
