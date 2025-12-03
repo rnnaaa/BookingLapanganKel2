@@ -139,7 +139,7 @@ function activeLink($page)
                 </li>
 
                 <li class="nav-item">
-                    <a href="settings.php" class="nav-link <?= activeLink('settings.php') ?>">
+                    <a href="pengaturan.php" class="nav-link <?= activeLink('pengaturan.php') ?>">
                         <i class="nav-icon fas fa-cog"></i>
                         <p>Pengaturan Sistem</p>
                     </a>
