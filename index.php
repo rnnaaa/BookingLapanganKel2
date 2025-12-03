@@ -1,19 +1,28 @@
 <?php 
 session_start();
-require 'config/database.php'; // Koneksi Database Wajib
+require 'config/database.php'; // Pastikan path koneksi benar
 include __DIR__ . '/include_user/header.php'; 
 
 // ============================================================
-// LOGIKA BACKEND: AMBIL 3 TESTIMONI TERBARU
+// 1. AMBIL KONFIGURASI UMUM (STATISTIK)
+// ============================================================
+$configQuery = mysqli_query($conn, "SELECT * FROM web_config LIMIT 1");
+$config = mysqli_fetch_assoc($configQuery);
+
+// Set default jika database kosong
+$totalLap = $config['total_lapangan'] ?? 4;
+$jamOps   = $config['jam_operasional'] ?? '08-23';
+$minDp    = $config['min_dp_persen'] ?? 30;
+
+// ============================================================
+// 2. AMBIL DATA TESTIMONI (3 TERBARU)
 // ============================================================
 $testimonials = [];
-// Limit 3 saja untuk halaman depan
-$query = "SELECT * FROM saran ORDER BY created_at DESC LIMIT 3"; 
-$result = mysqli_query($conn, $query);
+$queryTesti = "SELECT * FROM saran ORDER BY created_at DESC LIMIT 3"; 
+$resTesti = mysqli_query($conn, $queryTesti);
 
-if ($result) {
-    while ($row = mysqli_fetch_assoc($result)) {
-        // Mapping kategori ke 'Peran' (Sama seperti kontak.php)
+if ($resTesti) {
+    while ($row = mysqli_fetch_assoc($resTesti)) {
         $roleMap = [
             'fasilitas' => 'Member', 
             'pelayanan' => 'Pelanggan', 
@@ -21,7 +30,6 @@ if ($result) {
             'harga' => 'Member', 
             'lainnya' => 'Pengunjung'
         ];
-        
         $displayName = ($row['is_anonim'] == 1) ? 'Pengguna' : htmlspecialchars($row['nama']);
         $displayRole = $roleMap[$row['kategori']] ?? 'Pelanggan';
 
@@ -37,25 +45,14 @@ if ($result) {
 
 <style>
     /* STYLE KONSISTEN */
-    body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
-    }
-    h1, h2, h3, h4, h5, h6, .font-poppins {
-        font-family: 'Poppins', sans-serif;
-    }
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    h1, h2, h3, h4, h5, h6, .font-poppins { font-family: 'Poppins', sans-serif; }
 
     /* Animasi & Efek */
-    @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
-    }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     .animate-float { animation: float 4s ease-in-out infinite; }
     
-    @keyframes pulse-slow {
-        0%, 100% { opacity: 0.6; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.1); }
-    }
+    @keyframes pulse-slow { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
     .animate-pulse-slow { animation: pulse-slow 3s infinite; }
 
     /* Card Effects */
@@ -67,6 +64,9 @@ if ($result) {
     details > summary::-webkit-details-marker { display: none; }
     details[open] summary ~ * { animation: slideDown 0.3s ease-in-out; }
     @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* Smooth Scroll */
+    html { scroll-behavior: smooth; }
 </style>
 
 <main>
@@ -101,16 +101,16 @@ if ($result) {
 
                 <div class="grid grid-cols-3 gap-4 p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
                     <div class="text-center border-r border-white/10 last:border-0">
-                        <div class="text-2xl font-bold">4</div>
+                        <div class="text-2xl font-bold"><?= $totalLap ?></div>
                         <div class="text-xs text-white/70 uppercase tracking-wider">Tipe Lapangan</div>
                     </div>
                     <div class="text-center border-r border-white/10 last:border-0">
-                        <div class="text-2xl font-bold">08-23</div>
+                        <div class="text-2xl font-bold"><?= $jamOps ?></div>
                         <div class="text-xs text-white/70 uppercase tracking-wider">Jam Operasional</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-2xl font-bold">30%</div>
-                        <div class="text-xs text-white/70 uppercase tracking-wider">Min DP Event</div>
+                        <div class="text-2xl font-bold"><?= $minDp ?>%</div>
+                        <div class="text-xs text-white/70 uppercase tracking-wider">Min DP </div>
                     </div>
                 </div>
             </div>
@@ -124,7 +124,7 @@ if ($result) {
                             <span class="bg-yellow-400 text-slate-900 text-xs font-bold px-2 py-1 rounded">POPULER</span>
                             <span class="flex text-yellow-400 text-sm">★★★★★</span>
                         </div>
-                        <h3 class="text-xl font-bold">4 Lapangan Standard Internasional</h3>
+                        <h3 class="text-xl font-bold"><?= $totalLap ?> Lapangan Standard Internasional</h3>
                         <p class="text-sm text-white/80">Futsal • Badminton • Basket</p>
                     </div>
                 </div>
@@ -197,6 +197,23 @@ if ($result) {
                     <div class="flex flex-wrap gap-2">
                         <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏸 Badminton</span>
                         <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">🏆 BWF</span>
+                    </div>
+                </div>
+            </article>
+            
+             <article class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover-lift group" data-aos="fade-up" data-aos-delay="400">
+                <div class="relative h-60 overflow-hidden">
+                    <img src="assets/images/lapangan1.jpg" alt="Futsal A" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                    <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm">
+                        <span class="text-primary font-bold text-sm">Rp 30.000</span> <span class="text-xs text-slate-500">/ jam</span>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <h3 class="font-bold text-lg text-slate-800 mb-2 group-hover:text-primary transition-colors">Lapangan D (Premium)</h3>
+                    <p class="text-slate-500 text-sm mb-4 line-clamp-2">Lapangan multifungsi dengan tribun penonton.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">⚽ Futsal</span>
+                        <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-100">📣 Tribun</span>
                     </div>
                 </div>
             </article>
@@ -273,26 +290,39 @@ if ($result) {
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div class="p-6 rounded-2xl bg-slate-50 text-center hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-slate-100">
-                    <div class="w-16 h-16 mx-auto bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mb-4">🕌</div>
-                    <h3 class="font-bold text-slate-800 mb-1">Mushola</h3>
-                    <p class="text-xs text-slate-500">Bersih & Nyaman</p>
-                </div>
-                <div class="p-6 rounded-2xl bg-slate-50 text-center hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-slate-100">
-                    <div class="w-16 h-16 mx-auto bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl mb-4">🚿</div>
-                    <h3 class="font-bold text-slate-800 mb-1">Shower</h3>
-                    <p class="text-xs text-slate-500">Air Hangat</p>
-                </div>
-                <div class="p-6 rounded-2xl bg-slate-50 text-center hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-slate-100">
-                    <div class="w-16 h-16 mx-auto bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center text-2xl mb-4">☕</div>
-                    <h3 class="font-bold text-slate-800 mb-1">Cafe</h3>
-                    <p class="text-xs text-slate-500">Snack & Minuman</p>
-                </div>
-                <div class="p-6 rounded-2xl bg-slate-50 text-center hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-slate-100">
-                    <div class="w-16 h-16 mx-auto bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl mb-4">🅿️</div>
-                    <h3 class="font-bold text-slate-800 mb-1">Parkir</h3>
-                    <p class="text-xs text-slate-500">Luas & Aman</p>
-                </div>
+                <?php
+                // Ambil Data Fasilitas
+                $queryFasilitas = mysqli_query($conn, "SELECT * FROM fasilitas ORDER BY id ASC");
+                
+                // Array warna selang-seling
+                $colors = [
+                    ['bg' => 'bg-blue-100', 'text' => 'text-blue-600'],
+                    ['bg' => 'bg-green-100', 'text' => 'text-green-600'],
+                    ['bg' => 'bg-orange-100', 'text' => 'text-orange-600'],
+                    ['bg' => 'bg-purple-100', 'text' => 'text-purple-600'],
+                    ['bg' => 'bg-red-100', 'text' => 'text-red-600'],
+                    ['bg' => 'bg-yellow-100', 'text' => 'text-yellow-600']
+                ];
+                $i = 0;
+
+                if (mysqli_num_rows($queryFasilitas) > 0) {
+                    while ($fas = mysqli_fetch_assoc($queryFasilitas)) {
+                        $theme = $colors[$i % count($colors)];
+                ?>
+                    <div class="p-6 rounded-2xl bg-slate-50 text-center hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-slate-100">
+                        <div class="w-16 h-16 mx-auto <?= $theme['bg'] . ' ' . $theme['text'] ?> rounded-2xl flex items-center justify-center text-2xl mb-4">
+                            <?= $fas['icon'] ?>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-1"><?= htmlspecialchars($fas['nama']) ?></h3>
+                        <p class="text-xs text-slate-500"><?= htmlspecialchars($fas['deskripsi']) ?></p>
+                    </div>
+                <?php
+                        $i++;
+                    }
+                } else {
+                    echo '<div class="col-span-4 text-center text-gray-400">Belum ada data fasilitas.</div>';
+                }
+                ?>
             </div>
         </div>
     </section>
@@ -354,20 +384,28 @@ if ($result) {
         <div class="max-w-3xl mx-auto px-4">
             <h2 class="text-3xl font-poppins font-bold text-center mb-10 text-slate-800">Pertanyaan Umum</h2>
             <div class="space-y-4">
-                <details class="group bg-white rounded-2xl p-5 cursor-pointer open:bg-white open:shadow-md transition-all">
-                    <summary class="font-semibold text-slate-800 flex justify-between items-center">
-                        Cara Booking Lapangan?
-                        <i class="fa-solid fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform"></i>
+                <?php
+                // Ambil Data FAQ
+                $queryFaq = mysqli_query($conn, "SELECT * FROM faq ORDER BY id ASC");
+                
+                if (mysqli_num_rows($queryFaq) > 0) {
+                    while ($faq = mysqli_fetch_assoc($queryFaq)) {
+                ?>
+                <details class="group bg-white rounded-2xl p-5 cursor-pointer open:bg-white open:shadow-md transition-all border border-slate-100">
+                    <summary class="font-semibold text-slate-800 flex justify-between items-center select-none">
+                        <?= htmlspecialchars($faq['pertanyaan']) ?>
+                        <i class="fa-solid fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform duration-300"></i>
                     </summary>
-                    <p class="mt-3 text-sm text-slate-600 leading-relaxed">Pilih menu lapangan, klik jam yang tersedia, login akun Anda, dan lakukan pembayaran DP atau Lunas.</p>
+                    <div class="mt-3 text-sm text-slate-600 leading-relaxed animate-fadeIn">
+                        <?= nl2br(htmlspecialchars($faq['jawaban'])) ?>
+                    </div>
                 </details>
-                <details class="group bg-white rounded-2xl p-5 cursor-pointer open:bg-white open:shadow-md transition-all">
-                    <summary class="font-semibold text-slate-800 flex justify-between items-center">
-                        Apakah bisa refund DP?
-                        <i class="fa-solid fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform"></i>
-                    </summary>
-                    <p class="mt-3 text-sm text-slate-600 leading-relaxed">Refund hanya dapat dilakukan jika pembatalan dilakukan minimal H-2 sebelum jadwal main. Hubungi admin untuk prosesnya.</p>
-                </details>
+                <?php 
+                    }
+                } else {
+                    echo '<p class="text-center text-slate-500">Belum ada pertanyaan umum.</p>';
+                }
+                ?>
             </div>
         </div>
     </section>
@@ -385,7 +423,7 @@ if ($result) {
 </main>
 
 <script>
-    // DATA DARI PHP
+    // DATA TESTIMONI DARI PHP
     const dbTestimonials = <?= json_encode($testimonials) ?>;
 
     document.addEventListener('DOMContentLoaded', function() {
