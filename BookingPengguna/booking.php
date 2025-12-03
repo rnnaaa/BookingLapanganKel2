@@ -8,12 +8,8 @@ require '../config/database.php';
 require '../include_user/release_slots.php';
 // ==================================================
 
-// --- BAGIAN USER ---
-if (!isset($_SESSION['id_user'])) {
-    $_SESSION['id_user'] = 1;
-    $_SESSION['nama'] = "User Demo";
-}
-$user_id = $_SESSION['id_user'];
+$user_id = isset($_SESSION['id_user']) ? $_SESSION['id_user'] : 0;
+$is_logged_in = isset($_SESSION['id_user']);
 
 // ------------------ BACKEND ENDPOINT UNTUK CART (AJAX) ------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
