@@ -6,7 +6,7 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT); // <<< PASTIKAN INI A
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "bookinglapanganb2"; // ✅ disesuaikan dengan nama database kamu
+$db   = "bookinglapanganb2"; 
 
 // Membuat koneksi menggunakan metode Obyek
 $conn = new mysqli($host, $user, $pass, $db);

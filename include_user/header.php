@@ -332,7 +332,7 @@ function isActive($page_name) {
                     </div>
                  <?php else: ?>
                     <a href="<?= $base_url ?>/auth/login.php" class="w-full text-center border-2 border-primary text-primary py-3 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">Masuk Akun</a>
-                    <a href="<?= $base_url ?>/auth/register.php" class="w-full text-center bg-gradient-to-r from-primary to-primaryDark text-white py-3 rounded-xl font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-blue-200">Daftar Member Baru</a>
+                    <a href="<?= $base_url ?>/auth/register.php" class="w-full text-center bg-gradient-to-r from-primary to-primaryDark text-white py-3 rounded-xl font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-blue-200">Daftar Akun Baru</a>
                  <?php endif; ?>
             </div>
         </div>
