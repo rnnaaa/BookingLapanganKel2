@@ -198,20 +198,49 @@ date_default_timezone_set('Asia/Jakarta');
 
 <script>
   $(function() {
-    $('.btn-delete').click(function() {
+    // 1. Konfigurasi Toast SweetAlert2 (Pojok Kanan Atas)
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
+
+    // 2. Cek apakah ada Session Flash Message dari PHP (users_hapus.php)
+    <?php if (isset($_SESSION['alert'])): ?>
+      Toast.fire({
+        icon: '<?= $_SESSION['alert']['type'] ?>',
+        title: '<?= $_SESSION['alert']['message'] ?>'
+      });
+      <?php unset($_SESSION['alert']); // Hapus session agar tidak muncul terus saat refresh ?>
+    <?php endif; ?>
+
+    // 3. Logika Tombol Hapus dengan Konfirmasi
+    $('.btn-delete').click(function(e) {
+      e.preventDefault();
       const id = $(this).data('id');
+      
       Swal.fire({
         title: 'Yakin ingin menghapus?',
-        text: 'Data pengguna ini akan dihapus permanen!',
+        text: "Data pengguna beserta riwayatnya akan dihapus permanen!",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Ya, hapus',
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Ya, Hapus!',
         cancelButtonText: 'Batal'
       }).then((result) => {
         if (result.isConfirmed) {
+          // Redirect ke file proses hapus
           window.location.href = 'users_hapus.php?id=' + id;
         }
       });
     });
+    
   });
 </script>

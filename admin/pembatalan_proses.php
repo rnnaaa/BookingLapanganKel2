@@ -1,7 +1,7 @@
 <?php
 // pembatalan_proses.php
 require_once 'auth_check.php';
-session_start();
+// session_start();
 require_once __DIR__ . '/../config/database.php';
 
 // --- LOGIKA KEAMANAN & REALISTIS ---
