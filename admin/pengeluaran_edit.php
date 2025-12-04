@@ -2,7 +2,7 @@
 // File: pengeluaran_edit.php
 require_once 'auth_check.php';
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-session_start();
+// session_start();
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Jakarta');
 

@@ -89,22 +89,51 @@ date_default_timezone_set('Asia/Jakarta');
 
 <script>
 $(function(){
-  // Konfirmasi hapus admin
-  $('.btn-delete').click(function(){
+  // 1. Konfigurasi Toast (Notifikasi Pojok Kanan Atas)
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+      toast.addEventListener('mouseenter', Swal.stopTimer)
+      toast.addEventListener('mouseleave', Swal.resumeTimer)
+    }
+  });
+
+  // 2. Tampilkan Notifikasi jika ada Session dari users_hapus.php
+  <?php if (isset($_SESSION['alert'])): ?>
+    Toast.fire({
+      icon: '<?= $_SESSION['alert']['type'] ?>',
+      title: '<?= $_SESSION['alert']['message'] ?>'
+    });
+    <?php unset($_SESSION['alert']); ?>
+  <?php endif; ?>
+
+  // 3. Logika Tombol Hapus Admin
+  $('.btn-delete').click(function(e){
+    e.preventDefault();
     const id = $(this).data('id');
+    
     Swal.fire({
       title: 'Yakin ingin menghapus?',
-      text: 'Data admin ini akan dihapus permanen!',
+      text: 'Data administrator ini akan dihapus permanen!',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Ya, hapus',
+      confirmButtonColor: '#d33', // Merah untuk bahaya
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, hapus!',
       cancelButtonText: 'Batal'
     }).then((result) => {
       if(result.isConfirmed){
-        // menuju file penghapus
-        window.location.href = 'users_hapus.php?id=' + id;
+        // PERUBAHAN UTAMA DI SINI:
+        // Kita tambahkan parameter '&redirect=admin_data.php'
+        // Sesuaikan 'admin_data.php' dengan nama file halaman ini yang sebenarnya (misal admin.php)
+        window.location.href = 'users_hapus.php?id=' + id + '&redirect=admin.php';
       }
     });
   });
+
 });
 </script>

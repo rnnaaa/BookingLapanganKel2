@@ -278,7 +278,7 @@ $total_notif = $jml_booking + $jml_bayar + $jml_batal;
         <div class="dropdown-divider"></div>
         <a href="pembayaran.php" class="dropdown-item"><i class="fas fa-money-bill-wave mr-2"></i> <?= $jml_bayar ?> Pembayaran Masuk</a>
         <div class="dropdown-divider"></div>
-        <a href="pembatalan.php" class="dropdown-item"><i class="fas fa-undo-alt mr-2"></i> <?= $jml_batal ?> Permintaan Refund</a>
+        <a href="pembatalan_booking.php" class="dropdown-item"><i class="fas fa-undo-alt mr-2"></i> <?= $jml_batal ?> Permintaan Refund</a>
       </div>
     </li>
 

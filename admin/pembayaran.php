@@ -1,14 +1,23 @@
 <?php
-// pembayaran.php - FIXED: DATATABLES ERROR 18 (INCORRECT COLUMN COUNT) SOLVED
-require_once 'auth_check.php';
-require_once __DIR__ . '/../config/database.php';
+// admin/pembayaran.php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// 1. Panggil auth_check paling atas (Ini akan memulai session dan cek login)
+require_once 'auth_check.php'; 
+
+// --- PERBAIKAN 1: HAPUS session_start() MANUAL ---
+// if (session_status() === PHP_SESSION_NONE) { session_start(); } <--- HAPUS INI
+
+// --- PERBAIKAN 2: "GHOST ERROR KILLER" ---
+// Jika script sampai di baris ini, artinya User SUDAH LOGIN (lolos dari auth_check).
+// Jadi, jika ada pesan "Sesi Habis" yang tersisa di session, itu adalah error lama (basi). Hapus saja.
+if (isset($_SESSION['error']) && (stripos($_SESSION['error'], 'habis') !== false || stripos($_SESSION['error'], 'login') !== false)) {
+    unset($_SESSION['error']);
 }
 
+require_once __DIR__ . '/../config/database.php';
+
 // =================================================================================
-// 1. LOGIKA FILTER & DATE RANGE
+// LOGIKA FILTER & DATE RANGE
 // =================================================================================
 $filter_start  = $_GET['start_date'] ?? date('Y-m-01'); // Default: Awal bulan ini
 $filter_end    = $_GET['end_date']   ?? date('Y-m-t');  // Default: Akhir bulan ini
@@ -22,7 +31,7 @@ if ($filter_status !== 'all') {
 }
 
 // =================================================================================
-// 2. HITUNG STATISTIK DASHBOARD
+// HITUNG STATISTIK DASHBOARD
 // =================================================================================
 $whereStats = "WHERE p.created_at BETWEEN '$filter_start 00:00:00' AND '$filter_end 23:59:59'";
 
@@ -77,7 +86,7 @@ include('../includes/sidebar.php');
 
       <div class="row g-3 mb-4">
           <div class="col-md-4 col-sm-6">
-              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); color: white;">
+              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); color: white;">
                   <div class="card-body d-flex align-items-center">
                       <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
                           <i class="fas fa-money-check-alt fa-2x"></i>
@@ -92,9 +101,9 @@ include('../includes/sidebar.php');
           </div>
 
           <div class="col-md-4 col-sm-6">
-              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #ffc107 0%, #ffdb4d 100%); color: #333;">
+              <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #ffc107 0%, #ffdb4d 100%); color: white;">
                   <div class="card-body d-flex align-items-center">
-                      <div class="bg-dark bg-opacity-10 rounded-circle p-3 me-3">
+                      <div class="bg-light bg-opacity-10 rounded-circle p-3 me-3">
                           <i class="fas fa-hourglass-half fa-2x"></i>
                       </div>
                       <div>
@@ -214,7 +223,6 @@ $sql = "
 
 $result = mysqli_query($conn, $sql);
 
-// PERBAIKAN UTAMA: JIKA ERROR, TAMPILKAN DI LUAR TABEL. JIKA KOSONG, BIARKAN KOSONG.
 if (!$result) {
     echo '</tbody></table><div class="alert alert-danger m-3">Error Database: '.mysqli_error($conn).'</div><table class="d-none"><tbody>';
 } elseif (mysqli_num_rows($result) > 0) {
