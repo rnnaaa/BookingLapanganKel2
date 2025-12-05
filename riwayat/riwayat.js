@@ -408,6 +408,11 @@ function openDetailMember(idMember) {
                             <span class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-100 text-green-700">${d.status}</span>
                         </div>
                         <div class="text-sm space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Pemesan</span>
+                            <span class="font-semibold">${d.pemesan}</span>
+                        </div>
+                        <div class="text-sm space-y-2">
                             <div class="flex justify-between"><span class="text-slate-500">Lapangan</span><span class="font-semibold">${d.nama_lapangan}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">Periode</span><span class="font-semibold">${d.periode}</span></div>
                         </div>
@@ -436,5 +441,179 @@ function openDetailMember(idMember) {
       } else {
         content.innerHTML = `<p class="text-red-500 text-center">${resp.message}</p>`;
       }
+    });
+}
+// FITUR UBAH JADWAL MEMBER (BARU)
+function openUbahJadwalMember(idMember, idLapangan, sisaUbah, namaMember, idUser) {
+    // 1. Validasi Kuota
+    if (sisaUbah <= 0) {
+        Swal.fire("Info", "Kuota ubah jadwal (3x) sudah habis.", "info");
+        return;
+    }
+
+    // 2. Isi Input Hidden
+    document.getElementById("member_id").value = idMember;
+    document.getElementById("member_id_lapangan").value = idLapangan;
+    document.getElementById("member_id_user").value = idUser || "";
+    
+    // Tampilkan Nama Member (Opsional, hanya visual)
+    const namaEl = document.getElementById("member_nama_pengguna");
+    if(namaEl) namaEl.innerText = namaMember || "Member";
+
+    // 3. Reset Form ke Status Awal
+    const selectSesi = document.getElementById("pilih_sesi_lama");
+    const inputDate = document.getElementById("member_new_date");
+    const selectJam = document.getElementById("member_new_jam");
+
+    selectSesi.innerHTML = '<option value="">Memuat data...</option>';
+    selectSesi.disabled = false;
+
+    inputDate.value = "";
+    inputDate.disabled = true; // Matikan tanggal sebelum pilih sesi lama
+    
+    selectJam.innerHTML = '<option value="">Pilih tanggal dulu...</option>';
+    selectJam.disabled = true; // Matikan jam sebelum pilih tanggal
+
+    // 4. Ambil Daftar Jadwal Upcoming dari API
+    const formData = new FormData();
+    formData.append("action", "get_member_upcoming_sessions");
+    formData.append("id_member", idMember);
+
+    fetch("riwayat_api.php", { method: "POST", body: formData })
+        .then(r => r.json())
+        .then(res => {
+            selectSesi.innerHTML = "";
+            
+            if (res.status === "success" && res.data && res.data.length > 0) {
+                // Tambahkan opsi default
+                selectSesi.add(new Option("Pilih jadwal yang mau diubah...", ""));
+                
+                // Looping data jadwal
+                res.data.forEach(s => {
+                    // Tampilkan format: Senin, 10 Jan 2024 (10:00 - 11:00)
+                    selectSesi.add(new Option(`${s.tanggal_indo} (${s.jam_main})`, s.id_member_jadwal));
+                });
+
+                // Buka Modal
+                document.getElementById("modalUbahMember").classList.add("active");
+            } else {
+                Swal.fire("Info", "Tidak ada jadwal mendatang yang bisa diubah.", "info");
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire("Error", "Gagal memuat jadwal member.", "error");
+        });
+}
+
+// --- Event Listener: Ketika Jadwal Lama Dipilih ---
+const selectSesiLama = document.getElementById("pilih_sesi_lama");
+const memberNewDate = document.getElementById("member_new_date");
+const memberNewJam = document.getElementById("member_new_jam");
+
+if (selectSesiLama) {
+    selectSesiLama.addEventListener("change", function () {
+        // Jika user sudah memilih salah satu jadwal (value tidak kosong)
+        if (this.value) {
+            memberNewDate.disabled = false; // Aktifkan input tanggal
+            memberNewDate.value = ""; // Reset tanggal
+            
+            // Set minimal tanggal hari ini
+            const today = new Date().toISOString().split("T")[0];
+            memberNewDate.setAttribute("min", today);
+            
+            // Reset jam
+            memberNewJam.innerHTML = '<option value="">Pilih tanggal dulu...</option>';
+            memberNewJam.disabled = true;
+        } else {
+            // Jika user kembali memilih "Pilih jadwal..."
+            memberNewDate.disabled = true;
+            memberNewJam.disabled = true;
+            memberNewDate.value = "";
+        }
+    });
+}
+
+// --- Event Listener: Ketika Tanggal Baru Dipilih ---
+if (memberNewDate) {
+    memberNewDate.addEventListener("change", function () {
+        const idLapangan = document.getElementById("member_id_lapangan").value;
+        const date = this.value;
+
+        if (!date) return;
+
+        memberNewJam.innerHTML = "<option>Memuat slot...</option>";
+        memberNewJam.disabled = true;
+
+        // Cek Slot Tersedia (Sama seperti booking reguler)
+        fetch(`riwayat_api.php?action=get_available_sessions&lapangan_id=${idLapangan}&selected_date=${date}`)
+            .then(r => r.json())
+            .then(res => {
+                memberNewJam.innerHTML = "";
+                
+                if (res.status === "success") {
+                    const slots = res.data || [];
+                    
+                    if (slots.length === 0) {
+                        memberNewJam.add(new Option("Penuh / Tidak tersedia", ""));
+                    } else {
+                        memberNewJam.add(new Option("Pilih Jam Baru", ""));
+                        slots.forEach(slot => {
+                            // Tampilkan jam yang tersedia
+                            memberNewJam.add(new Option(`${slot.jam_mulai} - ${slot.jam_selesai}`, slot.id_jadwal_waktu));
+                        });
+                        memberNewJam.disabled = false; // Aktifkan input jam
+                    }
+                } else {
+                    memberNewJam.add(new Option("Gagal memuat jadwal", ""));
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                memberNewJam.innerHTML = "<option>Error koneksi</option>";
+            });
+    });
+}
+
+// --- Event Listener: Submit Form Ubah Member ---
+const formMember = document.getElementById("formUbahMember");
+if (formMember) {
+    formMember.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        // Validasi input
+        if(!selectSesiLama.value || !memberNewDate.value || !memberNewJam.value) {
+            Swal.fire("Peringatan", "Mohon lengkapi semua data!", "warning");
+            return;
+        }
+
+        Swal.fire({
+            title: "Konfirmasi Ubah Jadwal",
+            text: "Jadwal lama akan dilepas dan diganti dengan jadwal baru. Kuota ubah jadwal akan berkurang.",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Ya, Ubah",
+            confirmButtonColor: "#f97316",
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const formData = new FormData(this);
+                formData.append("action", "ubah_jadwal_member");
+
+                Swal.fire({ title: "Memproses...", didOpen: () => Swal.showLoading() });
+
+                fetch("riwayat_api.php", { method: "POST", body: formData })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.status === "success") {
+                            Swal.fire("Berhasil", res.message, "success").then(() => location.reload());
+                        } else {
+                            Swal.fire("Gagal", res.message, "error");
+                        }
+                    })
+                    .catch(err => {
+                        Swal.fire("Error", "Terjadi kesalahan server", "error");
+                    });
+            }
+        });
     });
 }
