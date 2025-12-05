@@ -7,6 +7,7 @@ let maxQuota = 0;
 let hargaPerJam = 0;
 let selectedMethod = 'qris';
 let timerInterval;
+let isSubmitting = false;
 
 // Helper: Format Tanggal
 function formatDate(dateString) { 
@@ -113,13 +114,11 @@ window.addEventListener('popstate', function(event) {
 
 // D. Intercept Refresh / Close Tab
 window.addEventListener('beforeunload', function (e) {
-    if (currentStep > 1) {
-        // Kirim sinyal ke backend untuk lepas slot (menggunakan Beacon API agar tetap terkirim saat browser tutup)
+if (currentStep > 1 && !isSubmitting) {
         const formData = new FormData();
         formData.append('action', 'reset_timer');
         navigator.sendBeacon('member.php', formData);
 
-        // Munculkan dialog native browser (text custom tidak didukung browser modern, tapi dialog akan muncul)
         e.preventDefault();
         e.returnValue = ''; 
     }
@@ -461,7 +460,6 @@ function renderReviewStep() {
 }
 
 function renderPaymentInstruction() {
-    // ... (Kode renderPaymentInstruction sama seperti sebelumnya, hanya ganti warna ke amber jika perlu) ...
     const container = document.getElementById('paymentInstruction');
     const totalBayar = selectedSlots.length * hargaPerJam;
     const totalFormatted = 'Rp ' + totalBayar.toLocaleString('id-ID');
@@ -474,14 +472,49 @@ function renderPaymentInstruction() {
         <div class="border-t border-slate-200 my-4"></div>`;
     
     if (selectedMethod === 'qris') {
-        content += `<div class="bg-white p-4 rounded-xl border border-slate-200 inline-block shadow-sm">
+        content += `
+        <div class="bg-white p-4 rounded-xl border border-slate-200 inline-block shadow-sm">
             <img src="../assets/images/qris_rush.jpg" alt="QRIS" class="mx-auto w-48 rounded-lg mb-3">
             <p class="text-sm text-slate-600 mt-3"><i class="fa-solid fa-scan mr-1"></i> Scan kode di atas.</p>
         </div>`;
-    } else {
-        // ... (BCA/Mandiri blocks remain similar) ...
-         content += `<div class="p-4 bg-slate-50 rounded-lg text-center"><p class="text-slate-600">Metode ${selectedMethod.toUpperCase()} dipilih.</p></div>`;
+    } 
+    else if (selectedMethod === 'bca') {
+        content += `
+        <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-left max-w-sm mx-auto">
+            <div class="flex items-center justify-between mb-4">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Bank_Central_Asia.svg" alt="BCA" class="h-6">
+                <span class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded">Manual Check</span>
+            </div>
+            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">Nomor Rekening</p>
+            <div class="flex items-center gap-3 mb-3">
+                <span class="text-2xl font-mono font-bold text-slate-800" id="rekBCA">8290821321</span>
+                <button onclick="navigator.clipboard.writeText('8290821321'); Swal.fire({icon:'success', title:'Disalin!', timer:1000, showConfirmButton:false})" class="text-blue-500 hover:text-blue-700 text-sm"><i class="fa-regular fa-copy"></i></button>
+            </div>
+            <p class="text-sm text-slate-600">A/N <strong>Rush Badminton Academy</strong></p>
+        </div>
+        <div class="mt-4 text-xs text-slate-400">
+            <i class="fa-solid fa-circle-info mr-1"></i> Harap transfer sesuai nominal hingga 3 digit terakhir.
+        </div>`;
+    } 
+    else if (selectedMethod === 'mandiri') {
+        content += `
+        <div class="bg-yellow-50 p-6 rounded-2xl border border-yellow-100 text-left max-w-sm mx-auto">
+            <div class="flex items-center justify-between mb-4">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" alt="Mandiri" class="h-8">
+                <span class="text-xs font-bold text-yellow-700 bg-yellow-100 px-2 py-1 rounded">Manual Check</span>
+            </div>
+            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">Nomor Rekening</p>
+            <div class="flex items-center gap-3 mb-3">
+                <span class="text-2xl font-mono font-bold text-slate-800" id="rekMandiri">144002349812</span>
+                <button onclick="navigator.clipboard.writeText('144002349812'); Swal.fire({icon:'success', title:'Disalin!', timer:1000, showConfirmButton:false})" class="text-yellow-600 hover:text-yellow-800 text-sm"><i class="fa-regular fa-copy"></i></button>
+            </div>
+            <p class="text-sm text-slate-600">A/N <strong>Rush Badminton Academy</strong></p>
+        </div>
+        <div class="mt-4 text-xs text-slate-400">
+            <i class="fa-solid fa-circle-info mr-1"></i> Harap transfer sesuai nominal hingga 3 digit terakhir.
+        </div>`;
     }
+
     container.innerHTML = content;
 }
 
@@ -507,9 +540,20 @@ function submitMember() {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
+            // --- FIX ISSUE 1: SET FLAG SUBMITTING KE TRUE ---
+            isSubmitting = true; 
+            
             // Bersihkan history saat sukses agar user tidak bisa back ke proses pembayaran
             history.replaceState(null, null, window.location.pathname);
-            Swal.fire({icon: 'success', title: 'Berhasil!', text: 'Pendaftaran member berhasil dikirim.', confirmButtonColor: '#d97706'}).then(() => window.location.href = '../DashPengguna.php');
+            
+            Swal.fire({
+                icon: 'success', 
+                title: 'Berhasil!', 
+                text: 'Pendaftaran member berhasil dikirim.', 
+                confirmButtonColor: '#d97706'
+            }).then(() => {
+                window.location.href = '../DashPengguna.php';
+            });
         } else { 
             Swal.fire('Gagal', data.message, 'error'); 
             btn.disabled = false; 

@@ -62,6 +62,45 @@ if ($res_member->num_rows > 0) {
 }
 $stmt_member->close();
 
+// 4. Ambil Jadwal Berikutnya (LOGIKA KETAT: Aktif, Tidak Batal, Tidak Expired, Belum Lewat)
+$next_booking = null;
+$stmt_next = $conn->prepare("
+    SELECT 
+        b.id_booking, 
+        b.tanggal, 
+        b.status, 
+        b.payment_status,
+        l.nama_lapangan,
+        (SELECT MIN(jw.jam_mulai) 
+         FROM detail_booking db 
+         JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu 
+         WHERE db.id_booking = b.id_booking) as jam_mulai,
+        (SELECT MAX(jw.jam_selesai) 
+         FROM detail_booking db 
+         JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu 
+         WHERE db.id_booking = b.id_booking) as jam_selesai
+    FROM booking b
+    JOIN lapangan l ON b.id_lapangan = l.id_lapangan
+    WHERE b.id_user = ?
+    -- 1. Filter Status Booking
+    AND b.status NOT IN ('dibatalkan', 'ditolak', 'selesai')
+    -- 2. Filter Status Pembayaran (PENTING: Kadang status booking 'menunggu' tapi pembayaran 'dibatalkan')
+    AND b.payment_status != 'dibatalkan'
+    -- 3. Filter Expired (Jangan tampilkan booking yang telat bayar)
+    AND (b.expired_at IS NULL OR b.expired_at > NOW())
+    -- 4. Filter Waktu Main (Harus masa depan)
+    AND CONCAT(b.tanggal, ' ', (SELECT MAX(jw.jam_selesai) FROM detail_booking db JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu WHERE db.id_booking = b.id_booking)) >= NOW()
+    ORDER BY b.tanggal ASC, jam_mulai ASC
+    LIMIT 1
+");
+$stmt_next->bind_param('i', $user_id);
+$stmt_next->execute();
+$result_next = $stmt_next->get_result();
+if ($result_next->num_rows > 0) {
+    $next_booking = $result_next->fetch_assoc();
+}
+$stmt_next->close();
+
 // Variabel Tampilan
 $nama_lengkap = htmlspecialchars($user['nama']);
 $nama_depan = explode(' ', $nama_lengkap)[0];
@@ -71,6 +110,7 @@ $foto_profil = !empty($user['foto_profil']) ? 'uploads/profiles/' . $user['foto_
 // Styling Kartu Welcome berdasarkan Member
 $welcome_bg = $is_member ? 'bg-gradient-to-r from-yellow-500 to-amber-600' : 'bg-gradient-to-r from-primary to-primaryDark';
 $badge_member = $is_member ? '<span class="bg-white/20 text-white text-[10px] sm:text-xs px-2 py-1 rounded-md uppercase tracking-wider font-bold border border-white/30 ml-2">MEMBER VIP</span>' : '';
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -271,8 +311,60 @@ $badge_member = $is_member ? '<span class="bg-white/20 text-white text-[10px] sm
             <div class="flex flex-col gap-6 animate-fade-in-up" style="animation-delay: 0.6s;">
                 <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-5 sm:p-6 rounded-2xl shadow-lg relative overflow-hidden">
                     <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10"></div>
-                    <h4 class="font-bold text-white/60 text-xs uppercase tracking-wider mb-4">Jadwal Berikutnya</h4>
-                    <div id="nextBookingBox"><p class="text-slate-400 text-sm italic">Belum ada jadwal aktif.</p></div>
+                    <h4 class="font-bold text-white/60 text-xs uppercase tracking-wider mb-4">Jadwal Berikutnya (Reguler)</h4>
+                        <div id="nextBookingBox" class="relative z-10">
+                            <?php if ($next_booking): ?>
+                                <?php 
+                                    // Format Tanggal & Jam
+                                    $tgl = new DateTime($next_booking['tanggal']);
+                                    $formatted_date = $hari_indo[$tgl->format('l')] . ', ' . $tgl->format('d M Y');
+                                    $jam_start = substr($next_booking['jam_mulai'], 0, 5);
+                                    $jam_end = substr($next_booking['jam_selesai'], 0, 5);
+
+                                    // Tentukan Warna Badge Status
+                                    $badge_color = 'bg-green-500/20 text-green-300 border-green-500/30';
+                                    $status_text = $next_booking['status'];
+                                    
+                                    // Jika belum bayar, ubah warna jadi kuning
+                                    if ($next_booking['payment_status'] == 'belum_bayar' || $next_booking['status'] == 'menunggu') {
+                                        $badge_color = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+                                        $status_text = 'Menunggu Pembayaran';
+                                    } elseif ($next_booking['status'] == 'disetujui' || $next_booking['payment_status'] == 'lunas') {
+                                        $status_text = 'Siap Main';
+                                    }
+                                ?>
+                                <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4 animate-fade-in-up">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h5 class="text-lg font-bold text-white truncate w-2/3"><?= htmlspecialchars($next_booking['nama_lapangan']) ?></h5>
+                                        <span class="px-2 py-1 <?= $badge_color ?> text-[10px] uppercase font-bold rounded border whitespace-nowrap">
+                                            <?= $status_text ?>
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-blue-100 text-sm mb-3">
+                                        <div class="flex items-center gap-1.5">
+                                            <i class="fa-regular fa-calendar"></i>
+                                            <span><?= $formatted_date ?></span>
+                                        </div>
+                                        <div class="h-3 w-[1px] bg-white/20"></div>
+                                        <div class="flex items-center gap-1.5">
+                                            <i class="fa-regular fa-clock"></i>
+                                            <span><?= $jam_start ?> - <?= $jam_end ?></span>
+                                        </div>
+                                    </div>
+                                    <a href="riwayat/riwayat.php" class="block w-full text-center bg-white text-slate-900 text-xs font-bold py-2 rounded-lg hover:bg-blue-50 transition-colors">
+                                        Lihat Detail
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-center py-4">
+                                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/10 text-white/50 mb-3">
+                                        <i class="fa-regular fa-calendar-xmark text-xl"></i>
+                                    </div>
+                                    <p class="text-white/80 text-sm font-medium">Tidak ada jadwal aktif.</p>
+                                    <p class="text-white/40 text-xs mt-1">Yuk booking lapangan sekarang!</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                 </div>
                 
                 <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100">

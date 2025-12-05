@@ -70,8 +70,8 @@ if ($is_logged_in) {
     // QUERY MEMBER
     $qMember = "
         SELECT 
-            m.id_member, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir,
-            m.total_bayar, m.status, l.nama_lapangan, u.nama AS nama_pemesan, u.username,
+            m.id_member, m.id_lapangan, m.id_user, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir,
+            m.total_bayar, m.status, l.nama_lapangan, u.nama AS nama_pengguna, u.username,
             (SELECT COUNT(*) FROM member_jadwal mj WHERE mj.id_member = m.id_member) AS total_sesi,
             (SELECT COUNT(*) FROM history_ubah_jadwal h WHERE h.id_member = m.id_member AND h.tipe = 'member') AS used_reschedule
         FROM member m
@@ -222,24 +222,29 @@ if ($is_logged_in) {
                             <div class="footer-info">
                                 <?php if ($row['status_pembatalan'] == 'pending'): ?>
                                     <div class="info-box warning">Sedang dalam proses verifikasi admin.</div>
+
+                                <?php elseif ($sudahUbah): ?>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                                        <i class="fa-solid fa-clock-rotate-left"></i> Sudah Reschedule
+                                    </span>
                                 <?php elseif ($can_cancel): ?>
                                     <div class="info-box">Bisa dibatalkan sebelum: <?= $limitBatal->format('H:i') ?></div>
                                 <?php endif; ?>
                             </div>
                             <div class="footer-actions">
-                                <button class="btn-solid blue" onclick="openDetailBooking(<?= $row['id_booking'] ?>)"><i class="fa-solid fa-eye"></i> Detail</button>
+                                <button class="btn-solid blue" onclick="openDetailBooking(<?= (int)$row['id_booking'] ?>)"><i class="fa-solid fa-eye"></i> Detail</button>
                                 
                                 <?php if ($can_edit): ?>
-                                    <button class="btn-solid orange" onclick="openUbahJadwal(<?= $row['id_sesi'] ?>, <?= $row['id_lapangan'] ?>)"><i class="fa-solid fa-calendar-days"></i> Ubah Jadwal</button>
+                                    <button class="btn-solid orange" onclick="openUbahJadwal(<?= (int)$row['id_sesi'] ?>, <?= (int)$row['id_lapangan'] ?>)"><i class="fa-solid fa-calendar-days"></i> Ubah Jadwal</button>
                                 <?php endif; ?>
 
                                 <?php if ($can_cancel): ?>
                                     <button class="btn-solid red" onclick="openAjukanBatal(
-                                        <?= $row['id_sesi'] ?>, 
+                                        <?= (int)$row['id_sesi'] ?>, 
                                         '<?= htmlspecialchars($row['nama_lapangan']) ?>', 
-                                        '<?= $formattedDate ?>', 
-                                        '<?= $rentangJam ?>', 
-                                        <?= $refundAmount ?> 
+                                        '<?= htmlspecialchars($formattedDate) ?>', 
+                                        '<?= htmlspecialchars($rentangJam) ?>', 
+                                        <?= (int)$refundAmount ?> 
                                     )">
                                         <i class="fa-solid fa-ban"></i> Batalkan
                                     </button>
@@ -258,14 +263,14 @@ if ($is_logged_in) {
                     <div class="empty-icon-wrapper member-icon"><i class="fa-solid fa-crown"></i></div>
                     <h3 class="empty-title">Belum Jadi Member?</h3>
                     <p class="empty-desc">Dapatkan harga spesial dan prioritas booking.</p>
-                    <a href="../Member/daftar.php" class="btn btn-outline-action">Lihat Paket Member</a>
+                    <a href="../Member/member.php" class="btn btn-outline-action">Lihat Paket Member</a>
                 </div>
             <?php else: ?>
                 <div class="booking-list">
                     <?php foreach ($memberBookings as $mem): 
                         $start = date('d M Y', strtotime($mem['tanggal_mulai']));
                         $end = date('d M Y', strtotime($mem['tanggal_berakhir']));
-                        $sisa = 3 - $mem['used_reschedule']; if ($sisa < 0) $sisa = 0;
+                        $sisaUbah = 3 - $mem['used_reschedule']; if ($sisaUbah < 0) $sisaUbah = 0;
                         $memIdDisplay = "MMBR" . str_pad($mem['id_member'], 8, '0', STR_PAD_LEFT);
                         $statusClass = ($mem['status'] == 'aktif') ? 'status-pill green' : 'status-pill gray';
                         $statusText = ($mem['status'] == 'aktif') ? 'AKTIF' : 'NONAKTIF';
@@ -281,17 +286,35 @@ if ($is_logged_in) {
                         <div class="card-body">
                             <div class="data-row"><div class="data-label">Durasi:</div><div class="data-value"><?= $mem['durasi_bulan'] ?> bulan</div></div>
                             <div class="data-row"><div class="data-label">Periode:</div><div class="data-value"><?= $start ?> - <?= $end ?></div></div>
+                            <div class="data-row"><div class="data-label">Pemesan:</div><div class="data-value"><?= htmlspecialchars($row['nama_user']) ?></div></div>
                             <div class="data-row"><div class="data-label">Total Bayar:</div><div class="data-value text-green font-bold">Rp <?= number_format($mem['total_bayar'], 0, ',', '.') ?></div></div>
-                            <div class="data-row"><div class="data-label">Sisa Ubah Jadwal:</div><div class="data-value font-bold text-blue-600"><?= $sisa ?> dari 3 kali</div></div>
+                            <div class="data-row"><div class="data-label">Sisa Ubah Jadwal:</div><div class="data-value font-bold text-blue-600"><?= $sisaUbah ?> dari 3 kali</div></div>
                             <div class="data-row"><div class="data-label">Jadwal Terjadwal:</div><div class="data-value"><?= $mem['total_sesi'] ?> sesi</div></div>
                         </div>
                         <div class="card-footer">
-                            <div class="footer-info"><div class="info-simple">Dapat diubah</div></div>
+                            <div class="footer-info">
+                                <?php if ($mem['status'] == 'aktif' && $mem['used_reschedule'] > 0): ?>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                                        <i class="fa-solid fa-clock-rotate-left"></i> Sudah Reschedule (<?= $mem['used_reschedule'] ?> dari 3 kali)
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                             <div class="footer-actions">
-                                <button class="btn-solid blue" onclick="openDetailMember(<?= $mem['id_member'] ?>)"><i class="fa-solid fa-eye"></i> Lihat Detail</button>
-                                <?php if ($mem['status'] == 'aktif'): ?>
-                                    <button class="btn-solid orange" onclick="openUbahJadwalMember(<?= $mem['id_member'] ?>)"><i class="fa-solid fa-calendar-days"></i> Ubah Jadwal</button>
-                                    <button class="btn-solid red" onclick="batalkanMember(<?= $mem['id_member'] ?>)"><i class="fa-solid fa-ban"></i> Batalkan Member</button>
+                                <button class="btn-solid blue" onclick="openDetailMember(<?= $mem['id_member'] ?>)">
+                                    <i class="fa-solid fa-eye"></i> Lihat Detail
+                                </button>
+                                <?php if ($mem['status'] == 'aktif' && $sisaUbah > 0): ?>
+                                    <button class="btn-solid orange" onclick="openUbahJadwalMember(
+                                        <?= (int)$mem['id_member'] ?>, 
+                                        <?= (int)$mem['id_lapangan'] ?>, 
+                                        <?= (int)$sisaUbah ?>, 
+                                        '<?= htmlspecialchars($mem['nama_pengguna'], ENT_QUOTES) ?>', 
+                                        <?= (int)$mem['id_user'] ?>
+                                    )">
+                                        <i class="fa-solid fa-calendar-days"></i> Ubah Jadwal
+                                    </button>
+                                <?php elseif ($sisaUbah == 0): ?>
+                                    <span class="text-xs text-red-500 font-bold px-3 py-2 bg-red-50 rounded">Kuota ubah habis (3/3)</span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -381,6 +404,41 @@ if ($is_logged_in) {
             <button type="submit" class="btn-solid red w-full mt-6 py-3 rounded-lg font-bold shadow-lg hover:shadow-red-200 transition-shadow">
                 Kirim Pengajuan Refund
             </button>
+        </form>
+    </div>
+</div>
+<div id="modalUbahMember" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modalUbahMember')">&times;</span>
+        <h3 class="text-xl font-bold mb-2">Ubah Jadwal Member</h3>
+        <p class="text-sm text-slate-500 mb-4">Nama: <span class="font-bold text-slate-700" id="member_nama_pengguna"></span></p>
+        
+        <form id="formUbahMember">
+            <input type="hidden" id="member_id" name="id_member">
+            <input type="hidden" id="member_id_lapangan" name="id_lapangan">
+            <input type="hidden" id="member_id_user" name="id_user">
+            
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2">1. Pilih Jadwal Lama</label>
+                <select id="pilih_sesi_lama" name="id_member_jadwal" class="w-full p-2 border rounded bg-slate-50" required>
+                    <option value="">Memuat data...</option>
+                </select>
+                <p class="text-xs text-slate-500 mt-1">Hanya jadwal upcoming yang bisa diubah.</p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2">2. Pilih Tanggal Baru</label>
+                <input type="date" id="member_new_date" name="new_date" class="w-full p-2 border rounded" disabled required>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2">3. Pilih Jam Baru</label>
+                <select id="member_new_jam" name="new_jadwal_waktu" class="w-full p-2 border rounded" disabled required>
+                    <option value="">Pilih tanggal dulu...</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-solid blue w-full py-2">Simpan Perubahan Jadwal</button>
         </form>
     </div>
 </div>
