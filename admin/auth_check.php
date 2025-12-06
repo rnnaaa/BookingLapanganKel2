@@ -27,22 +27,6 @@ if ($_SESSION['role'] !== 'admin') {
     exit;
 }
 
-// 5. CEK TIMEOUT: Auto logout jika tidak aktif selama 30 menit (1800 detik)
-$timeout_duration = 1800; 
-
-if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $timeout_duration) {
-    // Hapus semua data session
-    session_unset();
-    session_destroy();
-    
-    // Mulai session baru sebentar hanya untuk mengirim pesan error (feedback)
-    session_start();
-    $_SESSION['error'] = "Sesi Anda telah habis. Silakan login kembali.";
-    
-    header('Location: ../Auth/login.php?timeout=1');
-    exit;
-}
-
-// Update waktu aktivitas terakhir user
-$_SESSION['last_activity'] = time();
+// 5. TIMEOUT DIHAPUS
+// Kode pengecekan durasi last_activity telah dihapus agar admin tidak auto-logout.
 ?>

@@ -1,4 +1,5 @@
 <?php
+// payment.php - Halaman Pembayaran Booking Pengguna
 date_default_timezone_set('Asia/Jakarta');
 session_start();
 require '../config/database.php';
@@ -102,9 +103,18 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
   <style type="text/tailwindcss">
     body { font-family: 'Inter', sans-serif; }
     .card { @apply bg-white rounded-xl shadow-soft p-5; }
+    
+    /* Utility Modal */
     .modal-backdrop { display: none; }
     .modal-backdrop.open { @apply fixed inset-0 z-50 flex items-center justify-center p-4; background-color: rgba(10, 20, 40, 0.6); backdrop-filter: blur(4px); }
-    .modal-panel { @apply bg-white rounded-xl shadow-lift w-full max-w-md overflow-hidden; }
+    .modal-panel { @apply bg-white rounded-xl shadow-lift w-full max-w-md overflow-hidden relative; }
+    
+    /* Animation for Modal */
+    @keyframes modalPop {
+        0% { transform: scale(0.95); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-modal-pop-in { animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
 </head>
 
@@ -235,7 +245,7 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
               <div class="card">
                   <h3 class="font-poppins font-semibold text-base mb-4">Atur Pembayaran</h3>
                   <div class="space-y-3">
-                      <label class="flex justify-between items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-primary-light transition-all">
+                      <label class="payment-option-label flex justify-between items-center p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-primary">
                           <div class="flex items-center gap-3">
                               <span class="font-medium text-sm">Bayar Lunas</span>
                           </div>
@@ -244,7 +254,8 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                           </div>
                           <input type="radio" name="payment_type" value="lunas" class="hidden payment-type" checked data-amount="<?= $total_biaya ?>">
                       </label>
-                      <label class="flex justify-between items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-primary-light transition-all">
+
+                      <label class="payment-option-label flex justify-between items-center p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-primary">
                           <div class="flex items-center gap-3">
                               <span class="font-medium text-sm">Bayar DP (50%)</span>
                           </div>
@@ -254,6 +265,7 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                           <input type="radio" name="payment_type" value="dp" class="hidden payment-type" data-amount="<?= $total_biaya / 2 ?>">
                       </label>
                   </div>
+                  
                   <div class="flex justify-between font-bold text-base pt-4 border-t border-slate-200 mt-4">
                       <span>Total Bayar Sekarang</span>
                       <span id="currentPaymentAmount" class="text-green-600">Rp <?= number_format($total_biaya, 0, ',', '.') ?></span>
@@ -261,7 +273,7 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                   <input type="hidden" name="payment_amount" id="paymentAmountInput" value="<?= $total_biaya ?>">
               </div>
               
-              <div class="card flex justify-between items-center cursor-pointer hover:bg-gray-50">
+              <div id="btnReschedulePolicy" class="card flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors">
                   <div class="flex items-center gap-3">
                       <i class="fa-solid fa-shield-halved text-primary text-lg"></i>
                       <span class="font-semibold text-sm text-slate-700">Kebijakan Reschedule</span>
@@ -296,6 +308,32 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
         <div class="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
             <button id="cancelVerificationBtn" type="button" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">Batal</button>
             <button id="confirmVerificationBtn" type="button" class="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primaryDark rounded-lg transition-colors">Ya, Sudah Sesuai</button>
+        </div>
+    </div>
+</div>
+
+<div id="rescheduleModal" class="modal-backdrop">
+    <div class="modal-panel animate-modal-pop-in max-w-lg">
+        <div class="flex justify-between items-center p-4 border-b border-gray-200 bg-primary-light">
+            <h3 class="font-poppins font-semibold text-lg text-primaryDark">Kebijakan Reschedule</h3>
+            <button id="closeRescheduleModal" class="text-slate-400 hover:text-red-500 text-2xl transition-colors">&times;</button>
+        </div>
+        <div class="p-6 max-h-[70vh] overflow-y-auto text-sm text-slate-600 leading-relaxed space-y-4">
+            <p><strong>1. Batas Waktu Reschedule:</strong><br>
+            Permintaan reschedule hanya dapat dilakukan maksimal 5 jam sebelum jadwal main dimulai.</p>
+            
+            <p><strong>2. Pembatalan Booking:</strong><br>
+            batalkan booking reguler juga 12 jam sebelum jadwal.</p>
+            
+            <p><strong>3. Ketersediaan Lapangan:</strong><br>
+            Reschedule hanya dapat dilakukan jika slot lapangan pengganti tersedia. Harga lapangan pengganti sama.</p>
+            
+            <div class="bg-yellow-50 border border-yellow-200 p-3 rounded text-yellow-800 text-xs">
+                <i class="fa-solid fa-circle-info mr-1"></i> Hubungi admin via WhatsApp untuk proses reschedule lebih lanjut.
+            </div>
+        </div>
+        <div class="p-4 bg-gray-50 border-t border-gray-200 text-right">
+            <button id="btnUnderstandReschedule" type="button" class="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primaryDark rounded-lg transition-colors shadow-sm">Saya Mengerti</button>
         </div>
     </div>
 </div>
@@ -396,7 +434,6 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
       }, 1000);
 
       // --- FIX: Hapus Produk Tambahan (Bypass Alert) ---
-      // Saat user klik hapus produk, kita izinkan reload halaman
       const productRemoveBtns = document.querySelectorAll('.product-remove-btn');
       productRemoveBtns.forEach(btn => {
           btn.addEventListener('click', function() {
@@ -434,10 +471,10 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
                       .then(res => {
                           if (res.status === 'ok') {
                               if (res.count <= 0) {
-                                 navigator.sendBeacon('cancel_booking.php?ajax=1');
-                                 window.location.href = 'booking.php';
+                                   navigator.sendBeacon('cancel_booking.php?ajax=1');
+                                   window.location.href = 'booking.php';
                               } else {
-                                 location.reload();
+                                   location.reload();
                               }
                           } else {
                               isSafeExit = false; 
@@ -449,20 +486,42 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
           });
       });
 
-      // --- UI PAYMENT TYPE ---
+      // --- UI PAYMENT TYPE & HIGHLIGHTING (UPDATED) ---
       const paymentTypes = document.querySelectorAll('.payment-type');
       const currentPaymentAmount = document.getElementById('currentPaymentAmount');
       const paymentAmountInput = document.getElementById('paymentAmountInput');
+      
+      // Fungsi untuk mengupdate style kotak pilihan (Active State)
+      function updatePaymentSelection() {
+        document.querySelectorAll('.payment-option-label').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio.checked) {
+                // Style Active: Background biru muda, Border Biru, Ring Biru
+                label.classList.add('bg-primary-light', 'border-primary', 'ring-1', 'ring-primary');
+                label.classList.remove('border-gray-200');
+            } else {
+                // Style Inactive: Reset ke normal
+                label.classList.remove('bg-primary-light', 'border-primary', 'ring-1', 'ring-primary');
+                label.classList.add('border-gray-200');
+            }
+        });
+      }
+
       paymentTypes.forEach(type => {
           type.addEventListener('change', function() {
               const amount = parseFloat(this.dataset.amount);
               const formattedAmount = 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
               currentPaymentAmount.textContent = formattedAmount;
               paymentAmountInput.value = amount;
+              
+              updatePaymentSelection(); // Panggil fungsi highlight
           });
       });
+      
+      // Jalankan sekali saat load untuk highlight default selection
+      updatePaymentSelection();
 
-      // --- MODAL KONFIRMASI ---
+      // --- MODAL KONFIRMASI (VERIFIKASI) ---
       const paymentForm = document.getElementById('paymentForm');
       const openModalBtn = document.getElementById('openVerificationModal');
       const modal = document.getElementById('verificationModal');
@@ -470,23 +529,35 @@ $total_biaya = $total_biaya_sewa + $total_biaya_produk;
       const cancelBtn = document.getElementById('cancelVerificationBtn');
       const confirmBtn = document.getElementById('confirmVerificationBtn');
       
-      const openModal = () => modal && modal.classList.add('open');
-      const closeModal = () => modal && modal.classList.remove('open');
+      const openModal = (m) => m && m.classList.add('open');
+      const closeModal = (m) => m && m.classList.remove('open');
 
-      if (openModalBtn) openModalBtn.addEventListener('click', openModal);
-      if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-      if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      if (openModalBtn) openModalBtn.addEventListener('click', () => openModal(modal));
+      if (closeModalBtn) closeModalBtn.addEventListener('click', () => closeModal(modal));
+      if (cancelBtn) cancelBtn.addEventListener('click', () => closeModal(modal));
+      if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal); });
       
       if (confirmBtn) {
           confirmBtn.addEventListener('click', function() {
-              closeModal();
+              closeModal(modal);
               // Izinkan pindah halaman karena mau submit
               isSafeExit = true; 
               window.removeEventListener('beforeunload', handleBeforeUnload);
               paymentForm.submit();
           });
       }
+
+      // --- MODAL KEBIJAKAN RESCHEDULE (NEW) ---
+      const rescheduleBtn = document.getElementById('btnReschedulePolicy');
+      const rescheduleModal = document.getElementById('rescheduleModal');
+      const closeRescheduleBtn = document.getElementById('closeRescheduleModal');
+      const understandRescheduleBtn = document.getElementById('btnUnderstandReschedule');
+
+      if (rescheduleBtn) rescheduleBtn.addEventListener('click', () => openModal(rescheduleModal));
+      if (closeRescheduleBtn) closeRescheduleBtn.addEventListener('click', () => closeModal(rescheduleModal));
+      if (understandRescheduleBtn) understandRescheduleBtn.addEventListener('click', () => closeModal(rescheduleModal));
+      if (rescheduleModal) rescheduleModal.addEventListener('click', (e) => { if (e.target === rescheduleModal) closeModal(rescheduleModal); });
+
   });
   </script>
 </body>

@@ -73,13 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $conn->commit();
 
-        $_SESSION['toast_success'] = "Member berhasil diaktifkan! ID: $id_member";
+        $_SESSION['toast_success'] = "✅ Member berhasil diaktifkan! ID: $id_member";
         header("Location: member.php");
         exit;
 
     } catch (Exception $e) {
         $conn->rollback();
-        $_SESSION['toast_error'] = "ERROR: " . $e->getMessage();
+        $_SESSION['toast_error'] = "❌ ERROR: " . $e->getMessage();
         error_log("Member Activation Error: " . $e->getMessage() . " | MySQL Error: " . $conn->error);
         header("Location: member.php");
         exit;
@@ -110,172 +110,468 @@ $qMember = mysqli_query($conn, "
 ");
 
 include('../includes/header.php');
-// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 
 <style>
-/* Pastikan semua input/select/select2 punya tinggi yang sama agar rapi (versi A) */
-.form-control, .form-select {
-    height: 46px;
-    padding: .5rem .75rem;
-    box-sizing: border-box;
+/* Professional Member Management Styling */
+:root {
+    --primary-gradient: linear-gradient(135deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
+    --success-gradient: linear-gradient(135deg, #28a745 0%, #218838 100%);
+    --card-shadow: 0 4px 20px rgba(14, 92, 145, 0.15);
+    --card-hover-shadow: 0 8px 30px rgba(14, 92, 145, 0.25);
 }
 
-.select2-container--bootstrap4 .select2-selection--single {
-    height: 46px;
-    padding: .25rem .5rem;
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Content Header Enhancement */
+.content-header {
+    margin-bottom: 2rem;
+}
+
+.content-header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #2c3e50;
+    letter-spacing: -0.5px;
+    margin: 0;
+}
+
+.content-header h1 i {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.content-header .btn-primary {
+    background: var(--primary-gradient);
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+    transition: all 0.3s ease;
+}
+
+.content-header .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+}
+
+/* Alert Enhancements */
+.alert {
+    border-radius: 12px;
+    border: none;
+    padding: 1rem 1.5rem;
+    font-size: 0.938rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+}
+
+/* Form Card Enhancement */
+.card-primary {
+    border-radius: 20px;
+    border: none;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+}
+
+.card-primary:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+
+.card-primary .card-header {
+    background: var(--primary-gradient);
+    padding: 1.75rem;
+    border: none;
+}
+
+.card-primary .card-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+.card-primary .card-body {
+    padding: 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 100%);
+}
+
+/* Form Elements Consistent Height */
+.form-control, .form-select {
+    height: 48px;
+    padding: 0.75rem 1rem;
     box-sizing: border-box;
+    border: 2px solid #e3e6f0;
+    border-radius: 10px;
+    font-size: 0.938rem;
+    transition: all 0.3s ease;
+    background: #ffffff;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #2196f3;
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+    background: #ffffff;
+}
+
+/* Select2 Bootstrap 4 Height Match */
+.select2-container--bootstrap4 .select2-selection--single {
+    height: 48px !important;
+    padding: 0.5rem 1rem !important;
+    box-sizing: border-box;
+    border: 2px solid #e3e6f0 !important;
+    border-radius: 10px !important;
+    transition: all 0.3s ease;
+}
+
+.select2-container--bootstrap4 .select2-selection--single:focus,
+.select2-container--bootstrap4.select2-container--focus .select2-selection--single {
+    border-color: #2196f3 !important;
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1) !important;
 }
 
 .select2-container--bootstrap4 .select2-selection__rendered {
-    line-height: 46px;
+    line-height: 48px !important;
+    padding-left: 0 !important;
+    color: #495057;
 }
 
 .select2-container--bootstrap4 .select2-selection__arrow {
-    height: 46px;
+    height: 46px !important;
+}
+
+/* Form Labels */
+label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #5a5c69;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.3px;
+}
+
+/* Button Enhancements */
+.btn-success {
+    background: var(--success-gradient);
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 1.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.card-footer {
+    background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
+    border-top: 2px solid #e3e6f0;
+    padding: 1.5rem 2rem;
+}
+
+/* Table Card Enhancement */
+.card {
+    border-radius: 20px;
+    border: none;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.card .card-header {
+    background: var(--primary-gradient);
+    padding: 1.75rem;
+    border: none;
+}
+
+.card .card-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+/* Enhanced Table Styling */
+#tblMember {
+    margin: 0;
+}
+
+#tblMember thead {
+    background: linear-gradient(135deg, #f8f9fc 0%, #f1f3f9 100%);
+}
+
+#tblMember thead th {
+    font-size: 0.813rem;
+    font-weight: 700;
+    color: #5a5c69;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 1rem;
+    border-bottom: 2px solid #e3e6f0;
+}
+
+#tblMember tbody tr {
+    transition: all 0.2s ease;
+}
+
+#tblMember tbody tr:hover {
+    background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(14, 92, 145, 0.1);
+}
+
+#tblMember tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f1f3f9;
+}
+
+/* Badge Enhancements */
+.badge {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 8px;
+    letter-spacing: 0.3px;
+}
+
+.badge.bg-success {
+    background: var(--success-gradient) !important;
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%) !important;
+}
+
+/* Input Group Enhancement */
+.input-group .form-control {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.input-group-text {
+    background: linear-gradient(135deg, #f1f3f9 0%, #e9ecf4 100%);
+    border: 2px solid #e3e6f0;
+    border-right: none;
+    color: #4e73df;
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .card-primary .card-body {
+        padding: 1.5rem;
+    }
+    
+    .content-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .form-control, .form-select,
+    .select2-container--bootstrap4 .select2-selection--single {
+        height: 44px !important;
+    }
 }
 </style>
 
-<div class="content-wrapper animate__animated animate__fadeIn">
+<div class="content-wrapper animate-fade-in">
 
 <section class="content-header">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
-        <h1><i class="fas fa-users mr-2"></i> Data Member</h1>
-        <button class="btn btn-primary shadow-sm" data-bs-toggle="collapse" data-bs-target="#formTambah">
-            <i class="fas fa-plus-circle"></i> Tambah Member
+    <div class="container-fluid d-flex justify-content-between align-items-center flex-wrap">
+        <div class="mb-3 mb-md-0">
+            <h1><i class="fas fa-users me-2"></i> Data Member</h1>
+            <p class="text-muted mb-0 mt-2">Kelola membership dan aktivasi anggota</p>
+        </div>
+        <button class="btn btn-primary shadow" data-bs-toggle="collapse" data-bs-target="#formTambah">
+            <i class="fas fa-plus-circle me-1"></i> Tambah Member
         </button>
     </div>
 </section>
 
 <section class="content">
-<?php 
-if (!empty($_SESSION['toast_error'])):
-    echo '<div class="alert alert-danger mt-3">'.$_SESSION['toast_error'].'</div>';
-    unset($_SESSION['toast_error']);
-endif;
+    <div class="container-fluid">
+        
+        <?php 
+        if (!empty($_SESSION['toast_error'])):
+            echo '<div class="alert alert-danger alert-dismissible fade show">
+                    <i class="fas fa-exclamation-triangle me-2"></i>'.$_SESSION['toast_error'].'
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                  </div>';
+            unset($_SESSION['toast_error']);
+        endif;
 
-if (!empty($_SESSION['toast_success'])):
-    echo '<div class="alert alert-success mt-3">'.$_SESSION['toast_success'].'</div>';
-    unset($_SESSION['toast_success']);
-endif;
-?>
+        if (!empty($_SESSION['toast_success'])):
+            echo '<div class="alert alert-success alert-dismissible fade show">
+                    <i class="fas fa-check-circle me-2"></i>'.$_SESSION['toast_success'].'
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                  </div>';
+            unset($_SESSION['toast_success']);
+        endif;
+        ?>
 
-<!-- FORM (Versi A: 3 kolom stabil) -->
-<div class="collapse mt-3" id="formTambah">
-    <div class="card card-primary shadow-lg border-0">
-        <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
-            <h3 class="card-title mb-0"><i class="fas fa-user-plus"></i> Aktivasi Member Baru</h3>
+        <!-- FORM TAMBAH MEMBER -->
+        <div class="collapse" id="formTambah">
+            <div class="card card-primary">
+                <div class="card-header text-white">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-user-plus me-2"></i> Aktivasi Member Baru
+                    </h3>
+                </div>
+
+                <form method="POST" id="formMember" class="needs-validation" novalidate>
+                    <div class="card-body row g-4">
+
+                        <!-- ROW 1: tiga kolom -->
+                        <div class="col-md-4">
+                            <label for="id_user_select">Pilih User</label>
+                            <select name="id_user" id="id_user_select" class="form-select select2-bootstrap4" required>
+                                <option value="">-- Pilih User --</option>
+                                <?php while($u=mysqli_fetch_assoc($qUsers)): ?>
+                                    <option value="<?= $u['id_user'] ?>"><?= htmlspecialchars($u['nama']) ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                            <div class="invalid-feedback">Pilih user terlebih dahulu.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="id_lapangan">Pilih Lapangan</label>
+                            <select name="id_lapangan" id="id_lapangan" class="form-select select2-bootstrap4" required>
+                                <option value="">-- Pilih Lapangan --</option>
+                                <?php while($l=mysqli_fetch_assoc($qLapangan)): ?>
+                                    <option value="<?= $l['id_lapangan'] ?>"><?= htmlspecialchars($l['nama_lapangan']) ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                            <div class="invalid-feedback">Pilih lapangan terlebih dahulu.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="durasi_bulan">Durasi Membership</label>
+                            <select name="durasi_bulan" id="durasi_bulan" class="form-select select2-bootstrap4" required>
+                                <option value="1">1 Bulan</option>
+                                <option value="2">2 Bulan</option>
+                                <option value="3">3 Bulan</option>
+                            </select>
+                            <div class="invalid-feedback">Pilih durasi membership.</div>
+                        </div>
+
+                        <!-- ROW 2: tiga kolom -->
+                        <div class="col-md-4">
+                            <label for="tanggal_mulai">Tanggal Mulai</label>
+                            <input type="date" 
+                                   id="tanggal_mulai" 
+                                   name="tanggal_mulai" 
+                                   class="form-control" 
+                                   value="<?= date('Y-m-d') ?>" 
+                                   required>
+                            <div class="invalid-feedback">Pilih tanggal mulai.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="method">Metode Pembayaran</label>
+                            <select name="method" id="method" class="form-select select2-bootstrap4" required>
+                                <option value="tunai">💵 Tunai</option>
+                                <option value="qris">📱 QRIS</option>
+                                <option value="bank_transfer">🏦 Transfer Bank</option>
+                            </select>
+                            <div class="invalid-feedback">Pilih metode pembayaran.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="total_bayar_display">Total Bayar</label>
+                            <input type="text" 
+                                   id="total_bayar_display" 
+                                   class="form-control fw-bold text-end" 
+                                   readonly 
+                                   style="background: #e9ecf4; color: #2196f3;">
+                            <input type="hidden" id="total_bayar_value" name="total_bayar_value">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> Perhitungan: Rp <?= number_format($harga_per_jam_member,0,',','.') ?> × 4 jam/bulan
+                            </small>
+                        </div>
+
+                    </div>
+
+                    <div class="card-footer text-end">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i> Simpan & Aktivasi
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <form method="POST" id="formMember" class="needs-validation" novalidate>
-            <div class="card-body row g-3">
-
-                <!-- ROW 1: tiga kolom -->
-                <div class="col-md-4">
-                    <label for="id_user_select">Pilih User</label>
-                    <select name="id_user" id="id_user_select" class="form-select select2-bootstrap4" required>
-                        <option value="">-- Pilih --</option>
-                        <?php while($u=mysqli_fetch_assoc($qUsers)): ?>
-                            <option value="<?= $u['id_user'] ?>"><?= htmlspecialchars($u['nama']) ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                    <div class="invalid-feedback">Pilih user.</div>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="id_lapangan">Pilih Lapangan</label>
-                    <select name="id_lapangan" id="id_lapangan" class="form-select select2-bootstrap4" required>
-                        <option value="">-- Pilih Lapangan --</option>
-                        <?php while($l=mysqli_fetch_assoc($qLapangan)): ?>
-                            <option value="<?= $l['id_lapangan'] ?>"><?= htmlspecialchars($l['nama_lapangan']) ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                    <div class="invalid-feedback">Pilih lapangan.</div>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="durasi_bulan">Durasi Membership</label>
-                    <select name="durasi_bulan" id="durasi_bulan" class="form-select select2-bootstrap4" required>
-                        <option value="1">1 Bulan</option>
-                        <option value="2">2 Bulan</option>
-                        <option value="3">3 Bulan</option>
-                    </select>
-                    <div class="invalid-feedback">Pilih durasi.</div>
-                </div>
-
-                <!-- ROW 2: tiga kolom -->
-                <div class="col-md-4">
-                    <label for="tanggal_mulai">Tanggal Mulai</label>
-                    <input type="date" id="tanggal_mulai" name="tanggal_mulai" class="form-control" value="<?= date('Y-m-d') ?>" required>
-                    <div class="invalid-feedback">Isi tanggal mulai.</div>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="method">Metode Pembayaran</label>
-                    <select name="method" id="method" class="form-select select2-bootstrap4" required>
-                        <option value="tunai">Tunai</option>
-                        <option value="qris">QRIS</option>
-                        <option value="bank_transfer">Transfer Bank</option>
-                    </select>
-                    <div class="invalid-feedback">Pilih metode pembayaran.</div>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="total_bayar_display">Total Bayar (Asumsi: <?= number_format($harga_per_jam_member,0,',','.') ?> x 4 jam/bln)</label>
-                    <input type="text" id="total_bayar_display" class="form-control fw-bold text-end" readonly>
-                    <input type="hidden" id="total_bayar_value" name="total_bayar_value">
-                </div>
-
+        <!-- DAFTAR MEMBER -->
+        <div class="card shadow-lg border-0">
+            <div class="card-header text-white">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i> Daftar Member Terdaftar
+                </h3>
             </div>
 
-            <div class="card-footer text-end">
-                <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Simpan</button>
+            <div class="card-body table-responsive p-0">
+                <table id="tblMember" class="table table-hover align-middle w-100 mb-0">
+                    <thead class="text-center">
+                        <tr>
+                            <th>No</th>
+                            <th>Nama Member</th>
+                            <th>Lapangan</th>
+                            <th>Durasi</th>
+                            <th>Tanggal Mulai</th>
+                            <th>Tanggal Berakhir</th>
+                            <th>Total Bayar</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php $no=1; while($m=mysqli_fetch_assoc($qMember)): ?>
+                        <tr>
+                            <td class="text-center fw-semibold text-muted"><?= $no++ ?></td>
+                            <td class="fw-semibold"><?= htmlspecialchars($m['nama']) ?></td>
+                            <td class="text-center"><?= htmlspecialchars($m['nama_lapangan']) ?></td>
+                            <td class="text-center"><span class="badge bg-primary"><?= $m['durasi_bulan'] ?> Bulan</span></td>
+                            <td class="text-center"><?= date('d M Y', strtotime($m['tanggal_mulai'])) ?></td>
+                            <td class="text-center"><?= date('d M Y', strtotime($m['tanggal_berakhir'])) ?></td>
+                            <td class="text-end fw-bold text-success">Rp <?= number_format($m['total_bayar'],0,',','.') ?></td>
+                            <td class="text-center">
+                                <span class="badge bg-<?= $m['status']=='aktif'?'success':'secondary' ?>">
+                                    <?= ucfirst($m['status']) ?>
+                                </span>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                    </tbody>
+                </table>
             </div>
-        </form>
-    </div>
-</div>
+        </div>
 
-<!-- DAFTAR MEMBER -->
-<div class="card shadow-lg border-0 mt-4">
-    <div class="card-header text-white" style="background: linear-gradient(90deg,#0e5c91,#2196f3);">
-        <h3 class="card-title mb-0"><i class="fas fa-list"></i> Daftar Member</h3>
     </div>
-
-    <div class="card-body table-responsive">
-        <table id="tblMember" class="table table-bordered table-striped table-hover align-middle w-100">
-            <thead class="bg-light text-center">
-                <tr>
-                    <th>No</th>
-                    <th>Nama</th>
-                    <th>Lapangan</th>
-                    <th>Durasi</th>
-                    <th>Tanggal Mulai</th>
-                    <th>Tanggal Berakhir</th>
-                    <th>Total Bayar</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php $no=1; while($m=mysqli_fetch_assoc($qMember)): ?>
-                <tr>
-                    <td class="text-center"><?= $no++ ?></td>
-                    <td><?= htmlspecialchars($m['nama']) ?></td>
-                    <td><?= htmlspecialchars($m['nama_lapangan']) ?></td>
-                    <td class="text-center"><?= $m['durasi_bulan'] ?> bln</td>
-                    <td class="text-center"><?= date('d-m-Y', strtotime($m['tanggal_mulai'])) ?></td>
-                    <td class="text-center"><?= date('d-m-Y', strtotime($m['tanggal_berakhir'])) ?></td>
-                    <td class="text-end fw-bold">Rp <?= number_format($m['total_bayar'],0,',','.') ?></td>
-                    <td class="text-center">
-                        <span class="badge bg-<?= $m['status']=='aktif'?'success':'secondary' ?>"><?= ucfirst($m['status']) ?></span>
-                    </td>
-                </tr>
-            <?php endwhile; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
 </section>
 </div>
 
@@ -288,49 +584,60 @@ include('../includes/footer.php');
 ?>
 
 <script>
-    // Inisialisasi select2 dan DataTable
-    $(document).ready(function() {
-        $('#id_user_select, #id_lapangan, #durasi_bulan, #method').select2({
-            theme: 'bootstrap4',
-            placeholder: "Pilih...",
-            width: '100%'
-        });
-
-        $('#tblMember').DataTable();
-
-        // Setup hitung awal
-        hitungTotal();
-
-        // Validasi bootstrap (optional)
-        (function () {
-            'use strict'
-            var forms = document.querySelectorAll('.needs-validation')
-            Array.prototype.slice.call(forms).forEach(function (form) {
-                form.addEventListener('submit', function (event) {
-                    if (!form.checkValidity()) {
-                        event.preventDefault()
-                        event.stopPropagation()
-                    }
-                    form.classList.add('was-validated')
-                }, false)
-            })
-        })()
+$(document).ready(function() {
+    // Inisialisasi select2 dengan tema bootstrap4
+    $('#id_user_select, #id_lapangan, #durasi_bulan, #method').select2({
+        theme: 'bootstrap4',
+        placeholder: "Pilih...",
+        width: '100%',
+        allowClear: true
     });
 
-    // Hitung total bayar berdasarkan harga per jam (asumsi 4 jam/bln)
-    function hitungTotal(){
-        let hargaPerJam = <?= json_encode($harga_per_jam_member) ?>;
-        let durasi = parseInt($('#durasi_bulan').val()) || 0;
-        let total = hargaPerJam * 4 * durasi;
-        $('#total_bayar_display').val("Rp " + total.toLocaleString('id-ID'));
-        $('#total_bayar_value').val(total);
-    }
+    // Inisialisasi DataTable
+    // $('#tblMember').DataTable({
+    //     responsive: true,
+    //     language: {
+    //         url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json'
+    //     }
+    // });
 
-    // trigger hitung saat durasi berubah
-    $('#durasi_bulan').on('change', hitungTotal);
-    // juga trigger saat lapangan berubah optionally (if price depends on lapangan you can recalc)
-    $('#id_lapangan').on('change', function(){
-        // jika nantinya ingin ambil harga berdasarkan lapangan via ajax tambahkan di sini
-        hitungTotal();
-    });
+    // Setup hitung awal
+    hitungTotal();
+
+    // Validasi bootstrap
+    (function () {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+    })()
+
+    // Auto hide alerts
+    setTimeout(function() {
+        $('.alert').fadeOut('slow');
+    }, 5000);
+});
+
+// Hitung total bayar berdasarkan harga per jam (asumsi 4 jam/bln)
+function hitungTotal(){
+    let hargaPerJam = <?= json_encode($harga_per_jam_member) ?>;
+    let durasi = parseInt($('#durasi_bulan').val()) || 0;
+    let total = hargaPerJam * 4 * durasi;
+    $('#total_bayar_display').val("Rp " + total.toLocaleString('id-ID'));
+    $('#total_bayar_value').val(total);
+}
+
+// trigger hitung saat durasi berubah
+$('#durasi_bulan').on('change', hitungTotal);
+// juga trigger saat lapangan berubah (jika nantinya harga berbeda per lapangan)
+$('#id_lapangan').on('change', function(){
+    hitungTotal();
+});
 </script>
