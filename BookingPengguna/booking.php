@@ -386,6 +386,163 @@ require '../include_user/header.php';
         </p>
       </div>
     </div>
+    <script>
+    // Ambil status login dari PHP
+    const isLoggedIn = <?= json_encode($is_logged_in); ?>;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ambil semua tombol slot yang tersedia
+        const slotButtons = document.querySelectorAll('.jam-main');
+
+        slotButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                // 1. Cek Login Dulu
+                if (!isLoggedIn) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Akses Dibatasi',
+                        text: 'Silakan login terlebih dahulu untuk membooking lapangan.',
+                        confirmButtonText: 'Login Sekarang',
+                        confirmButtonColor: '#3085d6',
+                        showCancelButton: true,
+                        cancelButtonText: 'Batal'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = '../auth/login.php'; // Sesuaikan path login kamu
+                        }
+                    });
+                    return;
+                }
+
+                // 2. Ambil Data dari Atribut Tombol
+                const dataSlot = {
+                    id_jadwal_waktu: this.dataset.id,
+                    id_lapangan: this.dataset.lapangan,
+                    tanggal: this.dataset.tanggal,
+                    jam: this.dataset.jam,
+                    harga: this.dataset.harga,
+                    nama_lapangan: '<?= $lapangan['nama_lapangan'] ?>', // Ambil dari PHP langsung aman
+                    action: 'add_to_cart'
+                };
+
+                // 3. Tampilkan Pilihan (SweetAlert)
+                Swal.fire({
+                    title: 'Booking Slot Ini?',
+                    html: `
+                        <div class="text-left text-sm">
+                            <p><strong>Jam:</strong> ${dataSlot.jam}</p>
+                            <p><strong>Tanggal:</strong> ${formatDateIndo(dataSlot.tanggal)}</p>
+                            <p><strong>Harga:</strong> Rp ${parseInt(dataSlot.harga).toLocaleString('id-ID')}</p>
+                        </div>
+                    `,
+                    icon: 'question',
+                    showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonText: '<i class="fa-solid fa-check"></i> Langsung Checkout',
+                    confirmButtonColor: '#10b981', // Hijau (Checkout)
+                    denyButtonText: '<i class="fa-solid fa-cart-plus"></i> Masukkan Keranjang', 
+                    denyButtonColor: '#3b82f6', // Biru (Keranjang)
+                    cancelButtonText: 'Batal',
+                    cancelButtonColor: '#64748b'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // User pilih "Langsung Checkout"
+                        processBooking(dataSlot, true); 
+                    } else if (result.isDenied) {
+                        // User pilih "Masukkan Keranjang"
+                        processBooking(dataSlot, false);
+                    }
+                });
+            });
+        });
+    });
+
+    // Fungsi Utama Memproses Booking
+    function processBooking(data, isDirectCheckout) {
+        // Tampilkan Loading
+        Swal.fire({
+            title: 'Memproses...',
+            text: 'Sedang mengecek ketersediaan slot...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        // Kirim Data ke Backend (booking.php itu sendiri)
+        const formData = new FormData();
+        for (const key in data) {
+            formData.append(key, data[key]);
+        }
+
+        fetch('booking.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.status === 'ok') {
+                // SUKSES: Slot tersedia & masuk session
+                
+                if (isDirectCheckout) {
+                    // Jika Direct Checkout -> Redirect ke halaman pembayaran/keranjang
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Slot Diamankan!',
+                        text: 'Mengalihkan ke halaman pembayaran...',
+                        timer: 1000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        // GANTI 'keranjang.php' dengan halaman checkout kamu (misal: pembayaran.php)
+                        window.location.href = 'keranjang.php'; 
+                    });
+                } else {
+                    // Jika Masuk Keranjang -> Tetap di halaman ini
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: 'Slot berhasil ditambahkan ke keranjang.',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload(); // Reload untuk update tampilan tombol
+                    });
+                }
+
+            } else {
+                // GAGAL: Slot sudah diambil orang lain / Error lain
+                // Pesan error diambil langsung dari backend (Baris 67 di PHP kamu)
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal Booking',
+                    text: res.message || 'Terjadi kesalahan sistem.',
+                    confirmButtonText: 'Cari Jadwal Lain'
+                }).then(() => {
+                    if(res.message.includes('sudah dibooking')) {
+                        location.reload(); // Reload agar status slot berubah jadi merah (booked)
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Terjadi kesalahan koneksi.',
+            });
+        });
+    }
+
+    // Helper: Format Tanggal Sederhana
+    function formatDateIndo(dateString) {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const date = new Date(dateString);
+        return date.toLocaleDateString('id-ID', options);
+    }
+</script>
   </main>
   
 

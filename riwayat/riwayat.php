@@ -227,8 +227,14 @@ if ($is_logged_in) {
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
                                         <i class="fa-solid fa-clock-rotate-left"></i> Sudah Reschedule
                                     </span>
-                                <?php elseif ($can_cancel): ?>
-                                    <div class="info-box">Bisa dibatalkan sebelum: <?= $limitBatal->format('H:i') ?></div>
+                                <?php elseif ($can_cancel || $can_edit): ?>
+                                    <div class="info-box">
+                                        <?php if ($can_edit): ?>
+                                            Bisa ubah jadwal & batalkan sebelum: <strong><?= $limitBatal->format('d M Y, H:i') ?></strong>
+                                        <?php else: ?>
+                                            Bisa dibatalkan sebelum: <strong><?= $limitBatal->format('d M Y, H:i') ?></strong>
+                                        <?php endif; ?>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                             <div class="footer-actions">
@@ -293,11 +299,36 @@ if ($is_logged_in) {
                         </div>
                         <div class="card-footer">
                             <div class="footer-info">
-                                <?php if ($mem['status'] == 'aktif' && $mem['used_reschedule'] > 0): ?>
+                                <?php 
+                                    // Untuk member, tampilkan info ubah jadwal dengan deadline
+                                    if ($mem['status'] == 'aktif' && $sisaUbah > 0):
+                                        // Fetch upcoming session untuk member ini
+                                        $qSesi = "SELECT tanggal_booking, jam_mulai FROM member_jadwal WHERE id_member = ? AND tanggal_booking >= CURDATE() AND status = 'aktif' ORDER BY tanggal_booking ASC LIMIT 1";
+                                        $stmtSesi = $conn->prepare($qSesi);
+                                        $stmtSesi->bind_param("i", $mem['id_member']);
+                                        $stmtSesi->execute();
+                                        $sesiRes = $stmtSesi->get_result()->fetch_assoc();
+                                        
+                                        if ($sesiRes):
+                                            try {
+                                                $jamSesi = new DateTime($sesiRes['tanggal_booking'] . ' ' . $sesiRes['jam_mulai']);
+                                                $deadlineUbah = (new DateTime($sesiRes['tanggal_booking'] . ' ' . $sesiRes['jam_mulai']))->sub(new DateInterval('PT5H'));
+                                                $sesiNum = 1; // Ini bisa di-improve kalau butuh nomor sesi yang akurat
+                                ?>
+                                    <div class="info-box">
+                                        Sesi 1 bisa diubah jadwal sebelum: <strong><?= $deadlineUbah->format('d M Y, H:i') ?></strong>
+                                    </div>
+                                <?php 
+                                            } catch (Exception $e) {}
+                                        endif;
+                                    elseif ($mem['status'] == 'aktif' && $mem['used_reschedule'] > 0):
+                                ?>
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
                                         <i class="fa-solid fa-clock-rotate-left"></i> Sudah Reschedule (<?= $mem['used_reschedule'] ?> dari 3 kali)
                                     </span>
-                                <?php endif; ?>
+                                <?php 
+                                    endif; 
+                                ?>
                             </div>
                             <div class="footer-actions">
                                 <button class="btn-solid blue" onclick="openDetailMember(<?= $mem['id_member'] ?>)">

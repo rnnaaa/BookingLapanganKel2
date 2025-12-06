@@ -221,28 +221,74 @@ $form_action = "proses_pembayaran.php";
                             <p class="text-xs font-mono text-slate-500">NMID: ID1025384582157</p>
                         </div>
 
-                        <?php elseif ($metode_pembayaran === 'bca'): ?>
-                        <div id="bca-view" class="bg-[#f0f9ff] p-6 rounded-xl border border-blue-100">
-                            <div class="flex items-center gap-3 mb-4">
-                                <i class="fa-solid fa-building-columns text-blue-600 text-xl"></i>
-                                <h5 class="text-base font-bold text-blue-900">Bank BCA</h5>
+<?php elseif ($metode_pembayaran === 'bca'): ?>
+                        <div id="bca-view" class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-10 -mt-10 blur-3xl opacity-60"></div>
+                            
+                            <div class="flex items-center gap-5 mb-6 relative z-10">
+                                <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-3xl group-hover:scale-105 transition-transform duration-300 shadow-sm">
+                                    <i class="fa-solid fa-building-columns"></i>
+                                </div>
+                                <div>
+                                    <h5 class="text-xl font-bold text-slate-800">Bank BCA</h5>
+                                    <p class="text-sm text-slate-500">Verifikasi Manual</p>
+                                </div>
                             </div>
-                            <div class="text-sm text-slate-500 mb-1">Nomor Rekening</div>
-                            <div class="text-2xl font-bold text-slate-800 tracking-wider mb-3">123 456 7890</div>
-                            <div class="text-sm text-slate-500 mb-1">Atas Nama</div>
-                            <div class="text-base font-semibold text-slate-800">Rush Badminton Academy</div>
+
+                            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-6 relative z-10 group-hover:border-blue-200 transition-colors">
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Nomor Rekening</p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-2xl md:text-3xl font-bold text-slate-800 font-mono tracking-tight">6025 669669</p>
+                                    <button type="button" onclick="navigator.clipboard.writeText('6025 669669'); Swal.fire({icon:'success', title:'Disalin!', toast:true, position:'top-end', showConfirmButton:false, timer:1500});" class="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-600 flex items-center justify-center transition-all" title="Salin Rekening">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-4 relative z-10">
+                                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 border border-slate-200">
+                                    <i class="fa-solid fa-user-shield text-lg"></i>
+                                </div>
+                                <div>
+                                     <p class="text-xs text-slate-500 mb-0.5">Atas Nama</p>
+                                     <p class="font-bold text-slate-800 text-lg">RUDI RAHMAWAN</p>
+                                </div>
+                            </div>
                         </div>
 
                         <?php elseif ($metode_pembayaran === 'mandiri'): ?>
-                        <div id="mandiri-view" class="bg-[#fffbeb] p-6 rounded-xl border border-yellow-100">
-                            <div class="flex items-center gap-3 mb-4">
-                                <i class="fa-solid fa-building-columns text-yellow-600 text-xl"></i>
-                                <h5 class="text-base font-bold text-yellow-900">Bank Mandiri</h5>
+                        <div id="mandiri-view" class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full -mr-10 -mt-10 blur-3xl opacity-60"></div>
+
+                            <div class="flex items-center gap-5 mb-6 relative z-10">
+                                <div class="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 text-3xl group-hover:scale-105 transition-transform duration-300 shadow-sm">
+                                    <i class="fa-solid fa-building-columns"></i>
+                                </div>
+                                <div>
+                                    <h5 class="text-xl font-bold text-slate-800">Bank Mandiri</h5>
+                                    <p class="text-sm text-slate-500">Verifikasi Manual</p>
+                                </div>
                             </div>
-                            <div class="text-sm text-slate-500 mb-1">Nomor Rekening</div>
-                            <div class="text-2xl font-bold text-slate-800 tracking-wider mb-3">098 765 4321</div>
-                            <div class="text-sm text-slate-500 mb-1">Atas Nama</div>
-                            <div class="text-base font-semibold text-slate-800">Rush Badminton Academy</div>
+
+                            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-6 relative z-10 group-hover:border-amber-200 transition-colors">
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Nomor Rekening</p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-2xl md:text-3xl font-bold text-slate-800 font-mono tracking-tight">143 05 23333332</p>
+                                    <button type="button" onclick="navigator.clipboard.writeText('143 05 23333332'); Swal.fire({icon:'success', title:'Disalin!', toast:true, position:'top-end', showConfirmButton:false, timer:1500});" class="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-600 flex items-center justify-center transition-all" title="Salin Rekening">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-4 relative z-10">
+                                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 border border-slate-200">
+                                    <i class="fa-solid fa-user-shield text-lg"></i>
+                                </div>
+                                <div>
+                                     <p class="text-xs text-slate-500 mb-0.5">Atas Nama</p>
+                                     <p class="font-bold text-slate-800 text-lg">RUDI RAHMAWAN</p>
+                                </div>
+                            </div>
                         </div>
                         <?php endif; ?>
                     </div>

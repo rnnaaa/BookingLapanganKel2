@@ -274,81 +274,108 @@ switch ($action) {
 
     // 4. UBAH JADWAL
     case 'ubah_jadwal_sesi':
-        $id_sesi = $_POST['id_sesi'] ?? 0;
-        $id_lapangan = $_POST['id_lapangan'] ?? 0;
-        $new_date = $_POST['new_date'] ?? '';
-        $new_waktu_id = $_POST['new_jadwal_waktu'] ?? 0;
-
-        if (empty($id_sesi) || empty($new_date) || empty($new_waktu_id)) {
-            echo json_encode(['status' => 'error', 'message' => 'Data tidak lengkap.']); exit;
-        }
-
-        $conn->begin_transaction();
         try {
+            $id_sesi = $_POST['id_sesi'] ?? 0;
+            $id_lapangan = $_POST['id_lapangan'] ?? 0;
+            $new_date = $_POST['new_date'] ?? '';
+            $new_waktu_id = $_POST['new_jadwal_waktu'] ?? 0;
+
+            if (empty($id_sesi) || empty($new_date) || empty($new_waktu_id)) {
+                throw new Exception('Data tidak lengkap.');
+            }
+
+            $conn->begin_transaction();
+            
             // Ambil Data Lama
             $qOld = "SELECT db.id_booking, db.id_jadwal_waktu, b.tanggal, jw.jam_mulai, (SELECT COUNT(*) FROM history_ubah_jadwal h WHERE h.id_detail_booking = db.id_detail_booking) as count_ubah FROM detail_booking db JOIN booking b ON db.id_booking = b.id_booking JOIN jadwal_waktu jw ON db.id_jadwal_waktu = jw.id_jadwal_waktu WHERE db.id_detail_booking = ? AND b.id_user = ? FOR UPDATE";
             $stmtOld = $conn->prepare($qOld);
+            if (!$stmtOld) throw new Exception('Prepare error: ' . $conn->error);
             $stmtOld->bind_param("ii", $id_sesi, $user_id);
-            $stmtOld->execute();
+            if (!$stmtOld->execute()) throw new Exception('Execute error: ' . $stmtOld->error);
             $oldData = $stmtOld->get_result()->fetch_assoc();
 
             if (!$oldData) throw new Exception("Data booking tidak valid.");
             if ($oldData['count_ubah'] > 0) throw new Exception("Anda sudah pernah mengubah jadwal ini.");
 
-            // Cek Jadwal Baru
+            // Cek Jadwal Harian Baru
             $qHarian = "SELECT id_jadwal_harian FROM jadwal_harian WHERE id_lapangan = ? AND tanggal = ?";
             $stmtH = $conn->prepare($qHarian);
+            if (!$stmtH) throw new Exception('Prepare error: ' . $conn->error);
             $stmtH->bind_param("is", $id_lapangan, $new_date);
-            $stmtH->execute();
+            if (!$stmtH->execute()) throw new Exception('Execute error: ' . $stmtH->error);
             $harianRes = $stmtH->get_result();
             if ($harianRes->num_rows == 0) throw new Exception("Jadwal belum dibuka.");
             $id_harian_baru = $harianRes->fetch_assoc()['id_jadwal_harian'];
 
-            // Cek Slot Kosong
+            // Cek Slot Kosong (Tersedia)
             $qCheck = "SELECT id_detail FROM jadwal_detail WHERE id_jadwal_harian = ? AND id_jadwal_waktu = ? AND status = 'tersedia' FOR UPDATE";
             $stmtCheck = $conn->prepare($qCheck);
+            if (!$stmtCheck) throw new Exception('Prepare error: ' . $conn->error);
             $stmtCheck->bind_param("ii", $id_harian_baru, $new_waktu_id);
-            $stmtCheck->execute();
+            if (!$stmtCheck->execute()) throw new Exception('Execute error: ' . $stmtCheck->error);
             if ($stmtCheck->get_result()->num_rows == 0) throw new Exception("Slot sudah terisi.");
 
-            // Lepas Slot Lama
+            // Lepas Slot Lama - Cari jadwal_harian lama dulu
             $qHarianLama = "SELECT id_jadwal_harian FROM jadwal_harian WHERE id_lapangan = ? AND tanggal = ?";
             $stmtHL = $conn->prepare($qHarianLama);
+            if (!$stmtHL) throw new Exception('Prepare error: ' . $conn->error);
             $stmtHL->bind_param("is", $id_lapangan, $oldData['tanggal']);
-            $stmtHL->execute();
-            $id_harian_lama = $stmtHL->get_result()->fetch_assoc()['id_jadwal_harian'];
-
-            $conn->query("UPDATE jadwal_detail SET status = 'tersedia', id_booking = NULL WHERE id_jadwal_harian = $id_harian_lama AND id_jadwal_waktu = {$oldData['id_jadwal_waktu']}");
+            if (!$stmtHL->execute()) throw new Exception('Execute error: ' . $stmtHL->error);
+            $hlRes = $stmtHL->get_result();
+            if ($hlRes->num_rows > 0) {
+                $id_harian_lama = $hlRes->fetch_assoc()['id_jadwal_harian'];
+                
+                // Release old slot
+                $stmtRelease = $conn->prepare("UPDATE jadwal_detail SET status = 'tersedia', id_booking = NULL WHERE id_jadwal_harian = ? AND id_jadwal_waktu = ?");
+                if (!$stmtRelease) throw new Exception('Prepare error: ' . $conn->error);
+                $stmtRelease->bind_param("ii", $id_harian_lama, $oldData['id_jadwal_waktu']);
+                if (!$stmtRelease->execute()) throw new Exception('Execute error: ' . $stmtRelease->error);
+            }
             
-            // Ambil Slot Baru
+            // Book Slot Baru
             $stmtUpdNew = $conn->prepare("UPDATE jadwal_detail SET status = 'dibooking', id_booking = ? WHERE id_jadwal_harian = ? AND id_jadwal_waktu = ?");
+            if (!$stmtUpdNew) throw new Exception('Prepare error: ' . $conn->error);
             $stmtUpdNew->bind_param("iii", $oldData['id_booking'], $id_harian_baru, $new_waktu_id);
-            $stmtUpdNew->execute();
+            if (!$stmtUpdNew->execute()) throw new Exception('Execute error: ' . $stmtUpdNew->error);
 
-            // Update Detail Booking
-            $conn->query("UPDATE detail_booking SET id_jadwal_waktu = $new_waktu_id WHERE id_detail_booking = $id_sesi");
+            // Update Detail Booking (jadwal_waktu baru)
+            $stmtUpdDetail = $conn->prepare("UPDATE detail_booking SET id_jadwal_waktu = ? WHERE id_detail_booking = ?");
+            if (!$stmtUpdDetail) throw new Exception('Prepare error: ' . $conn->error);
+            $stmtUpdDetail->bind_param("ii", $new_waktu_id, $id_sesi);
+            if (!$stmtUpdDetail->execute()) throw new Exception('Execute error: ' . $stmtUpdDetail->error);
 
-            // Update Tanggal Utama (Jika berubah)
+            // Update Tanggal Utama (jika berubah)
             if ($oldData['tanggal'] != $new_date) {
                 $stmtUpdB = $conn->prepare("UPDATE booking SET tanggal = ? WHERE id_booking = ?");
+                if (!$stmtUpdB) throw new Exception('Prepare error: ' . $conn->error);
                 $stmtUpdB->bind_param("si", $new_date, $oldData['id_booking']);
-                $stmtUpdB->execute();
+                if (!$stmtUpdB->execute()) throw new Exception('Execute error: ' . $stmtUpdB->error);
             }
 
-            // Log History
-            $qJamBaru = "SELECT jam_mulai FROM jadwal_waktu WHERE id_jadwal_waktu = $new_waktu_id";
-            $jamBaruStr = $conn->query($qJamBaru)->fetch_assoc()['jam_mulai'];
+            // Log History - Ambil jam baru
+            $qJamBaru = "SELECT jam_mulai FROM jadwal_waktu WHERE id_jadwal_waktu = ?";
+            $stmtJamBaru = $conn->prepare($qJamBaru);
+            if (!$stmtJamBaru) throw new Exception('Prepare error: ' . $conn->error);
+            $stmtJamBaru->bind_param("i", $new_waktu_id);
+            if (!$stmtJamBaru->execute()) throw new Exception('Execute error: ' . $stmtJamBaru->error);
+            $jamBaruRes = $stmtJamBaru->get_result()->fetch_assoc();
+            if (!$jamBaruRes) throw new Exception("Gagal mengambil data jam baru.");
+            $jamBaruStr = $jamBaruRes['jam_mulai'];
             
             $stmtHist = $conn->prepare("INSERT INTO history_ubah_jadwal (id_detail_booking, tipe, tanggal_lama, jam_lama, tanggal_baru, jam_baru, id_lapangan, id_user) VALUES (?, 'reguler', ?, ?, ?, ?, ?, ?)");
+            if (!$stmtHist) throw new Exception('Prepare error: ' . $conn->error);
             $stmtHist->bind_param("issssii", $id_sesi, $oldData['tanggal'], $oldData['jam_mulai'], $new_date, $jamBaruStr, $id_lapangan, $user_id);
-            $stmtHist->execute();
+            if (!$stmtHist->execute()) throw new Exception('Execute error: ' . $stmtHist->error);
 
             $conn->commit();
+            ob_end_clean();
             echo json_encode(['status' => 'success', 'message' => 'Jadwal berhasil diubah.']);
         } catch (Exception $e) {
             $conn->rollback();
+            ob_end_clean();
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
+        exit;
         break;
 
 // 5. GET MEMBER UPCOMING SESSIONS (Untuk Dropdown Ubah Jadwal)
@@ -516,8 +543,6 @@ switch ($action) {
 
     // 7. GET MEMBER DETAIL (Untuk tombol Detail)
     case 'get_member_detail':
-         // ... (Kode Get Member Detail SAMA seperti yang sebelumnya, tidak perlu diubah) ...
-         // Copy dari kode sebelumnya
          $id_member = $_POST['id_member'] ?? 0;
          $qMem = "SELECT m.id_member, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, m.total_bayar, m.status, l.nama_lapangan, u.nama AS nama_user FROM member m JOIN lapangan l ON m.id_lapangan = l.id_lapangan JOIN users u ON m.id_user = u.id_user WHERE m.id_member = ? AND m.id_user = ?";
          $stmt = $conn->prepare($qMem);
@@ -533,11 +558,18 @@ switch ($action) {
          $stmtJ->execute();
          $resJadwal = $stmtJ->get_result();
          
+         // Mapping hari ke bahasa Indonesia
+         $hariMap = ['Monday' => 'Senin', 'Tuesday' => 'Selasa', 'Wednesday' => 'Rabu', 'Thursday' => 'Kamis', 'Friday' => 'Jumat', 'Saturday' => 'Sabtu', 'Sunday' => 'Minggu'];
+         $bulanMap = ['January' => 'Januari', 'February' => 'Februari', 'March' => 'Maret', 'April' => 'April', 'May' => 'Mei', 'June' => 'Juni', 'July' => 'Juli', 'August' => 'Agustus', 'September' => 'September', 'October' => 'Oktober', 'November' => 'November', 'December' => 'Desember'];
+         
          $jadwalList = [];
          while($row = $resJadwal->fetch_assoc()) {
              $dateObj = new DateTime($row['tanggal_booking']);
+             $hari = $hariMap[$dateObj->format('l')] ?? $dateObj->format('l');
+             $bulan = $bulanMap[$dateObj->format('F')] ?? $dateObj->format('F');
+             $tglFormatted = $hari . ', ' . $dateObj->format('j') . ' ' . $bulan . ' ' . $dateObj->format('Y');
              $jadwalList[] = [
-                 'tanggal' => $dateObj->format('l, j F Y'),
+                 'tanggal' => $tglFormatted,
                  'jam' => substr($row['jam_mulai'], 0, 5) . ' - ' . substr($row['jam_selesai'], 0, 5)
              ];
          }
