@@ -10,9 +10,9 @@ $host = $_SERVER['HTTP_HOST'];
 $folder_project = ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1') ? '/BookingLapanganKel2' : ''; 
 $base_url = $protocol . "://" . $host . $folder_project;
 
-// === AUTO LOGOUT (20 MENIT) ===
+// === AUTO LOGOUT (3 JAM) ===
 if (isset($_SESSION['id_user'])) {
-    $timeout_duration = 1200; 
+    $timeout_duration = 10800; 
     if (isset($_SESSION['last_activity'])) {
         $inactive_time = time() - $_SESSION['last_activity'];
         if ($inactive_time > $timeout_duration) {

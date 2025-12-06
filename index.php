@@ -67,7 +67,7 @@ if ($resTesti) {
                     Pesan Lapangan <br/><span class="text-yellow-300">Lebih Cepat</span>, Main Tanpa Ribet
                 </h1>
                 <p class="text-lg md:text-xl text-white/90 max-w-xl mb-8 font-light leading-relaxed">
-                    Pilih lapangan, cek jadwal real-time, dan konfirmasi langsung. Solusi terbaik untuk latihan rutin hingga turnamen besar.
+                    Pilih lapangan, cek jadwal real-time, dan konfirmasi langsung. Solusi terbaik untuk latihan rutin.
                 </p>
                 <div class="flex flex-wrap gap-4 mb-10">
                     <a href="#lapangan" class="bg-white text-primary hover:bg-gray-100 px-8 py-4 rounded-xl font-bold shadow-lg transform transition hover:scale-105 flex items-center gap-2">
@@ -94,7 +94,7 @@ if ($resTesti) {
             </div>
             <div class="lg:w-6/12 relative" data-aos="fade-left">
                 <div class="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20 transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                    <img src="uploads/lapangan/lap_1761769990.jpg" onerror="this.src='public/img/default_hero.jpg'" alt="SportField Arena" class="w-full h-[450px] object-cover hover:scale-105 transition-transform duration-700" />
+                    <img src="uploads/lapangan/lapangan_utama.jpg" onerror="this.src='public/img/default_hero.jpg'" alt="SportField Arena" class="w-full h-[450px] object-cover hover:scale-105 transition-transform duration-700" />
                     <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                     <div class="absolute bottom-6 left-6 text-white">
                         <div class="flex items-center gap-2 mb-1">
@@ -164,44 +164,107 @@ if ($resTesti) {
         </div>
     </section>
 
-    <section id="penawaran" class="py-20 bg-white relative">
-        <div class="absolute inset-0 bg-slate-50 transform -skew-y-3 z-0 origin-top-left"></div>
+<section id="penawaran" class="py-24 relative overflow-hidden">
+        <div class="absolute inset-0 bg-slate-50"></div>
+        <div class="absolute top-0 left-0 w-full h-full overflow-hidden opacity-30 pointer-events-none">
+            <div class="absolute -top-24 -right-24 w-96 h-96 bg-blue-200/40 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-0 left-0 w-72 h-72 bg-yellow-200/40 rounded-full blur-3xl"></div>
+        </div>
+
         <div class="max-w-7xl mx-auto px-4 relative z-10">
-            <div class="text-center mb-16">
-                <span class="text-primary font-bold tracking-wider uppercase text-sm">Membership & Promo</span>
-                <h2 class="text-4xl font-poppins font-bold text-slate-800 mt-2">Penawaran Spesial</h2>
+            <div class="text-center mb-16" data-aos="fade-up">
+                <span class="inline-block py-1 px-3 rounded-full bg-blue-100 text-primary text-xs font-bold tracking-wider uppercase mb-3">Membership & Promo</span>
+                <h2 class="text-4xl md:text-5xl font-poppins font-extrabold text-slate-900 leading-tight">
+                    Penawaran <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">Spesial</span>
+                </h2>
+                <p class="text-slate-500 mt-4 max-w-2xl mx-auto text-lg">Dapatkan harga terbaik untuk permainan rutin Anda.</p>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 max-w-5xl mx-auto items-center">
                 
-                <div class="relative p-8 bg-gradient-to-br from-primary to-primaryDark text-white rounded-3xl shadow-xl hover-lift overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-                    <div class="flex items-center gap-4 mb-6">
-                        <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl backdrop-blur">👑</div>
-                        <div>
-                            <h3 class="font-bold text-xl">Member Weekend</h3>
-                            <p class="text-white/80 text-sm">Prioritas Sabtu-Minggu</p>
+                <div class="relative group" data-aos="fade-right">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                    
+                    <div class="relative bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white rounded-[1.8rem] p-8 md:p-10 shadow-2xl transform transition-all duration-300 hover:-translate-y-2 border border-slate-700 overflow-hidden">
+                        
+                        <i class="fa-solid fa-crown absolute -right-6 -bottom-6 text-[10rem] text-white/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"></i>
+                        
+                        <div class="absolute top-0 right-0">
+                            <div class="bg-yellow-400 text-slate-900 text-xs font-bold px-4 py-1.5 rounded-bl-xl shadow-lg">
+                                <i class="fa-solid fa-fire mr-1"></i> BEST DEAL
+                            </div>
                         </div>
+
+                        <div class="flex items-center gap-4 mb-6 relative z-10">
+                            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-3xl shadow-lg text-white">
+                                <i class="fa-solid fa-crown"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-poppins font-bold text-2xl tracking-tight">Member Weekend</h3>
+                                <p class="text-slate-300 text-sm">Prioritas Sabtu & Minggu</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-8 pb-8 border-b border-white/10 relative z-10">
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-sm font-medium text-slate-400">Mulai dari</span>
+                                <span class="text-5xl font-extrabold text-white tracking-tight">Rp 25rb</span>
+                                <span class="text-lg text-slate-400 font-medium">/ jam</span>
+                            </div>
+                        </div>
+
+                        <ul class="space-y-4 mb-8 relative z-10">
+                            <li class="flex items-center gap-3 text-slate-200">
+                                <div class="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs"><i class="fa-solid fa-check"></i></div>
+                                <span class="text-sm font-medium">Prioritas Booking</span>
+                            </li>
+                            <li class="flex items-center gap-3 text-slate-200">
+                                <div class="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs"><i class="fa-solid fa-check"></i></div>
+                                <span class="text-sm font-medium">Harga Lebih Murah</span>
+                            </li>
+                     
+                        </ul>
+
+                        <button onclick="window.location.href='member/member.php'" class="w-full py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 text-slate-900 font-bold rounded-xl shadow-lg shadow-yellow-400/20 transition-all duration-300 transform hover:scale-[1.02] relative z-10">
+                            Daftar Member Sekarang <i class="fa-solid fa-arrow-right ml-2"></i>
+                        </button>
                     </div>
-                    <div class="text-3xl font-bold mb-6">Rp 25rb <span class="text-sm font-normal text-white/70">/Jam</span></div>
-                    <ul class="space-y-3 mb-8 text-sm text-white/90">
-                        <li class="flex items-center gap-3"><i class="fa-solid fa-check text-yellow-300"></i> Booking H-7</li>
-                        <li class="flex items-center gap-3"><i class="fa-solid fa-check text-yellow-300"></i> Diskon 15% Event</li>
-                    </ul>
-                    <button class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-primaryDark font-bold rounded-xl transition-colors shadow-lg" onclick="window.location.href='member.php'">Daftar Member</button>
                 </div>
 
-                <div class="relative p-8 bg-gradient-to-br from-primary to-primaryDark text-white rounded-3xl shadow-xl hover-lift overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-                    <div class="flex items-center gap-4 mb-6">
-                        <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl backdrop-blur">💎</div>
-                        <div>
-                            <h3 class="font-bold text-xl">Main Reguler</h3>
-                            <p class="text-white/80 text-sm">Latihan Harian</p>
+                <div class="relative group" data-aos="fade-left">
+                    <div class="relative bg-white text-slate-800 rounded-[1.8rem] p-8 shadow-xl border border-slate-100 transform transition-all duration-300 hover:-translate-y-2 overflow-hidden">
+                        
+                        <i class="fa-regular fa-futbol absolute -right-6 -bottom-6 text-[10rem] text-slate-50 rotate-12 group-hover:rotate-0 transition-transform duration-500"></i>
+
+                        <div class="flex items-center gap-4 mb-6 relative z-10">
+                            <div class="w-14 h-14 rounded-2xl bg-blue-50 text-primary flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-gem"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-poppins font-bold text-2xl text-slate-800">Main Reguler</h3>
+                                <p class="text-slate-500 text-sm">Latihan Harian Fleksibel</p>
+                            </div>
                         </div>
+
+                        <p class="text-slate-600 mb-8 leading-relaxed relative z-10 min-h-[80px]">
+                            Pilihan tepat untuk sparring santai dadakan atau latihan rutin mingguan bersama teman kantor atau komunitas Anda. Tanpa komitmen bulanan.
+                        </p>
+
+                        <div class="space-y-3 mb-8 bg-slate-50 p-5 rounded-xl border border-slate-100 relative z-10">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-bolt text-yellow-500"></i>
+                                <span class="text-sm font-semibold text-slate-700">Booking Instan via Web</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-wallet text-blue-500"></i>
+                                <span class="text-sm font-semibold text-slate-700">Pembayaran Mudah</span>
+                            </div>
+                        </div>
+
+                        <button onclick="window.location.href='BookingPengguna/booking.php'" class="w-full py-4 bg-gradient-to-r from-primary to-primaryDark hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300 transform hover:scale-[1.02] relative z-10">
+                            Booking Jadwal <i class="fa-solid fa-calendar-check ml-2"></i>
+                        </button>
                     </div>
-                    <p class="text-white/90 text-sm mb-6 leading-relaxed">Pilihan tepat untuk sparring santai atau latihan rutin mingguan tim Anda.</p>
-                    <div class="h-14 hidden md:block"></div> <button class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-primaryDark font-bold rounded-xl transition-colors shadow-lg mt-auto" onclick="window.location.href='BookingPengguna/booking.php'">Booking Sekarang</button>
                 </div>
 
             </div>
@@ -311,8 +374,7 @@ if ($resTesti) {
                 ?>
             </div>
         </div>
-    </section>
-    
+    </section>  
     <section class="py-16 bg-gradient-to-r from-primary to-primaryDark text-white text-center">
         <div class="max-w-4xl mx-auto px-4">
             <h2 class="text-3xl md:text-4xl font-poppins font-bold mb-4">Siap Jadi Juara Berikutnya?</h2>

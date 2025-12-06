@@ -351,8 +351,8 @@ $lapangans = []; $q = mysqli_query($conn, "SELECT * FROM lapangan WHERE status='
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <label class="cursor-pointer relative group w-full">
-                        <input type="radio" name="paket" value="1" data-quota="4" class="peer sr-only" checked>
-                        <div class="package-card h-full p-8 rounded-3xl border border-slate-200 bg-white peer-checked:border-amber-500 peer-checked:ring-4 peer-checked:ring-amber-50 relative overflow-hidden flex flex-col">
+                        <input type="radio" name="paket" value="1" data-quota="4" data-months="1" class="peer sr-only" checked>
+                        <div class="package-card h-full p-8 rounded-3xl border border-slate-200 bg-white peer-checked:border-slate-300 relative overflow-hidden flex flex-col">
                             <div class="mb-6">
                                 <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 text-2xl mb-4 group-hover:scale-110 transition-transform">
                                     <i class="fa-solid fa-stopwatch"></i>
@@ -365,14 +365,16 @@ $lapangans = []; $q = mysqli_query($conn, "SELECT * FROM lapangan WHERE status='
                                     <span class="text-3xl font-bold text-slate-900">4x</span>
                                     <span class="text-sm text-slate-500">pertemuan</span>
                                 </div>
-                                <div class="w-full py-3 bg-slate-50 rounded-xl text-slate-600 font-bold text-center text-sm group-hover:bg-amber-600 group-hover:text-white transition-colors">Pilih Paket</div>
+                                <div class="w-full py-3 bg-slate-200 rounded-xl text-slate-700 font-bold text-center text-sm group-hover:bg-slate-300 transition-colors">
+                                    Pilih Paket
+                                </div>
                             </div>
                         </div>
                     </label>
 
                     <label class="cursor-pointer relative group w-full">
-                        <input type="radio" name="paket" value="2" data-quota="8" class="peer sr-only">
-                        <div class="package-card h-full p-8 rounded-3xl border border-slate-200 bg-white peer-checked:border-amber-500 peer-checked:ring-4 peer-checked:ring-amber-50 relative overflow-hidden flex flex-col transform md:-translate-y-4 shadow-xl shadow-amber-100 z-10">
+                        <input type="radio" name="paket" value="2" data-quota="8" data-months="2" class="peer sr-only">
+                        <div class="package-card h-full p-8 rounded-3xl border border-slate-200 bg-white peer-checked:border-slate-300 relative overflow-hidden flex flex-col transform md:-translate-y-4 shadow-xl shadow-amber-100 z-10">
                             <div class="absolute top-0 right-0 bg-amber-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-bl-xl uppercase tracking-wider">Most Popular</div>
                             <div class="mb-6">
                                 <div class="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 text-2xl mb-4 group-hover:scale-110 transition-transform">
@@ -392,8 +394,8 @@ $lapangans = []; $q = mysqli_query($conn, "SELECT * FROM lapangan WHERE status='
                     </label>
 
                     <label class="cursor-pointer relative group w-full">
-                        <input type="radio" name="paket" value="3" data-quota="12" class="peer sr-only">
-                        <div class="package-card h-full p-8 rounded-3xl border border-slate-200 bg-white peer-checked:border-amber-500 peer-checked:ring-4 peer-checked:ring-amber-50 relative overflow-hidden flex flex-col">
+                        <input type="radio" name="paket" value="3" data-quota="12" data-months="3" class="peer sr-only">
+                        <div class="package-card h-full p-8 rounded-3xl border border-slate-200 bg-white peer-checked:border-slate-300 relative overflow-hidden flex flex-col">
                             <div class="absolute top-0 right-0 bg-slate-800 text-white text-[10px] font-bold px-4 py-1.5 rounded-bl-xl uppercase tracking-wider">Best Value</div>
                             <div class="mb-6">
                                 <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-amber-600 text-2xl mb-4 group-hover:scale-110 transition-transform">
@@ -407,17 +409,15 @@ $lapangans = []; $q = mysqli_query($conn, "SELECT * FROM lapangan WHERE status='
                                     <span class="text-3xl font-bold text-slate-900">12x</span>
                                     <span class="text-sm text-slate-500">pertemuan</span>
                                 </div>
-                                <div class="w-full py-3 bg-slate-50 rounded-xl text-slate-600 font-bold text-center text-sm group-hover:bg-amber-600 group-hover:text-white transition-colors">Pilih Paket</div>
+                                <div class="w-full py-3 bg-slate-200 rounded-xl text-slate-700 font-bold text-center text-sm group-hover:bg-slate-300 transition-colors">
+                                    Pilih Paket
+                                </div>
                             </div>
                         </div>
                     </label>
                 </div>
 
-                <div class="mt-16 flex justify-end">
-                    <button onclick="nextStep(2)" class="bg-slate-900 text-white pl-8 pr-6 py-4 rounded-full font-bold hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl hover:scale-105 flex items-center gap-3 group">
-                        Lanjut Pilih Jadwal <span class="bg-white/20 rounded-full w-6 h-6 flex items-center justify-center group-hover:translate-x-1 transition-transform"><i class="fa-solid fa-chevron-right text-xs"></i></span>
-                    </button>
-                </div>
+
             </div>
         </div>
 

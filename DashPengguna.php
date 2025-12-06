@@ -376,7 +376,7 @@ $badge_member = $is_member ? '<span class="bg-white/20 text-white text-[10px] sm
     </main>
 
     <footer class="py-6 sm:py-8 text-center text-xs sm:text-sm text-slate-500 px-4">
-        &copy; 2025 Rush Badminton Academy. Dibuat dengan ❤️.
+        &copy; 2025 Rush Badminton Academy.
     </footer>
 
     <div id="modalOverlay" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden transition-opacity duration-300 opacity-0 flex items-center justify-center p-4 sm:p-6">
