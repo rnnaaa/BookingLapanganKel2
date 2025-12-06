@@ -1,10 +1,7 @@
 <?php
-// sidebar.php (Sidebar + Topbar/Navbar)
-// Solusi Final: Mengatasi konflik rotasi panah AdminLTE
-
+// sidebar.php (Sidebar + Topbar/Navbar) - Professional Version
 $current_page = basename($_SERVER['PHP_SELF']);
 
-// Fungsi menandai menu aktif & membuka submenu otomatis
 function isActive($pages)
 {
     global $current_page;
@@ -18,17 +15,18 @@ function activeLink($page)
 }
 ?>
 
-<aside class="main-sidebar sidebar-light-primary elevation-4" style="background-color: #1874ad;">
+<aside class="main-sidebar sidebar-light-primary elevation-4" style="background: linear-gradient(180deg, #0d5a8f 0%, #1874ad 100%);">
 
-    <a href="dashboard.php" class="brand-link d-flex align-items-center" style="gap: 12px; padding: 12px 16px; background: #166a9c;">
-        <img src="../uploads/bukti_pembayaran/LogoRush2.png" alt="Logo" class="brand-image img-circle elevation-3" style="width: 40px; height: 40px; object-fit: cover; opacity: .95;">
-        <span class="brand-text font-weight-bold text-white" style="font-size: 13px; margin-top: 2px;">
+    <a href="dashboard.php" class="brand-link d-flex align-items-center" style="padding: 16px 20px; background: linear-gradient(135deg, #0d4f7d 0%, #166a9c 100%); border-bottom: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease;">
+        <img src="../uploads/bukti_pembayaran/LogoRush2.png" alt="Logo" class="brand-image elevation-3" style="width: 35px; height: 35px; object-fit: cover; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);">
+        <span class="brand-text font-weight-bold text-white ml-2" style="font-size: 12px; letter-spacing: 0.3px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
             Rush Badminton Academy
         </span>
     </a>
 
-    <div class="sidebar">
-        <div class="user-panel mt-3 pb-3 mb-3 d-flex align-items-center">
+    <div class="sidebar" style="padding-top: 2px;">
+        <!-- User Panel -->
+        <div class="user-panel mt-3 pb-3 mb-3 d-flex align-items-center" style="border-bottom: 1px solid rgba(255,255,255,0.15); padding: 12px 16px;">
             <?php
             $default_profile_pic = '../uploads/users/';
             $profile_pic_path = $default_profile_pic;
@@ -37,111 +35,132 @@ function activeLink($page)
             }
             ?>
             <div class="image">
-                <img src="<?= $profile_pic_path ?>" alt="User Image" class="img-circle elevation-2" style="width: 35px; height: 35px; object-fit: cover;">
+                <img src="<?= $profile_pic_path ?>" alt="User Image" class="img-circle elevation-3" style="width: 35px; height: 35px; object-fit: cover; border: 2px solid rgba(255,255,255,0.3); transition: transform 0.3s ease;">
             </div>
-            <div class="info text-truncate">
-                <a href="#" class="d-block text-white" style="font-weight: 500;">
+            <div class="info text-truncate ml-2">
+                <a href="#" class="d-block text-white" style="font-weight: 600; font-size: 14px; letter-spacing: 0.2px;">
                     <?php echo isset($_SESSION['nama']) ? htmlspecialchars($_SESSION['nama']) : 'Administrator'; ?>
                 </a>
+                <small class="text-white-50" style="font-size: 11px;">Administrator</small>
             </div>
         </div>
 
-        <div class="form-inline mb-2">
-            <div class="input-group" id="sidebar-search-container">
-                <input id="sidebar-search" class="form-control form-control-sidebar" type="search" placeholder="Cari menu..." aria-label="Search">
+        <!-- Search -->
+        <div class="form-inline mb-3 px-3">
+            <div class="input-group" id="sidebar-search-container" style="box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden;">
+                <input id="sidebar-search" class="form-control form-control-sidebar" type="search" placeholder="Cari menu..." aria-label="Search" style="border: none; background: rgba(255,255,255,0.95); font-size: 13px; padding: 10px 12px;">
                 <div class="input-group-append">
-                    <button class="btn btn-sidebar" id="btn-sidebar-search">
-                        <i class="fas fa-search fa-fw text-dark"></i>
+                    <button class="btn btn-sidebar" id="btn-sidebar-search" style="background: rgba(255,255,255,0.95); border: none; color: #1874ad; transition: all 0.3s ease;">
+                        <i class="fas fa-search fa-fw"></i>
                     </button>
                 </div>
             </div>
         </div>
 
-        <nav class="mt-2">
+        <!-- Navigation -->
+        <nav class="mt-2 px-2">
             <ul id="sidebar-menu" class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
 
-                <li class="nav-item">
-                    <a href="dashboard.php" class="nav-link <?= activeLink('dashboard.php') ?>">
-                        <i class="nav-icon fas fa-tachometer-alt"></i>
-                        <p>Dashboard</p>
+                <li class="nav-item mb-1">
+                    <a href="dashboard.php" class="nav-link <?= activeLink('dashboard.php') ?>" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-tachometer-alt" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">Dashboard</p>
                     </a>
                 </li>
 
-                <li class="nav-item has-treeview <?= isActive(['lapangan.php', 'jadwal_waktu.php', 'jadwal_harian.php', 'jadwal_view.php', 'jadwal_singkronisasi.php', 'jam_operasional.php']) ?>">
-                    <a href="#" class="nav-link">
-                        <i class="nav-icon fas fa-futbol"></i>
-                        <p>Lapangan & Jadwal <i class="right fas fa-angle-right rotate-icon"></i></p>
+                <li class="nav-item has-treeview mb-1 <?= isActive(['lapangan.php', 'jadwal_waktu.php', 'jadwal_harian.php', 'jadwal_view.php', 'jadwal_singkronisasi.php', 'jam_operasional.php']) ?>">
+                    <a href="#" class="nav-link" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-futbol" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">
+                            Lapangan & Jadwal 
+                            <i class="right fas fa-angle-right rotate-icon" style="transition: transform 0.3s ease;"></i>
+                        </p>
                     </a>
-                    <ul class="nav nav-treeview ml-3">
-                        <li class="nav-item"><a href="lapangan.php" class="nav-link <?= activeLink('lapangan.php') ?>"><p>Data Lapangan</p></a></li>
-                        <li class="nav-item"><a href="jadwal_waktu.php" class="nav-link <?= activeLink('jadwal_waktu.php') ?>"><p>Jadwal Waktu</p></a></li>
-                        <li class="nav-item"><a href="jadwal_harian.php" class="nav-link <?= activeLink('jadwal_harian.php') ?>"><p>Jadwal Harian</p></a></li>
-                        <li class="nav-item"><a href="jadwal_view.php" class="nav-link <?= activeLink('jadwal_view.php') ?>"><p>Jadwal View</p></a></li>
-                        <li class="nav-item"><a href="jadwal_singkronisasi.php" class="nav-link <?= activeLink('jadwal_singkronisasi.php') ?>"><p>Sinkronisasi</p></a></li>
-                        <li class="nav-item"><a href="jam_operasional.php" class="nav-link <?= activeLink('jam_operasional.php') ?>"><p>Jam Operasional</p></a></li>
+                    <ul class="nav nav-treeview" style="padding-left: 12px;">
+                        <li class="nav-item"><a href="lapangan.php" class="nav-link <?= activeLink('lapangan.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Lapangan</p></a></li>
+                        <li class="nav-item"><a href="jadwal_waktu.php" class="nav-link <?= activeLink('jadwal_waktu.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Jadwal Waktu</p></a></li>
+                        <li class="nav-item"><a href="jadwal_harian.php" class="nav-link <?= activeLink('jadwal_harian.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Jadwal Harian</p></a></li>
+                        <li class="nav-item"><a href="jadwal_view.php" class="nav-link <?= activeLink('jadwal_view.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Jadwal View</p></a></li>
+                        <li class="nav-item"><a href="jadwal_singkronisasi.php" class="nav-link <?= activeLink('jadwal_singkronisasi.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Sinkronisasi</p></a></li>
+                        <li class="nav-item"><a href="jam_operasional.php" class="nav-link <?= activeLink('jam_operasional.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Jam Operasional</p></a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item has-treeview <?= isActive(['booking.php', 'pembayaran.php', 'pembatalan_booking.php']) ?>">
-                    <a href="#" class="nav-link">
-                        <i class="nav-icon fas fa-calendar-check"></i>
-                        <p>Booking & Pembayaran <i class="right fas fa-angle-right rotate-icon"></i></p>
+                <li class="nav-item has-treeview mb-1 <?= isActive(['booking.php', 'pembayaran.php', 'pembatalan_booking.php']) ?>">
+                    <a href="#" class="nav-link" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-calendar-check" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">
+                            Booking & Pembayaran 
+                            <i class="right fas fa-angle-right rotate-icon" style="transition: transform 0.3s ease;"></i>
+                        </p>
                     </a>
-                    <ul class="nav nav-treeview ml-3">
-                        <li class="nav-item"><a href="booking.php" class="nav-link <?= activeLink('booking.php') ?>"><p>Data Booking</p></a></li>
-                        <li class="nav-item"><a href="pembatalan_booking.php" class="nav-link <?= activeLink('pembatalan_booking.php') ?>"><p>Pembatalan Booking</p></a></li>
-                        <li class="nav-item"><a href="pembayaran.php" class="nav-link <?= activeLink('pembayaran.php') ?>"><p>Pembayaran</p></a></li>
+                    <ul class="nav nav-treeview" style="padding-left: 12px;">
+                        <li class="nav-item"><a href="booking.php" class="nav-link <?= activeLink('booking.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Booking</p></a></li>
+                        <li class="nav-item"><a href="pembatalan_booking.php" class="nav-link <?= activeLink('pembatalan_booking.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Pembatalan Booking</p></a></li>
+                        <li class="nav-item"><a href="pembayaran.php" class="nav-link <?= activeLink('pembayaran.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Pembayaran</p></a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item has-treeview <?= isActive(['member.php', 'member_jadwal.php']) ?>">
-                    <a href="#" class="nav-link">
-                        <i class="nav-icon fas fa-id-card"></i>
-                        <p>Member <i class="right fas fa-angle-right rotate-icon"></i></p>
+                <li class="nav-item has-treeview mb-1 <?= isActive(['member.php', 'member_jadwal.php']) ?>">
+                    <a href="#" class="nav-link" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-id-card" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">
+                            Member 
+                            <i class="right fas fa-angle-right rotate-icon" style="transition: transform 0.3s ease;"></i>
+                        </p>
                     </a>
-                    <ul class="nav nav-treeview ml-3">
-                        <li class="nav-item"><a href="member.php" class="nav-link <?= activeLink('member.php') ?>"><p>Data Member</p></a></li>
-                        <li class="nav-item"><a href="member_jadwal.php" class="nav-link <?= activeLink('member_jadwal.php') ?>"><p>Jadwal Member</p></a></li>
+                    <ul class="nav nav-treeview" style="padding-left: 12px;">
+                        <li class="nav-item"><a href="member.php" class="nav-link <?= activeLink('member.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Member</p></a></li>
+                        <li class="nav-item"><a href="member_jadwal.php" class="nav-link <?= activeLink('member_jadwal.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Jadwal Member</p></a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item has-treeview <?= isActive(['produk.php', 'saran.php']) ?>">
-                    <a href="#" class="nav-link">
-                        <i class="nav-icon fas fa-cogs"></i>
-                        <p>Produk & Saran <i class="right fas fa-angle-right rotate-icon"></i></p>
+                <li class="nav-item has-treeview mb-1 <?= isActive(['produk.php', 'saran.php']) ?>">
+                    <a href="#" class="nav-link" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-cogs" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">
+                            Produk & Saran 
+                            <i class="right fas fa-angle-right rotate-icon" style="transition: transform 0.3s ease;"></i>
+                        </p>
                     </a>
-                    <ul class="nav nav-treeview ml-3">
-                        <li class="nav-item"><a href="produk.php" class="nav-link <?= activeLink('produk.php') ?>"><p>Data Produk</p></a></li>
-                        <li class="nav-item"><a href="saran.php" class="nav-link <?= activeLink('saran.php') ?>"><p>Data Saran & Masukan</p></a></li>
+                    <ul class="nav nav-treeview" style="padding-left: 12px;">
+                        <li class="nav-item"><a href="produk.php" class="nav-link <?= activeLink('produk.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Produk</p></a></li>
+                        <li class="nav-item"><a href="saran.php" class="nav-link <?= activeLink('saran.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Saran & Masukan</p></a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item has-treeview <?= isActive(['keuangan.php', 'pengeluaran.php']) ?>">
-                    <a href="#" class="nav-link">
-                        <i class="nav-icon fas fa-coins"></i>
-                        <p>Laporan Keuangan <i class="right fas fa-angle-right rotate-icon"></i></p>
+                <li class="nav-item has-treeview mb-1 <?= isActive(['keuangan.php', 'pengeluaran.php']) ?>">
+                    <a href="#" class="nav-link" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-coins" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">
+                            Laporan Keuangan 
+                            <i class="right fas fa-angle-right rotate-icon" style="transition: transform 0.3s ease;"></i>
+                        </p>
                     </a>
-                    <ul class="nav nav-treeview ml-3">
-                        <li class="nav-item"><a href="keuangan.php" class="nav-link <?= activeLink('keuangan.php') ?>"><p>Rekap Keuangan</p></a></li>
-                        <li class="nav-item"><a href="pengeluaran.php" class="nav-link <?= activeLink('pengeluaran.php') ?>"><p>Data Pengeluaran</p></a></li>
+                    <ul class="nav nav-treeview" style="padding-left: 12px;">
+                        <li class="nav-item"><a href="keuangan.php" class="nav-link <?= activeLink('keuangan.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Rekap Keuangan</p></a></li>
+                        <li class="nav-item"><a href="pengeluaran.php" class="nav-link <?= activeLink('pengeluaran.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Pengeluaran</p></a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item has-treeview <?= isActive(['users.php', 'admin.php']) ?>">
-                    <a href="#" class="nav-link">
-                        <i class="nav-icon fas fa-users"></i>
-                        <p>Pengguna Sistem <i class="right fas fa-angle-right rotate-icon"></i></p>
+                <li class="nav-item has-treeview mb-1 <?= isActive(['users.php', 'admin.php']) ?>">
+                    <a href="#" class="nav-link" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-users" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">
+                            Pengguna Sistem 
+                            <i class="right fas fa-angle-right rotate-icon" style="transition: transform 0.3s ease;"></i>
+                        </p>
                     </a>
-                    <ul class="nav nav-treeview ml-3">
-                        <li class="nav-item"><a href="users.php" class="nav-link <?= activeLink('users.php') ?>"><p>Data Pengguna</p></a></li>
-                        <li class="nav-item"><a href="admin.php" class="nav-link <?= activeLink('admin.php') ?>"><p>Data Admin</p></a></li>
+                    <ul class="nav nav-treeview" style="padding-left: 12px;">
+                        <li class="nav-item"><a href="users.php" class="nav-link <?= activeLink('users.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Pengguna</p></a></li>
+                        <li class="nav-item"><a href="admin.php" class="nav-link <?= activeLink('admin.php') ?>" style="border-radius: 6px; padding: 8px 16px;"><i class="fas fa-circle nav-icon" style="font-size: 6px; margin-right: 8px;"></i><p style="font-size: 13px;">Data Admin</p></a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item">
-                    <a href="pengaturan.php" class="nav-link <?= activeLink('pengaturan.php') ?>">
-                        <i class="nav-icon fas fa-cog"></i>
-                        <p>Pengaturan Sistem</p>
+                <li class="nav-item mb-1">
+                    <a href="pengaturan.php" class="nav-link <?= activeLink('pengaturan.php') ?>" style="border-radius: 8px; padding: 10px 16px; transition: all 0.3s ease;">
+                        <i class="nav-icon fas fa-cog" style="width: 24px; text-align: center;"></i>
+                        <p style="font-size: 14px; font-weight: 500; margin-left: 8px;">Pengaturan Sistem</p>
                     </a>
                 </li>
                 
@@ -151,53 +170,153 @@ function activeLink($page)
 </aside>
 
 <style>
-    /* 1. STATE DEFAULT (Tertutup) */
-    /* Kita Paksa menjadi 0 derajat dengan !important untuk mengalahkan style bawaan */
+    /* ===== PROFESSIONAL SIDEBAR STYLING ===== */
+    
+    /* Brand Link Hover */
+    .brand-link:hover {
+        background: linear-gradient(135deg, #0a4569 0%, #135d88 100%) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .brand-link:hover .brand-image {
+        transform: scale(1.05);
+    }
+    
+    /* User Panel Hover */
+    .user-panel:hover .img-circle {
+        transform: scale(1.08);
+        box-shadow: 0 0 15px rgba(255,255,255,0.4);
+    }
+    
+    /* Search Button Hover */
+    #btn-sidebar-search:hover {
+        background: rgba(255,255,255,1) !important;
+        color: #0d5a8f !important;
+        transform: scale(1.05);
+    }
+    
+    /* Navigation Links */
+    .nav-sidebar .nav-link {
+        color: rgba(255,255,255,0.9) !important;
+        margin-bottom: 4px;
+    }
+    
+    .nav-sidebar .nav-link:hover {
+        background-color: rgba(255,255,255,0.12) !important;
+        color: #fff !important;
+        transform: translateX(4px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    .nav-sidebar .nav-link.active {
+        background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.08) 100%) !important;
+        color: #fff !important;
+        border-left: 4px solid #fff;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    /* Icon Styling */
+    .nav-sidebar .nav-icon {
+        color: rgba(255,255,255,0.85);
+        font-size: 16px;
+    }
+    
+    .nav-sidebar .nav-link:hover .nav-icon,
+    .nav-sidebar .nav-link.active .nav-icon {
+        color: #fff;
+        text-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    /* Arrow Rotation */
     .nav-sidebar .nav-item > .nav-link .rotate-icon {
         transform: rotate(0deg) !important; 
         transition: transform 0.3s ease !important;
+        font-size: 14px;
+        margin-left: auto;
     }
-
-    /* 2. STATE TERBUKA (Menu Open) */
-    /* Kita Paksa menjadi 90 derajat (Searah Jarum Jam) dengan !important */
-    /* Panah Kanan (>) diputar 90 derajat jadi Panah Bawah (v) */
+    
     .nav-sidebar .nav-item.menu-open > .nav-link .rotate-icon {
         transform: rotate(90deg) !important;
     }
-
-    /* --- Style Dekorasi Lainnya (Garis-garis) --- */
-    .nav-treeview { margin-left: 15px; padding-left: 15px; position: relative; }
+    
+    /* Treeview Styling */
+    .nav-treeview {
+        margin-top: 6px;
+        padding-left: 20px;
+        position: relative;
+    }
+    
     .nav-treeview::before {
-        content: ""; position: absolute; top: 0; left: 2px; width: 2px; height: 100%;
-        background: rgba(255, 255, 255, 0.25); opacity: 0; transform: scaleY(0); transition: all 0.35s ease;
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 20px;
+        width: 2px;
+        height: 100%;
+        background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+        opacity: 0;
+        transform: scaleY(0);
+        transition: all 0.4s ease;
     }
-    .nav-item.menu-open>.nav-treeview::before { opacity: 1; transform: scaleY(1); animation: glowingLine 1.5s infinite; }
     
-    @keyframes glowingLine {
-        0% { box-shadow: 0 0 0px rgba(255, 255, 255, 0); }
-        50% { box-shadow: 0 0 6px rgba(255, 255, 255, 0.4); }
-        100% { box-shadow: 0 0 0px rgba(255, 255, 255, 0); }
+    .nav-item.menu-open > .nav-treeview::before {
+        opacity: 1;
+        transform: scaleY(1);
     }
-
-    .nav-treeview .nav-item { position: relative; padding-left: 20px; }
-    .nav-treeview .nav-item::before {
-        content: ""; position: absolute; top: 50%; left: -15px; width: 15px; height: 2px; background: rgba(255, 255, 255, 0.35);
-    }
-    .nav-treeview .nav-item::after {
-        content: ""; position: absolute; top: 0; left: -15px; width: 2px; height: 100%; background: rgba(255, 255, 255, 0.25);
-    }
-    .nav-treeview .nav-item:last-child::after { height: 50%; }
     
-    .nav-item.menu-open>.nav-treeview .nav-item::before,
-    .nav-item.menu-open>.nav-treeview .nav-item::after { animation: glowingBranch 1.6s infinite; }
-    
-    @keyframes glowingBranch {
-        0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; }
+    .nav-treeview .nav-link {
+        color: rgba(255,255,255,0.8) !important;
+        padding-left: 28px !important;
+        margin-bottom: 2px;
     }
-
-    .nav-treeview .nav-link p { color: #dcdcdc; font-size: 14px; }
-    .nav-treeview .nav-link:hover p { color: #ffffff; text-shadow: 0 0 4px rgba(255, 255, 255, 0.5); }
-    .nav-treeview .nav-link.active { background-color: rgba(255, 255, 255, 0.15); border-radius: 8px; }
+    
+    .nav-treeview .nav-link:hover {
+        color: #fff !important;
+        background-color: rgba(255,255,255,0.1) !important;
+        padding-left: 32px !important;
+    }
+    
+    .nav-treeview .nav-link.active {
+        background: linear-gradient(90deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 100%) !important;
+        color: #fff !important;
+        font-weight: 600;
+        border-left: 3px solid rgba(255,255,255,0.6);
+    }
+    
+    .nav-treeview .nav-icon {
+        color: rgba(255,255,255,0.6);
+        transition: all 0.3s ease;
+    }
+    
+    .nav-treeview .nav-link:hover .nav-icon {
+        color: #fff;
+        transform: scale(1.2);
+    }
+    
+    /* Smooth Transitions */
+    .nav-link, .nav-icon, .rotate-icon, .brand-image, .img-circle {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Scrollbar Styling */
+    .sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .sidebar::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.05);
+    }
+    
+    .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.2);
+        border-radius: 10px;
+    }
+    
+    .sidebar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.3);
+    }
 </style>
 
 <script>
@@ -210,14 +329,30 @@ function activeLink($page)
             query = query.toLowerCase();
             menuItems.forEach(item => {
                 const text = item.textContent.toLowerCase();
-                item.style.display = text.includes(query) ? '' : 'none';
+                if(text.includes(query)) {
+                    item.style.display = '';
+                    item.style.animation = 'fadeInMenu 0.3s ease';
+                } else {
+                    item.style.display = 'none';
+                }
             });
         }
+        
         if(searchInput) {
             searchInput.addEventListener('keyup', () => filterMenu(searchInput.value));
             searchButton.addEventListener('click', () => filterMenu(searchInput.value));
         }
     });
+    
+    // Add fade-in animation
+    // const style = document.createElement('style');
+    // style.textContent = `
+    //     @keyframes fadeInMenu {
+    //         from { opacity: 0; transform: translateY(-10px); }
+    //         to { opacity: 1; transform: translateY(0); }
+    //     }
+    // `;
+    document.head.appendChild(style);
 </script>
 
 <?php
@@ -240,54 +375,158 @@ if($result = mysqli_query($conn, "SELECT COUNT(*) as total FROM pembatalan_booki
 $total_notif = $jml_booking + $jml_bayar + $jml_batal;
 ?>
 
-<div class="preloader flex-column justify-content-center align-items-center">
-  <img class="animation__shake" src="../uploads/bukti_pembayaran/bukti_13_1763043777.png" alt="Badmintoon Logo" height="60" width="60">
-</div>
+<!-- Professional Preloader -->
+<!-- <div class="preloader flex-column justify-content-center align-items-center" style="background: linear-gradient(135deg, #0a4569 0%, #1874ad 50%, #2196f3 100%);">
+    <div class="preloader-content text-center">
+        <img class="animation__shake mb-3" src="../uploads/bukti_pembayaran/bukti_13_1763043777.png" alt="Logo" style="width: 90px; height: 90px; object-fit: contain; border-radius: 50%; background: white; padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+        <h4 class="text-white mb-2" style="font-weight: 600; letter-spacing: 1px; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">Rush Badminton Academy</h4>
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem; border-width: 0.3rem;">
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p class="text-white-50 mt-3" style="font-size: 13px; letter-spacing: 0.5px;">Memuat sistem...</p>
+    </div>
+</div> -->
 
-<nav class="main-header navbar navbar-expand navbar-white navbar-light">
-  <ul class="navbar-nav">
-    <li class="nav-item"><a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a></li>
-    <li class="nav-item d-none d-sm-inline-block"><a href="dashboard.php" class="nav-link">Dashboard</a></li>
-  </ul>
+<!-- Professional Navbar -->
+<nav class="main-header navbar navbar-expand navbar-white navbar-light" style="border-bottom: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+    <ul class="navbar-nav">
+        <li class="nav-item">
+            <a class="nav-link" data-widget="pushmenu" href="#" role="button" style="transition: all 0.3s ease;">
+                <i class="fas fa-bars" style="color: #1874ad;"></i>
+            </a>
+        </li>
+        <li class="nav-item d-none d-sm-inline-block">
+            <a href="dashboard.php" class="nav-link" style="color: #495057; font-weight: 500; transition: all 0.3s ease;">
+                <i class="fas fa-home mr-1" style="color: #1874ad;"></i> Dashboard
+            </a>
+        </li>
+    </ul>
 
-  <ul class="navbar-nav ml-auto">
-    <li class="nav-item">
-      <a class="nav-link" data-widget="navbar-search" href="#" role="button"><i class="fas fa-search"></i></a>
-      <div class="navbar-search-block">
-        <form class="form-inline">
-          <div class="input-group input-group-sm">
-            <input class="form-control form-control-navbar" type="search" placeholder="Cari data..." aria-label="Search">
-            <div class="input-group-append">
-              <button class="btn btn-navbar" type="submit"><i class="fas fa-search"></i></button>
-              <button class="btn btn-navbar" type="button" data-widget="navbar-search"><i class="fas fa-times"></i></button>
+    <ul class="navbar-nav ml-auto">
+        <!-- Search -->
+        <li class="nav-item">
+            <a class="nav-link" data-widget="navbar-search" href="#" role="button" style="transition: all 0.3s ease;">
+                <i class="fas fa-search" style="color: #6c757d;"></i>
+            </a>
+            <div class="navbar-search-block">
+                <form class="form-inline">
+                    <div class="input-group input-group-sm">
+                        <input class="form-control form-control-navbar" type="search" placeholder="Cari data..." aria-label="Search" style="border-radius: 20px 0 0 20px; border-right: none;">
+                        <div class="input-group-append">
+                            <button class="btn btn-navbar" type="submit" style="border-radius: 0; background: #f8f9fa; border: 1px solid #ced4da; border-left: none; color: #1874ad;">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <button class="btn btn-navbar" type="button" data-widget="navbar-search" style="border-radius: 0 20px 20px 0; background: #f8f9fa; border: 1px solid #ced4da; border-left: none; color: #6c757d;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
-          </div>
-        </form>
-      </div>
-    </li>
+        </li>
 
-    <li class="nav-item dropdown">
-      <a class="nav-link" data-toggle="dropdown" href="#">
-        <i class="far fa-bell"></i>
-        <?php if ($total_notif > 0): ?><span class="badge badge-warning navbar-badge"><?= $total_notif ?></span><?php endif; ?>
-      </a>
-      <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-        <span class="dropdown-item dropdown-header"><?= $total_notif ?> Notifikasi</span>
-        <div class="dropdown-divider"></div>
-        <a href="booking.php" class="dropdown-item"><i class="fas fa-calendar-check mr-2"></i> <?= $jml_booking ?> Booking baru</a>
-        <div class="dropdown-divider"></div>
-        <a href="pembayaran.php" class="dropdown-item"><i class="fas fa-money-bill-wave mr-2"></i> <?= $jml_bayar ?> Pembayaran Masuk</a>
-        <div class="dropdown-divider"></div>
-        <a href="pembatalan_booking.php" class="dropdown-item"><i class="fas fa-undo-alt mr-2"></i> <?= $jml_batal ?> Permintaan Refund</a>
-      </div>
-    </li>
+        <!-- Notifications -->
+        <li class="nav-item dropdown">
+            <a class="nav-link" data-toggle="dropdown" href="#" style="position: relative; transition: all 0.3s ease;">
+                <i class="far fa-bell" style="color: #6c757d; font-size: 18px;"></i>
+                <?php if ($total_notif > 0): ?>
+                    <span class="badge badge-warning navbar-badge" style="position: absolute; top: 5px; right: 5px; padding: 3px 6px; font-size: 10px; border-radius: 10px; animation: pulse 2s infinite;">
+                        <?= $total_notif ?>
+                    </span>
+                <?php endif; ?>
+            </a>
+            <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 320px;">
+                <span class="dropdown-item dropdown-header" style="background: linear-gradient(135deg, #1874ad 0%, #2196f3 100%); color: white; font-weight: 600; padding: 12px 16px; border-radius: 8px 8px 0 0;">
+                    <i class="fas fa-bell mr-2"></i><?= $total_notif ?> Notifikasi Baru
+                </span>
+                <div class="dropdown-divider m-0"></div>
+                <a href="booking.php" class="dropdown-item" style="padding: 12px 16px; transition: all 0.3s ease;">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-circle bg-primary mr-3" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-calendar-check text-white"></i>
+                        </div>
+                        <div>
+                            <strong><?= $jml_booking ?></strong> Booking Baru
+                            <br><small class="text-muted">Perlu verifikasi</small>
+                        </div>
+                    </div>
+                </a>
+                <div class="dropdown-divider m-0"></div>
+                <a href="pembayaran.php" class="dropdown-item" style="padding: 12px 16px; transition: all 0.3s ease;">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-circle bg-success mr-3" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-money-bill-wave text-white"></i>
+                        </div>
+                        <div>
+                            <strong><?= $jml_bayar ?></strong> Pembayaran Masuk
+                            <br><small class="text-muted">Menunggu konfirmasi</small>
+                        </div>
+                    </div>
+                </a>
+                <div class="dropdown-divider m-0"></div>
+                <a href="pembatalan_booking.php" class="dropdown-item" style="padding: 12px 16px; transition: all 0.3s ease;">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-circle bg-warning mr-3" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-undo-alt text-white"></i>
+                        </div>
+                        <div>
+                            <strong><?= $jml_batal ?></strong> Permintaan Refund
+                            <br><small class="text-muted">Perlu diproses</small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </li>
 
-    <li class="nav-item"><a class="nav-link" data-widget="fullscreen" href="#" role="button"><i class="fas fa-expand-arrows-alt"></i></a></li>
-    
-    <li class="nav-item">
-        <a href="logout.php" class="nav-link text-danger" role="button" title="Keluar dari Sistem">
-            <i class="fas fa-sign-out-alt mr-1"></i> <span class="d-none d-md-inline font-weight-bold">Logout</span>
-        </a>
-    </li>
-  </ul>
+        <!-- Fullscreen -->
+        <li class="nav-item">
+            <a class="nav-link" data-widget="fullscreen" href="#" role="button" style="transition: all 0.3s ease;">
+                <i class="fas fa-expand-arrows-alt" style="color: #6c757d;"></i>
+            </a>
+        </li>
+        
+        <!-- Logout -->
+        <li class="nav-item">
+            <a href="logout.php" class="nav-link" role="button" title="Keluar dari Sistem" style="color: #dc3545; font-weight: 600; transition: all 0.3s ease; padding: 8px 16px; border-radius: 6px;">
+                <i class="fas fa-sign-out-alt mr-1"></i> 
+                <span class="d-none d-md-inline">Logout</span>
+            </a>
+        </li>
+    </ul>
 </nav>
+
+<style>
+    /* Navbar Hover Effects */
+    .navbar-nav .nav-link:hover {
+        transform: translateY(-2px);
+        color: #1874ad !important;
+    }
+    
+    .navbar-nav .nav-link:hover i {
+        color: #1874ad !important;
+    }
+    
+    /* Dropdown Hover */
+    .dropdown-item:hover {
+        background: linear-gradient(90deg, rgba(24,116,173,0.05) 0%, transparent 100%);
+        transform: translateX(5px);
+    }
+    
+    /* Notification Pulse */
+    @keyframes pulse {
+        0%, 100% { 
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+        }
+        50% { 
+            transform: scale(1.05);
+            box-shadow: 0 0 0 5px rgba(255, 193, 7, 0);
+        }
+    }
+    
+    /* Logout Hover */
+    .nav-item a[href="logout.php"]:hover {
+        background: rgba(220, 53, 69, 0.1);
+        transform: translateY(-2px);
+    }
+</style>

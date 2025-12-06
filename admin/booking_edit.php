@@ -3,7 +3,6 @@
 require_once 'auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 
-// Pastikan session dimulai
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 if (!isset($_GET['id'])) {
@@ -13,10 +12,10 @@ if (!isset($_GET['id'])) {
 
 $id_booking = intval($_GET['id']);
 
-// --- 1. PROSES SIMPAN PERUBAHAN (POST) ---
+// PROSES SIMPAN PERUBAHAN
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // A. UPDATE STATUS & PEMBAYARAN (Simpel)
+    // UPDATE STATUS & PEMBAYARAN
     if (isset($_POST['action']) && $_POST['action'] == 'update_status') {
         $status_baru = $_POST['status'];
         $payment_status_baru = $_POST['payment_status'];
@@ -32,21 +31,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // B. RESCHEDULE / GANTI LAPANGAN (Kompleks)
+    // RESCHEDULE / GANTI LAPANGAN
     if (isset($_POST['action']) && $_POST['action'] == 'reschedule') {
         $new_id_lapangan = intval($_POST['id_lapangan']);
         $new_tanggal     = $_POST['tanggal'];
         $new_slot_ids    = $_POST['slot_ids'] ?? [];
 
         if (!$new_id_lapangan || !$new_tanggal || empty($new_slot_ids)) {
-            $_SESSION['toast_error'] = "⚠️ Data reschedule tidak lengkap. Pilih Lapangan, Tanggal, dan Slot.";
+            $_SESSION['toast_error'] = "⚠️ Data reschedule tidak lengkap.";
             header("Location: booking_edit.php?id=$id_booking");
             exit;
         }
 
         $conn->begin_transaction();
         try {
-            // 1. Ambil Harga Lapangan Baru
             $stmt = $conn->prepare("SELECT harga_per_jam FROM lapangan WHERE id_lapangan = ?");
             $stmt->bind_param("i", $new_id_lapangan);
             $stmt->execute();
@@ -54,24 +52,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $harga_per_jam = floatval($lap['harga_per_jam']);
             $stmt->close();
 
-            // 2. LEPAS SLOT LAMA (PENTING: Ini membuat slot lama tersedia lagi untuk orang lain)
-            // Set status='tersedia' dan id_booking=NULL untuk semua slot yg dimiliki booking ini saat ini
             $stmt = $conn->prepare("UPDATE jadwal_detail SET status='tersedia', id_booking=NULL WHERE id_booking = ?");
             $stmt->bind_param("i", $id_booking);
             $stmt->execute();
             $stmt->close();
 
-            // 3. HAPUS DETAIL BOOKING LAMA (Agar tidak duplikat data harga)
             $stmt = $conn->prepare("DELETE FROM detail_booking WHERE id_booking = ?");
             $stmt->bind_param("i", $id_booking);
             $stmt->execute();
             $stmt->close();
 
-            // 4. VALIDASI & KUNCI SLOT BARU
             $placeholders = implode(',', array_fill(0, count($new_slot_ids), '?'));
             $types = str_repeat('i', count($new_slot_ids));
             
-            // Gunakan FOR UPDATE untuk mengunci baris agar tidak diambil orang lain saat proses ini
             $sql = "SELECT id_detail, status, id_jadwal_waktu FROM jadwal_detail WHERE id_detail IN ($placeholders) FOR UPDATE";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param($types, ...$new_slot_ids);
@@ -81,205 +74,325 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
 
             if (count($rows) !== count($new_slot_ids)) {
-                throw new Exception("Data slot baru tidak valid atau tidak ditemukan.");
+                throw new Exception("Data slot baru tidak valid.");
             }
 
-            // 5. PROSES BOOKING SLOT BARU
             $total_baru = 0;
-            $durasi_per_slot = 1; // Asumsi 1 jam per slot (sesuaikan jika sistem Anda 30 menit)
+            $durasi_per_slot = 1;
             
-            // Siapkan statement update dan insert
             $stmt_upd_slot = $conn->prepare("UPDATE jadwal_detail SET status='dibooking', id_booking = ? WHERE id_detail = ?");
             $stmt_ins_det  = $conn->prepare("INSERT INTO detail_booking (id_booking, id_jadwal_waktu, harga) VALUES (?, ?, ?)");
 
             foreach ($rows as $r) {
-                // Pastikan slot target statusnya tersedia (karena slot lama sudah dilepas di step 2, 
-                // jika user memilih slot yang sama dengan sebelumnya, statusnya sudah 'tersedia' sekarang)
                 if ($r['status'] !== 'tersedia') {
-                    throw new Exception("Salah satu slot yang dipilih sudah diambil orang lain barusan.");
+                    throw new Exception("Slot sudah diambil orang lain.");
                 }
 
                 $harga_slot = $harga_per_jam * $durasi_per_slot;
                 $total_baru += $harga_slot;
 
-                // Update status slot jadi dibooking
                 $stmt_upd_slot->bind_param("ii", $id_booking, $r['id_detail']);
                 $stmt_upd_slot->execute();
 
-                // Insert detail baru
                 $stmt_ins_det->bind_param("iid", $id_booking, $r['id_jadwal_waktu'], $harga_slot);
                 $stmt_ins_det->execute();
             }
             $stmt_upd_slot->close();
             $stmt_ins_det->close();
 
-            // 6. HITUNG ULANG KEUANGAN
-            // Kita perlu tahu berapa yang SUDAH dibayar user sebelumnya
             $stmt = $conn->prepare("SELECT total_amount, remaining_amount FROM booking WHERE id_booking = ?");
             $stmt->bind_param("i", $id_booking);
             $stmt->execute();
             $curr = $stmt->get_result()->fetch_assoc();
             $stmt->close();
 
-            // Rumus: Uang Masuk = Total Lama - Sisa Lama
             $uang_masuk = floatval($curr['total_amount']) - floatval($curr['remaining_amount']);
-            
-            // Sisa Baru = Total Baru - Uang Masuk
             $remaining_baru = $total_baru - $uang_masuk;
 
-            // 7. UPDATE HEADER BOOKING
             $stmt = $conn->prepare("UPDATE booking SET id_lapangan = ?, tanggal = ?, total_amount = ?, remaining_amount = ?, updated_at = NOW() WHERE id_booking = ?");
             $stmt->bind_param("isddi", $new_id_lapangan, $new_tanggal, $total_baru, $remaining_baru, $id_booking);
             $stmt->execute();
             $stmt->close();
 
             $conn->commit();
-            $_SESSION['toast_success'] = "✅ Jadwal berhasil diubah! Slot lama sudah dilepas dan slot baru telah disimpan.";
+            $_SESSION['toast_success'] = "✅ Jadwal berhasil diubah!";
             header("Location: booking_detail.php?id=" . $id_booking);
             exit;
 
         } catch (Exception $e) {
             $conn->rollback();
-            $_SESSION['toast_error'] = "Gagal Reschedule: " . $e->getMessage();
+            $_SESSION['toast_error'] = "Gagal: " . $e->getMessage();
             header("Location: booking_edit.php?id=$id_booking");
             exit;
         }
     }
 }
 
-// --- 2. AMBIL DATA SAAT INI ---
+// AMBIL DATA SAAT INI
 $stmt = $conn->prepare("SELECT b.*, l.nama_lapangan FROM booking b JOIN lapangan l ON b.id_lapangan = l.id_lapangan WHERE b.id_booking = ?");
 $stmt->bind_param("i", $id_booking);
 $stmt->execute();
 $data = $stmt->get_result()->fetch_assoc();
 
-// Ambil list lapangan untuk dropdown
 $qLap = $conn->query("SELECT id_lapangan, nama_lapangan, harga_per_jam FROM lapangan WHERE status='aktif'");
 
 include('../includes/header.php');
-// include('../includes/topbar.php');
 include('../includes/sidebar.php');
 ?>
 
-<div class="content-wrapper animate__animated animate__fadeIn">
-    <section class="content-header">
-        <h1>
-            <i class="fas fa-edit me-2"></i> 
-            Edit Booking #<?= $id_booking ?>
-        </h1>
+<style>
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.content-wrapper {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+}
+
+.edit-card {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.card-header-gradient {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    padding: 1.5rem;
+}
+
+.slot-selector {
+    background: #f8f9fc;
+    border: 2px solid #e3e6f0;
+    border-radius: 10px;
+    padding: 1.5rem;
+    min-height: 120px;
+}
+
+.btn-slot {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.btn-slot:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-slot.active {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
+    border-color: #11998e !important;
+}
+
+.total-preview {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    font-size: 1.3rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.info-alert {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 1.25rem;
+    border: none;
+}
+
+.info-alert i {
+    font-size: 1.5rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.status-form-card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+@media (max-width: 768px) {
+    .content-wrapper {
+        padding: 1rem 0.5rem;
+    }
+    
+    .btn-slot {
+        min-width: 100px;
+    }
+}
+</style>
+
+<div class="content-wrapper">
+    <section class="content-header mb-4">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div class="mb-3 mb-md-0">
+                    <h1 style="font-weight: 700; color: #2d3748;">
+                        <i class="fas fa-edit me-2" style="color: #667eea;"></i> 
+                        Edit Booking #<?= $id_booking ?>
+                    </h1>
+                </div>
+                <a href="booking_detail.php?id=<?= $id_booking ?>" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Kembali
+                </a>
+            </div>
+        </div>
     </section>
 
     <section class="content">
-        
-        <?php if (!empty($_SESSION['toast_error'])): ?>
-            <div class="alert alert-danger alert-dismissible fade show">
-                <?= $_SESSION['toast_error']; ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            <?php unset($_SESSION['toast_error']); ?>
-        <?php endif; ?>
+        <div class="container-fluid">
 
-        <div class="row">
-            <!-- KOLOM KIRI: GANTI STATUS -->
-            <div class="col-md-4">
-                <div class="card shadow-lg border-0">
-                    <div class="card-header text-white" style="background: linear-gradient(90deg, #0e5c91, #2196f3);">
-                        <h3 class="card-title"><i class="fas fa-edit"></i> Update Status</h3>
-                    </div>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="update_status">
-                        <div class="card-body">
-                            <div class="form-group mb-3">
-                                <label>Status Booking</label>
-                                <select name="status" class="form-control">
-                                    <?php 
-                                    $statuses = ['menunggu','disetujui','selesai','ditolak','dibatalkan'];
-                                    foreach($statuses as $s) {
-                                        $sel = ($data['status'] == $s) ? 'selected' : '';
-                                        echo "<option value='$s' $sel>".ucfirst($s)."</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label>Status Pembayaran</label>
-                                <select name="payment_status" class="form-control">
-                                    <?php 
-                                    $pays = ['belum_bayar','dp_bayar','lunas'];
-                                    foreach($pays as $p) {
-                                        $sel = ($data['payment_status'] == $p) ? 'selected' : '';
-                                        echo "<option value='$p' $sel>".ucfirst(str_replace('_',' ',$p))."</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="card-footer text-end bg-light">
-                            <!-- TOMBOL UPDATE JADI BIRU (PRIMARY) -->
-                            <button type="submit" class="btn btn-primary">Update Status</button>
-                        </div>
-                    </form>
+            <?php if (!empty($_SESSION['toast_error'])): ?>
+                <div class="alert alert-danger alert-dismissible fade show">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <?= $_SESSION['toast_error']; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
-            </div>
+                <?php unset($_SESSION['toast_error']); ?>
+            <?php endif; ?>
 
-            <!-- KOLOM KANAN: RESCHEDULE (GANTI LAPANGAN/TANGGAL) -->
-            <div class="col-md-8">
-                <div class="card shadow-lg border-0">
-                    <div class="card-header text-white" style="background: linear-gradient(90deg, #0e5c91, #2196f3);">
-                        <h3 class="card-title"><i class="fas fa-calendar-alt"></i> Reschedule / Ganti Jadwal</h3>
-                    </div>
-                    <form method="POST" id="formReschedule">
-                        <input type="hidden" name="action" value="reschedule">
-                        <div class="card-body">
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> <strong>Penting:</strong> Saat Anda menyimpan perubahan, slot jadwal yang lama otomatis akan dilepas (menjadi tersedia kembali) dan slot baru akan dibooking. Total harga akan dihitung ulang.
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label>Pilih Lapangan</label>
-                                    <select name="id_lapangan" id="id_lapangan" class="form-control" required>
-                                        <?php while($l = $qLap->fetch_assoc()): ?>
-                                            <option value="<?= $l['id_lapangan'] ?>" 
-                                                    data-harga="<?= $l['harga_per_jam'] ?>"
-                                                    <?= ($l['id_lapangan'] == $data['id_lapangan']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($l['nama_lapangan']) ?> 
-                                                (Rp <?= number_format($l['harga_per_jam'],0) ?>/jam)
-                                            </option>
-                                        <?php endwhile; ?>
+            <div class="row g-4">
+                <!-- Status Update Card -->
+                <div class="col-md-4">
+                    <div class="card edit-card">
+                        <div class="card-header card-header-gradient text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-tasks me-2"></i> Update Status
+                            </h5>
+                        </div>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="update_status">
+                            <div class="card-body p-4">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-flag me-2 text-primary"></i>
+                                        Status Booking
+                                    </label>
+                                    <select name="status" class="form-select">
+                                        <?php 
+                                        $statuses = ['menunggu','disetujui','selesai','ditolak','dibatalkan'];
+                                        foreach($statuses as $s) {
+                                            $sel = ($data['status'] == $s) ? 'selected' : '';
+                                            echo "<option value='$s' $sel>".ucfirst($s)."</option>";
+                                        }
+                                        ?>
                                     </select>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label>Pilih Tanggal Baru</label>
-                                    <input type="date" name="tanggal" id="tanggal" class="form-control" 
-                                           value="<?= $data['tanggal'] ?>" min="<?= date('Y-m-d') ?>" required>
-                                </div>
-                            </div>
 
-                            <div class="mb-3">
-                                <label>Pilih Slot Jam Baru</label>
-                                <div id="slotLoading" style="display:none;" class="text-primary">
-                                    <i class="fas fa-spinner fa-spin"></i> Memuat jadwal...
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-money-bill-wave me-2 text-success"></i>
+                                        Status Pembayaran
+                                    </label>
+                                    <select name="payment_status" class="form-select">
+                                        <?php 
+                                        $pays = ['belum_bayar','dp_bayar','lunas'];
+                                        foreach($pays as $p) {
+                                            $sel = ($data['payment_status'] == $p) ? 'selected' : '';
+                                            echo "<option value='$p' $sel>".ucfirst(str_replace('_',' ',$p))."</option>";
+                                        }
+                                        ?>
+                                    </select>
                                 </div>
-                                <div id="slotList" class="d-flex flex-wrap gap-2 p-2 border bg-light rounded" style="min-height: 60px;">
-                                    <small class="text-muted">Silakan pilih lapangan dan tanggal untuk melihat slot.</small>
-                                </div>
-                                <input type="hidden" id="total_harga_temp">
                             </div>
-                            
-                            <!-- BAGIAN TOTAL: GRADASI BIRU & FONT PUTIH -->
-                            <div class="mt-3 p-3 rounded shadow-sm" style="background: linear-gradient(90deg, #0e5c91, #2196f3); color: white;">
-                                <h5 class="mb-0">Estimasi Total Baru: <span id="displayTotal" class="fw-bold">-</span></h5>
+                            <div class="card-footer bg-light p-3">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-save me-2"></i> Simpan Perubahan
+                                </button>
                             </div>
+                        </form>
+                    </div>
+                </div>
 
+                <!-- Reschedule Card -->
+                <div class="col-md-8">
+                    <div class="card edit-card">
+                        <div class="card-header card-header-gradient text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-calendar-alt me-2"></i> Reschedule / Ganti Jadwal
+                            </h5>
                         </div>
-                        <div class="card-footer ">
-                            <!-- TOMBOL BATAL FONT PUTIH -->
-                            <a href="booking_detail.php?id=<?= $id_booking ?>" class="btn btn-secondary me-2 text-white">Batal</a>
-                            <button type="submit" class="btn btn-primary" id="btnSaveReschedule">Simpan Perubahan Jadwal</button>
-                        </div>
-                    </form>
+                        <form method="POST" id="formReschedule">
+                            <input type="hidden" name="action" value="reschedule">
+                            <div class="card-body p-4">
+                                <div class="info-alert mb-4">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-info-circle me-3"></i>
+                                        <div>
+                                            <strong class="d-block mb-1">Informasi Penting</strong>
+                                            <small>Slot jadwal lama akan otomatis dilepas dan tersedia kembali. Total harga akan dihitung ulang berdasarkan slot baru.</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">
+                                            <i class="fas fa-futbol me-2"></i> Pilih Lapangan
+                                        </label>
+                                        <select name="id_lapangan" id="id_lapangan" class="form-select" required>
+                                            <?php while($l = $qLap->fetch_assoc()): ?>
+                                                <option value="<?= $l['id_lapangan'] ?>" 
+                                                        data-harga="<?= $l['harga_per_jam'] ?>"
+                                                        <?= ($l['id_lapangan'] == $data['id_lapangan']) ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars($l['nama_lapangan']) ?> 
+                                                    (Rp <?= number_format($l['harga_per_jam'],0) ?>/jam)
+                                                </option>
+                                            <?php endwhile; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">
+                                            <i class="far fa-calendar-alt me-2"></i> Pilih Tanggal
+                                        </label>
+                                        <input type="date" name="tanggal" id="tanggal" class="form-control" 
+                                               value="<?= $data['tanggal'] ?>" min="<?= date('Y-m-d') ?>" required>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold mb-3">
+                                        <i class="far fa-clock me-2"></i> Pilih Slot Jam Baru
+                                    </label>
+                                    <div id="slotLoading" style="display:none;" class="text-center py-3">
+                                        <div class="spinner-border text-primary"></div>
+                                        <p class="mt-2 text-muted">Memuat jadwal...</p>
+                                    </div>
+                                    <div id="slotList" class="slot-selector">
+                                        <small class="text-muted">
+                                            <i class="fas fa-hand-pointer me-2"></i>
+                                            Silakan pilih lapangan dan tanggal untuk melihat slot tersedia
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div class="total-preview text-center">
+                                    <small class="d-block mb-2 opacity-90">Estimasi Total Baru</small>
+                                    <div id="displayTotal" class="fw-bold">-</div>
+                                </div>
+
+                            </div>
+                            <div class="card-footer bg-light p-3 d-flex justify-content-between">
+                                <a href="booking_detail.php?id=<?= $id_booking ?>" class="btn btn-secondary">
+                                    <i class="fas fa-times me-2"></i> Batal
+                                </a>
+                                <button type="submit" class="btn btn-success" id="btnSaveReschedule">
+                                    <i class="fas fa-save me-2"></i> Simpan Perubahan Jadwal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -308,71 +421,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
         slotList.innerHTML = '';
         slotLoading.style.display = 'block';
-        selectedSlots = []; // Reset pilihan saat ganti tanggal/lapangan
+        selectedSlots = [];
         updateTotal();
 
-        // Panggil API get_slot dengan parameter exclude_booking agar slot kita sendiri tetap terlihat & bisa dipilih
         fetch(`booking_get_slot.php?id_lapangan=${idL}&tanggal=${tgl}&exclude_booking=${idBooking}`)
             .then(res => res.json())
             .then(data => {
                 slotLoading.style.display = 'none';
                 if(data.status !== 'success') {
-                    slotList.innerHTML = `<span class="text-danger">${data.message}</span>`;
+                    slotList.innerHTML = `<div class="alert alert-warning py-2">${data.message}</div>`;
                     return;
                 }
                 
                 if(data.slots.length === 0) {
-                    slotList.innerHTML = `<span class="text-muted">Tidak ada slot tersedia.</span>`;
+                    slotList.innerHTML = `<div class="text-center text-muted py-3"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>Tidak ada slot tersedia</div>`;
                     return;
                 }
 
+                const slotsWrapper = document.createElement('div');
+                slotsWrapper.className = 'd-flex flex-wrap gap-2';
+                
                 data.slots.forEach(s => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'btn btn-outline-primary btn-sm m-1';
+                    btn.className = 'btn btn-outline-primary btn-slot';
                     
-                    // Logic Tampilan Tombol
                     if (s.status === 'tersedia') {
-                        // Slot kosong -> Bisa dipilih
-                        btn.innerHTML = `${s.jam_mulai} - ${s.jam_selesai}`;
+                        btn.innerHTML = `<i class="far fa-clock me-1"></i> ${s.jam_mulai} - ${s.jam_selesai}`;
                         
-                        // Jika ini slot milik booking ini sendiri (karena exclude_booking), 
-                        // kita beri tanda visual (opsional)
                         if(s.is_mine) {
-                             btn.classList.add('border-info', 'text-info'); 
-                             // Opsional: btn.innerHTML += ' <i class="fas fa-check-circle"></i>';
+                             btn.classList.add('border-info', 'text-info');
                         }
                         
                         btn.onclick = () => toggleSlot(btn, s.id_detail);
                         
                     } else if (s.status === 'lewat') {
                         btn.disabled = true;
-                        btn.className = 'btn btn-secondary btn-sm m-1 opacity-50';
-                        btn.innerHTML = `<i class="fas fa-history"></i> ${s.jam_mulai}`;
+                        btn.className = 'btn btn-secondary btn-slot opacity-50';
+                        btn.innerHTML = `<i class="fas fa-history me-1"></i> ${s.jam_mulai}`;
                     } else {
-                        // Dibooking orang lain
                         btn.disabled = true;
-                        btn.className = 'btn btn-danger btn-sm m-1 disabled';
-                        btn.innerHTML = `<i class="fas fa-lock"></i> ${s.jam_mulai}`;
+                        btn.className = 'btn btn-danger btn-slot';
+                        btn.innerHTML = `<i class="fas fa-lock me-1"></i> ${s.jam_mulai}`;
                     }
                     
-                    slotList.appendChild(btn);
+                    slotsWrapper.appendChild(btn);
                 });
+                
+                slotList.innerHTML = '';
+                slotList.appendChild(slotsWrapper);
             })
             .catch(err => {
                 slotLoading.style.display = 'none';
-                slotList.innerHTML = `<span class="text-danger">Error koneksi.</span>`;
+                slotList.innerHTML = `<div class="alert alert-danger py-2">Error koneksi</div>`;
             });
     }
 
     function toggleSlot(btn, idDetail) {
         const idx = selectedSlots.indexOf(idDetail);
         if (idx > -1) {
-            // Unselect
             selectedSlots.splice(idx, 1);
             btn.classList.remove('btn-success', 'active', 'text-white');
             
-            // Kembalikan class awal (cek jika punya class info)
             if (btn.classList.contains('border-info')) {
                 btn.classList.add('btn-outline-primary', 'text-info');
             } else {
@@ -380,7 +490,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
         } else {
-            // Select
             selectedSlots.push(idDetail);
             btn.classList.remove('btn-outline-primary', 'text-info');
             btn.classList.add('btn-success', 'active', 'text-white');
@@ -389,16 +498,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateTotal() {
-        // Hapus input hidden lama
         form.querySelectorAll('input[name="slot_ids[]"]').forEach(el => el.remove());
 
         const opt = idLapangan.options[idLapangan.selectedIndex];
         const harga = parseFloat(opt.dataset.harga || 0);
-        const total = selectedSlots.length * harga; // Asumsi 1 jam per slot
+        const total = selectedSlots.length * harga;
 
         displayTotal.innerText = 'Rp ' + total.toLocaleString('id-ID');
 
-        // Tambahkan input hidden untuk form
         selectedSlots.forEach(id => {
             const input = document.createElement('input');
             input.type = 'hidden';
@@ -411,10 +518,8 @@ document.addEventListener('DOMContentLoaded', () => {
     idLapangan.addEventListener('change', loadSlots);
     tanggal.addEventListener('change', loadSlots);
 
-    // Load awal saat halaman dibuka
     loadSlots();
 
-    // Validasi Submit
     form.addEventListener('submit', (e) => {
         if (selectedSlots.length === 0) {
             e.preventDefault();
