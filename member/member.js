@@ -1,692 +1,555 @@
-// member.js
+/**
+ * member.js
+ * Logic utama sistem booking membership (Full Feature)
+ */
 
-// Variable global (isLoggedIn diambil dari PHP di file member.php)
+// --- GLOBAL VARIABLES ---
 let currentStep = 1;
-let selectedSlots = [];
-let maxQuota = 0;
-let hargaPerJam = 0;
-let selectedMethod = "qris";
-let timerInterval;
-let isSubmitting = false;
-let lockedMonth = null; // Track bulan yang ter-lock untuk 1 bulan paket
-let lockDuration = 0; // Durasi bulan yang dipilih
+let selectedSlots = [];     
+let maxQuota = 0;           
+let durationMonths = 0;     // Durasi paket (bulan)
+let selectedLapId = null;   
+let selectedLapPrice = 0;   
+let holdTimerInterval = null; 
+let isLoggedIn = false;     
 
-// Helper: Format Tanggal
-function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
-}
+// Variable Khusus Validasi Bulan (Dari kode asli Anda)
+let lockedMonth = null; 
+let lockedYear = null;
 
-// Helper: Get ISO Week
-function getISOWeek(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-}
+document.addEventListener('DOMContentLoaded', () => {
+    // Ambil status login dari PHP
+    if (typeof IS_LOGGED_IN !== 'undefined') isLoggedIn = IS_LOGGED_IN;
+    
+    // Inisialisasi
+    initPackageSelection();
+    checkExistingTimer();
 
-// Helper: Update Progress Bar
-function updateProgressLine(step) {
-  const progress = document.getElementById("progressLine");
-  if (step === 1) progress.style.width = "0%";
-  if (step === 2) progress.style.width = "33%";
-  if (step === 3) progress.style.width = "66%";
-  if (step === 4) progress.style.width = "100%";
-}
-
-// ----------------------------------------------------
-// 1. NAVIGATION GUARD & CANCEL LOGIC (FITUR BARU)
-// ----------------------------------------------------
-
-// A. Fungsi Tombol Batal di sebelah Timer
-function confirmCancelBooking() {
-  Swal.fire({
-    title: "Batalkan Booking?",
-    text: "Semua jadwal yang sudah dipilih akan dilepas dan Anda akan kembali ke halaman awal.",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#ef4444", // Red-500
-    cancelButtonColor: "#64748b", // Slate-500
-    confirmButtonText: "Ya, Batalkan",
-    cancelButtonText: "Lanjut Booking",
-  }).then((result) => {
-    if (result.isConfirmed) {
-      resetTimer(); // Reset dan lepas slot
+    // Listener Input File (Preview)
+    const fileInput = document.getElementById('inputBukti');
+    if (fileInput) {
+        fileInput.addEventListener('change', function() { handleFileUpload(this); });
     }
-  });
-}
 
-// B. Intercept Link Klik (Navbar, Footer, Logo)
-document.addEventListener(
-  "click",
-  function (e) {
-    // Jika timer aktif (Step > 1) dan yang diklik adalah link (<a>)
-    const targetLink = e.target.closest("a");
-    if (currentStep > 1 && targetLink) {
-      // Jangan cegah jika link cuma '#' atau javascript:void(0)
-      const href = targetLink.getAttribute("href");
-      if (!href || href === "#" || href.startsWith("javascript")) return;
-
-      e.preventDefault(); // Stop navigasi
-
-      Swal.fire({
-        title: "Anda sedang dalam proses booking!",
-        text: "Jika Anda keluar sekarang, slot yang sudah dipilih akan dilepas otomatis.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#ef4444",
-        cancelButtonColor: "#64748b",
-        confirmButtonText: "Ya, Keluar",
-        cancelButtonText: "Tetap di Sini",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          // Lepas slot secara background
-          const formData = new FormData();
-          formData.append("action", "reset_timer");
-          fetch("member.php", { method: "POST", body: formData }).then(() => {
-            window.location.href = href; // Lanjut navigasi manual
-          });
-        }
-      });
+    // Listener Input Tanggal (Validasi Bulan)
+    const dateInput = document.getElementById('inputTanggal');
+    if (dateInput) {
+        dateInput.addEventListener('change', handleDateChange);
     }
-  },
-  true
-); // Use capture phase
-
-// C. Intercept Browser Back Button
-window.addEventListener("popstate", function (event) {
-  if (currentStep > 1) {
-    // Push state lagi agar URL tidak berubah dulu (tetap stay)
-    history.pushState(null, null, window.location.href);
-
-    Swal.fire({
-      title: "Batalkan Proses?",
-      text: "Menekan tombol kembali akan membatalkan proses booking Anda.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#64748b",
-      confirmButtonText: "Ya, Keluar",
-      cancelButtonText: "Lanjut Booking",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        resetTimer(); // Reset UI & Backend
-        // Optional: Go back for real if needed, or just stay at step 1
-        // history.back();
-      }
-    });
-  }
 });
 
-// D. Intercept Refresh / Close Tab
-window.addEventListener("beforeunload", function (e) {
-  if (currentStep > 1 && !isSubmitting) {
-    const formData = new FormData();
-    formData.append("action", "reset_timer");
-    navigator.sendBeacon("member.php", formData);
-
-    e.preventDefault();
-    e.returnValue = "";
-  }
-});
-
-// ----------------------------------------------------
-// 2. CORE WIZARD LOGIC
-// ----------------------------------------------------
-
-function nextStep(step) {
-  // Cek Login saat masuk Step 2
-  if (step === 2 && !isLoggedIn) {
-    Swal.fire({
-      icon: "warning",
-      title: "Anda Belum Login",
-      text: "Silakan login terlebih dahulu untuk melanjutkan pendaftaran member.",
-      confirmButtonColor: "#d97706",
-      confirmButtonText: "Login Sekarang",
-      showCancelButton: true,
-      cancelButtonText: "Batal",
-    }).then((result) => {
-      if (result.isConfirmed) window.location.href = "../auth/login.php";
-    });
-    return;
-  }
-
-  // Logic Step 2 (Pilih Paket)
-  if (step === 2) {
-    const paketEl = document.querySelector('input[name="paket"]:checked');
-    const lapEl = document.getElementById("inputLapangan");
-    if (!paketEl) return Swal.fire({ icon: "warning", title: "Pilih Paket", text: "Silakan pilih durasi paket terlebih dahulu.", confirmButtonColor: "#d97706" });
-
-    maxQuota = parseInt(paketEl.dataset.quota);
-    lockDuration = parseInt(paketEl.dataset.months);
-    hargaPerJam = parseInt(lapEl.options[lapEl.selectedIndex].dataset.harga);
-    document.getElementById("maxQuota").textContent = maxQuota;
-
-    // Reset locked month ketika memilih paket baru
-    lockedMonth = null;
-
-    startCountdown();
-    renderSelectedList();
-
-    // PUSH STATE untuk Back Button Interceptor
-    history.pushState({ step: 2 }, "Step 2", "?step=2");
-  }
-
-  // Logic Step 3 (Review)
-  if (step === 3) {
-    if (selectedSlots.length !== maxQuota) return Swal.fire({ icon: "warning", title: "Jadwal Belum Lengkap", html: `Anda harus memilih <b>${maxQuota}</b> slot jadwal.`, confirmButtonColor: "#d97706" });
-    renderReviewStep();
-    history.pushState({ step: 3 }, "Step 3", "?step=3");
-  }
-
-  // Logic Step 4 (Bayar)
-  if (step === 4) {
-    selectedMethod = document.querySelector('input[name="metode"]:checked').value;
-    renderPaymentInstruction();
-    history.pushState({ step: 4 }, "Step 4", "?step=4");
-  }
-
-  // UI Transition (TANPA SCROLL)
-  document.querySelectorAll(".step-content").forEach((el) => el.classList.add("hidden"));
-  document.getElementById(`step${step}`).classList.remove("hidden");
-
-  document.querySelectorAll(".step-item").forEach((el) => el.classList.remove("active"));
-  for (let i = 1; i <= step; i++) {
-    document.getElementById(`step${i}-ind`).classList.add("active");
-  }
-  updateProgressLine(step);
-
-  currentStep = step;
-  // JANGAN scroll ke atas - hapus window.scrollTo
-}
-
-function prevStep(step) {
-  document.querySelectorAll(".step-content").forEach((el) => el.classList.add("hidden"));
-  document.getElementById(`step${step}`).classList.remove("hidden");
-
-  document.querySelectorAll(".step-item").forEach((el) => el.classList.remove("active"));
-  for (let i = 1; i <= step; i++) {
-    document.getElementById(`step${i}-ind`).classList.add("active");
-  }
-  updateProgressLine(step);
-
-  currentStep = step;
-  // JANGAN scroll ke atas - hapus window.scrollTo
-}
-
-// ----------------------------------------------------
-// 3. TIMER & SLOT LOGIC
-// ----------------------------------------------------
-
-function startCountdown() {
-  const timerBar = document.getElementById("memberTimerBar");
-  const timerDisplay = document.getElementById("countdownDisplay");
-  const timerContainer = document.getElementById("timerContainer");
-
-  const formData = new FormData();
-  formData.append("action", "start_timer");
-
-  fetch("member.php", { method: "POST", body: formData })
-    .then((r) => r.json())
-    .then((data) => {
-      if (data.status === "success") {
-        let timeLeft = data.remaining;
-        timerBar.classList.remove("hidden");
-
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-          if (timeLeft <= 0) {
-            handleTimeOut();
-          } else {
-            const m = Math.floor(timeLeft / 60)
-              .toString()
-              .padStart(2, "0");
-            const s = (timeLeft % 60).toString().padStart(2, "0");
-            timerDisplay.innerText = `${m}:${s}`;
-
-            if (timeLeft < 60) {
-              timerContainer.classList.remove("bg-amber-600");
-              timerContainer.classList.add("bg-red-600", "animate-pulse");
+// --- STEP 1: PILIH PAKET ---
+function initPackageSelection() {
+    const radios = document.querySelectorAll('input[name="paket"]');
+    
+    radios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            // Jika ganti paket saat sudah ada slot dipilih, reset dulu
+            if (selectedSlots.length > 0) {
+                Swal.fire({
+                    title: 'Ganti Paket?',
+                    text: 'Slot yang sudah dipilih akan direset karena aturan paket berubah.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Ganti',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        resetTimer(); // Reset semua
+                        applyPackageRules(e.target);
+                    } else {
+                        // Kembalikan ke radio sebelumnya (opsional)
+                        e.target.checked = false;
+                    }
+                });
+            } else {
+                applyPackageRules(e.target);
             }
-            timeLeft--;
-          }
-        }, 1000);
-      }
-    });
-}
-
-function handleTimeOut() {
-  clearInterval(timerInterval);
-  Swal.fire({
-    icon: "error",
-    title: "Waktu Habis!",
-    text: "Sesi pendaftaran member telah berakhir.",
-    confirmButtonColor: "#d97706",
-    allowOutsideClick: false,
-  }).then(() => {
-    resetTimer();
-  });
-}
-
-function resetTimer() {
-  document.getElementById("memberTimerBar").classList.add("hidden");
-  clearInterval(timerInterval);
-  selectedSlots = [];
-
-  // UI Reset to Step 1
-  document.querySelectorAll(".step-content").forEach((el) => el.classList.add("hidden"));
-  document.getElementById("step1").classList.remove("hidden");
-
-  // Reset indicators
-  document.querySelectorAll(".step-item").forEach((el) => el.classList.remove("active"));
-  document.getElementById("step1-ind").classList.add("active");
-  updateProgressLine(1);
-
-  // Reset Container Timer Color
-  document.getElementById("timerContainer").classList.add("bg-amber-600");
-  document.getElementById("timerContainer").classList.remove("bg-red-600", "animate-pulse");
-
-  currentStep = 1;
-
-  // Call Backend Release
-  const formData = new FormData();
-  formData.append("action", "reset_timer");
-  fetch("member.php", { method: "POST", body: formData });
-
-  // Reset URL History agar bersih dari state step 2/3/4
-  history.replaceState(null, null, window.location.pathname);
-}
-
-// --- LOAD SLOTS ---
-document.getElementById("inputTanggal").addEventListener("change", function () {
-  const tanggal = this.value;
-  const id_lapangan = document.getElementById("inputLapangan").value;
-  const container = document.getElementById("slotContainer");
-
-  container.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-circle-notch fa-spin text-amber-600 text-3xl"></i><p class="text-slate-500 mt-2 text-sm">Memuat jadwal...</p></div>';
-
-  const formData = new FormData();
-  formData.append("action", "get_slots");
-  formData.append("id_lapangan", id_lapangan);
-  formData.append("tanggal", tanggal);
-
-  fetch("member.php", { method: "POST", body: formData })
-    .then((r) => r.json())
-    .then((data) => {
-      if (data.status === "success") {
-        // Get current time untuk filter jam yang sudah lewat
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-        // Cek apakah tanggal yang dipilih adalah hari ini
-        const selectedDate = new Date(tanggal);
-        const today = new Date();
-        const isToday = selectedDate.getFullYear() === today.getFullYear() && selectedDate.getMonth() === today.getMonth() && selectedDate.getDate() === today.getDate();
-
-        let html = '<div class="slot-grid animate-fade">';
-        data.slots.forEach((slot) => {
-          const isLocal = selectedSlots.some((s) => s.id_waktu === slot.id_waktu && s.tanggal === tanggal);
-          const isMyHold = slot.is_my_hold;
-          const isSelected = isLocal || isMyHold;
-
-          // Parse jam dari format "HH:MM - HH:MM"
-          const jamParts = slot.jam.split(" - ");
-          const jamMulaiBagian = jamParts[0].split(":");
-          const jamMulaiHour = parseInt(jamMulaiBagian[0]);
-          const jamMulaiMinute = parseInt(jamMulaiBagian[1]);
-          const jamMulaiInMinutes = jamMulaiHour * 60 + jamMulaiMinute;
-
-          // Jika hari ini dan jam sudah lewat, DISABLE slot
-          let isPastTime = false;
-          if (isToday && jamMulaiInMinutes < currentTimeInMinutes) {
-            isPastTime = true;
-          }
-
-          let statusClass = "available";
-          let disabledAttr = "";
-          let icon = "";
-
-          if (slot.status === "dibooking") {
-            statusClass = "booked disabled";
-            disabledAttr = "disabled";
-            icon = '<i class="fa-solid fa-lock text-xs ml-1"></i>';
-          }
-
-          // DISABLE jam yang sudah lewat jika hari ini
-          if (isPastTime) {
-            statusClass = "booked disabled";
-            disabledAttr = "disabled";
-            icon = '<i class="fa-solid fa-clock text-xs ml-1"></i>';
-          }
-
-          const selectedClass = isSelected ? "selected" : "";
-
-          html += `<div class="slot-btn ${statusClass} ${selectedClass}" ${disabledAttr}
-                              onclick="toggleSlot('${slot.id_waktu}', '${tanggal}', '${slot.jam}', this)">
-                              ${slot.jam} ${icon}
-                         </div>`;
         });
-        html += "</div>";
-        container.innerHTML = html;
-      }
     });
-});
 
-// --- TOGGLE SLOT (ASYNC HOLD/UNHOLD) ---
-async function toggleSlot(id_waktu, tanggal, jam, el) {
-  if (el.classList.contains("disabled")) return;
+    // Set nilai awal saat load
+    const checked = document.querySelector('input[name="paket"]:checked');
+    if(checked) applyPackageRules(checked);
+}
 
-  const id_lapangan = document.getElementById("inputLapangan").value;
-  const index = selectedSlots.findIndex((s) => s.id_waktu === id_waktu && s.tanggal === tanggal);
+function applyPackageRules(radio) {
+    maxQuota = parseInt(radio.dataset.quota);
+    durationMonths = parseInt(radio.dataset.months);
+    
+    // Update UI Teks
+    const q1 = document.getElementById('maxQuota');
+    const q2 = document.getElementById('quotaText');
+    if(q1) q1.textContent = maxQuota;
+    if(q2) q2.textContent = maxQuota;
+    
+    updateCartUI(); // Re-validasi tombol next
+}
 
-  // UNHOLD
-  if (index > -1) {
-    el.classList.remove("selected");
-    el.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+// --- LOGIKA VALIDASI TANGGAL (Fitur Asli Anda) ---
+function handleDateChange(e) {
+    const dateVal = e.target.value;
+    if (!dateVal) return;
 
+    const selectedDate = new Date(dateVal);
+    const sMonth = selectedDate.getMonth();
+    const sYear = selectedDate.getFullYear();
+
+    // Logika Penguncian Bulan (Khusus Paket 1 Bulan / Sesuai logic lama)
+    // Jika durationMonths == 1, kita kunci bulan berdasarkan slot pertama yang dipilih
+    if (selectedSlots.length > 0 && lockedMonth !== null) {
+        if (sMonth !== lockedMonth || sYear !== lockedYear) {
+            Swal.fire({
+                title: 'Bulan Tidak Sesuai',
+                text: 'Untuk paket ini, semua jadwal harus berada di bulan yang sama.',
+                icon: 'warning'
+            });
+            e.target.value = ''; // Reset tanggal
+            return;
+        }
+    }
+
+    fetchSlots(dateVal);
+}
+
+// --- NAVIGASI STEP ---
+function nextStep(targetStep) {
+    // Validasi Step 1 -> 2
+    if (targetStep === 2) {
+        const lapSelect = document.getElementById('inputLapangan');
+        selectedLapId = lapSelect.value;
+        selectedLapPrice = parseInt(lapSelect.options[lapSelect.selectedIndex].dataset.harga);
+    }
+
+    // Validasi Step 2 -> 3 (Cek Kuota)
+    if (targetStep === 3) {
+        if (selectedSlots.length !== maxQuota) {
+            Swal.fire({ 
+                title: 'Jadwal Belum Lengkap', 
+                text: `Anda wajib memilih ${maxQuota} slot jadwal untuk paket ini!`, 
+                icon: 'warning',
+                confirmButtonColor: '#F59E0B'
+            });
+            return;
+        }
+        renderReview();
+    }
+
+    // Validasi Step 3 -> 4
+    if (targetStep === 4) {
+        updatePaymentInfo();
+    }
+
+    // Transisi UI
+    document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`step${targetStep}`).classList.remove('hidden');
+    
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 <= targetStep) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    // Update Progress Bar
+    const progressMap = {1: '0%', 2: '33%', 3: '66%', 4: '100%'};
+    const pLine = document.getElementById('progressLine');
+    if(pLine) pLine.style.width = progressMap[targetStep];
+    
+    currentStep = targetStep;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function prevStep(targetStep) {
+    document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`step${targetStep}`).classList.remove('hidden');
+    
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 <= targetStep) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    const progressMap = {1: '0%', 2: '33%', 3: '66%', 4: '100%'};
+    document.getElementById('progressLine').style.width = progressMap[targetStep];
+    
+    currentStep = targetStep;
+}
+
+// --- API: FETCH SLOTS ---
+async function fetchSlots(date) {
+    const container = document.getElementById('slotContainer');
+    container.innerHTML = '<div class="col-span-full text-center py-10"><i class="fa-solid fa-spinner fa-spin text-2xl text-amber-500"></i><div class="mt-2 text-slate-400">Memuat jadwal...</div></div>';
+    
     const formData = new FormData();
-    formData.append("action", "unhold_slot");
-    formData.append("id_waktu", id_waktu);
-    formData.append("tanggal", tanggal);
-    formData.append("id_lapangan", id_lapangan);
+    formData.append('action', 'get_slots');
+    formData.append('id_lapangan', selectedLapId);
+    formData.append('tanggal', date);
 
     try {
-      const res = await fetch("member.php", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.status === "success") {
-        selectedSlots.splice(index, 1);
-        el.innerText = jam;
-        renderSelectedList();
-      } else {
-        el.classList.add("selected");
-        el.innerText = jam;
-        Swal.fire("Error", "Gagal melepas slot.", "error");
-      }
-    } catch (e) {
-      el.classList.add("selected");
-      el.innerText = jam;
+        const res = await fetch('member.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            renderSlots(data.slots, date);
+        } else {
+            container.innerHTML = `<div class="col-span-full text-red-500 text-center">${data.message}</div>`;
+        }
+    } catch (e) { 
+        container.innerHTML = '<div class="col-span-full text-center text-red-500">Gagal memuat slot.</div>'; 
     }
-  }
-  // HOLD
-  else {
-    if (selectedSlots.length >= maxQuota) return Swal.fire({ icon: "info", title: "Kuota Terpenuhi", text: `Anda sudah memilih maksimal ${maxQuota} slot.` });
-
-    const targetDate = new Date(tanggal);
-    const targetWeek = getISOWeek(targetDate);
-    const targetYear = targetDate.getFullYear();
-
-    const isWeekOccupied = selectedSlots.some((s) => {
-      const d = new Date(s.tanggal);
-      return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
-    });
-    if (isWeekOccupied) return Swal.fire({ icon: "warning", title: "Jadwal Bentrok", text: "Sesuai aturan member, Anda hanya boleh memilih 1 jadwal per minggu." });
-
-    el.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
-
-    const formData = new FormData();
-    formData.append("action", "hold_slot");
-    formData.append("id_waktu", id_waktu);
-    formData.append("tanggal", tanggal);
-    formData.append("id_lapangan", id_lapangan);
-
-    try {
-      const res = await fetch("member.php", { method: "POST", body: formData });
-      const data = await res.json();
-
-      if (data.status === "success") {
-        selectedSlots.push({ id_waktu, tanggal, jam });
-        el.classList.add("selected");
-        el.innerText = jam;
-        if (selectedSlots.length === 1) startCountdown();
-        renderSelectedList();
-      } else {
-        el.innerText = jam;
-        el.classList.add("disabled", "booked");
-        Swal.fire("Gagal", data.message, "error");
-      }
-    } catch (e) {
-      el.innerText = jam;
-      Swal.fire("Error", "Koneksi bermasalah.", "error");
-    }
-  }
 }
 
-function renderSelectedList() {
-  const listEl = document.getElementById("selectedList");
-  const btnTo3 = document.getElementById("btnToStep3");
-  document.getElementById("countSelected").textContent = selectedSlots.length;
-
-  if (selectedSlots.length === maxQuota) {
-    btnTo3.disabled = false;
-    btnTo3.classList.remove("opacity-50", "cursor-not-allowed", "bg-gray-400");
-    btnTo3.classList.add("bg-amber-600", "hover:bg-amber-700", "shadow-lg");
-    btnTo3.classList.remove("bg-indigo-600", "hover:bg-indigo-700"); // Clean old classes
-  } else {
-    btnTo3.disabled = true;
-    btnTo3.classList.add("opacity-50", "cursor-not-allowed", "bg-gray-400");
-    btnTo3.classList.remove("bg-amber-600", "hover:bg-amber-700", "shadow-lg");
-  }
-
-  if (selectedSlots.length === 0)
-    listEl.innerHTML = '<div class="flex flex-col items-center justify-center h-40 text-slate-400"><i class="fa-regular fa-calendar-xmark text-3xl mb-2"></i><p class="text-xs">Belum ada jadwal dipilih</p></div>';
-  else {
-    selectedSlots.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
-    listEl.innerHTML = selectedSlots
-      .map(
-        (s, i) => `
-            <div class="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-100 shadow-sm mb-2 hover:shadow-md transition-shadow">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-bold">${i + 1}</div>
-                    <div>
-                        <div class="text-xs font-bold text-slate-800">${formatDate(s.tanggal)}</div>
-                        <div class="text-xs text-slate-500 font-mono">${s.jam}</div>
-                    </div>
-                </div>
-                <button onclick="toggleSlot('${s.id_waktu}', '${s.tanggal}', '${s.jam}', document.querySelector('.slot-btn.selected'))" 
-                        class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                    <i class="fa-solid fa-trash-can text-sm"></i>
-                </button>
-            </div>`
-      )
-      .join("");
-  }
-}
-
-function renderReviewStep() {
-  const tbody = document.getElementById("reviewTableBody");
-  const totalEl = document.getElementById("reviewTotalPrice");
-  const totalBayar = selectedSlots.length * hargaPerJam;
-
-  tbody.innerHTML = selectedSlots
-    .map(
-      (s, i) => `
-        <tr class="hover:bg-slate-50 transition-colors">
-            <td class="py-3 px-4 text-slate-500 font-medium">${i + 1}</td>
-            <td class="py-3 px-4 font-semibold text-slate-700">${formatDate(s.tanggal)}</td>
-            <td class="py-3 px-4 font-mono text-amber-600">${s.jam}</td>
-        </tr>`
-    )
-    .join("");
-
-  totalEl.textContent = "Rp " + totalBayar.toLocaleString("id-ID");
-}
-
-function renderPaymentInstruction() {
-  const container = document.getElementById("paymentInstruction");
-  const totalBayar = selectedSlots.length * hargaPerJam;
-  const totalFormatted = "Rp " + totalBayar.toLocaleString("id-ID");
-
-  let content = `
-        <div class="mb-6">
-            <p class="text-slate-500 text-sm mb-1">Total yang harus dibayar</p>
-            <strong class="text-3xl text-slate-800 tracking-tight">${totalFormatted}</strong>
-        </div>
-        <div class="border-t border-slate-200 my-4"></div>`;
-
-  if (selectedMethod === "qris") {
-    content += `
-        <div class="bg-white p-4 rounded-xl border border-slate-200 inline-block shadow-sm">
-            <img src="../assets/images/qris_rush.jpg" alt="QRIS" class="mx-auto w-48 rounded-lg mb-3">
-            <p class="text-sm text-slate-600 mt-3"><i class="fa-solid fa-scan mr-1"></i> Scan kode di atas.</p>
-        </div>`;
-  } else if (selectedMethod === "bca") {
-    content += `
-        <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-left max-w-sm mx-auto">
-            <div class="flex items-center justify-between mb-4">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Bank_Central_Asia.svg" alt="BCA" class="h-6">
-                <span class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded">Manual Check</span>
-            </div>
-            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">Nomor Rekening</p>
-            <div class="flex items-center gap-3 mb-3">
-                <span class="text-2xl font-mono font-bold text-slate-800" id="rekBCA">6025 669669</span>
-                <button onclick="navigator.clipboard.writeText('6025 669669'); Swal.fire({icon:'success', title:'Disalin!', timer:1000, showConfirmButton:false})" class="text-blue-500 hover:text-blue-700 text-sm"><i class="fa-regular fa-copy"></i></button>
-            </div>
-            <p class="text-sm text-slate-600">A/N <strong>RUDI RAHMAWAN</strong></p>
-        </div>
-        <div class="mt-4 text-xs text-slate-400">
-            <i class="fa-solid fa-circle-info mr-1"></i> Harap transfer sesuai nominal hingga 3 digit terakhir.
-        </div>`;
-  } else if (selectedMethod === "mandiri") {
-    content += `
-        <div class="bg-yellow-50 p-6 rounded-2xl border border-yellow-100 text-left max-w-sm mx-auto">
-            <div class="flex items-center justify-between mb-4">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" alt="Mandiri" class="h-8">
-                <span class="text-xs font-bold text-yellow-700 bg-yellow-100 px-2 py-1 rounded">Manual Check</span>
-            </div>
-            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">Nomor Rekening</p>
-            <div class="flex items-center gap-3 mb-3">
-                <span class="text-2xl font-mono font-bold text-slate-800" id="rekMandiri">143 05 23333332</span>
-                <button onclick="navigator.clipboard.writeText('143 05 23333332'); Swal.fire({icon:'success', title:'Disalin!', timer:1000, showConfirmButton:false})" class="text-yellow-600 hover:text-yellow-800 text-sm"><i class="fa-regular fa-copy"></i></button>
-            </div>
-            <p class="text-sm text-slate-600">A/N <strong>RUDI RAHMAWAN</strong></p>
-        </div>
-        <div class="mt-4 text-xs text-slate-400">
-            <i class="fa-solid fa-circle-info mr-1"></i> Harap transfer sesuai nominal hingga 3 digit terakhir.
-        </div>`;
-  }
-
-  container.innerHTML = content;
-}
-
-function submitMember() {
-  const fileInput = document.getElementById("inputBukti");
-  if (fileInput.files.length === 0) return Swal.fire({ icon: "warning", title: "Upload Bukti", text: "Bukti transfer wajib diupload.", confirmButtonColor: "#d97706" });
-
-  const btn = document.getElementById("btnFinalSubmit");
-  const originalContent = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...';
-
-  const formData = new FormData();
-  formData.append("action", "submit_member");
-  formData.append("id_lapangan", document.getElementById("inputLapangan").value);
-  formData.append("paket_bulan", document.querySelector('input[name="paket"]:checked').value);
-  formData.append("total_bayar", selectedSlots.length * hargaPerJam);
-  formData.append("metode_pembayaran", selectedMethod);
-  formData.append("selected_slots", JSON.stringify(selectedSlots));
-  formData.append("bukti_transfer", fileInput.files[0]);
-
-  fetch("member.php", { method: "POST", body: formData })
-    .then((r) => r.json())
-    .then((data) => {
-      if (data.status === "success") {
-        // --- FIX ISSUE 1: SET FLAG SUBMITTING KE TRUE ---
-        isSubmitting = true;
-
-        // Bersihkan history saat sukses agar user tidak bisa back ke proses pembayaran
-        history.replaceState(null, null, window.location.pathname);
-
-        Swal.fire({
-          icon: "success",
-          title: "Berhasil!",
-          text: "Pendaftaran member berhasil dikirim.",
-          confirmButtonColor: "#d97706",
-        }).then(() => {
-          window.location.href = "../DashPengguna.php";
-        });
-      } else {
-        Swal.fire("Gagal", data.message, "error");
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-      }
-    })
-    .catch((err) => {
-      console.error(err);
-      Swal.fire("Error", "Kesalahan koneksi.", "error");
-      btn.disabled = false;
-      btn.innerHTML = originalContent;
-    });
-}
-
-// ============================================
-// INITIALIZATION - Setup Event Listeners
-// ============================================
-document.addEventListener("DOMContentLoaded", function () {
-  // Auto-advance ke step 2 ketika paket dipilih
-  // Setup untuk radio input change events
-  const paketInputs = document.querySelectorAll('input[name="paket"]');
-  paketInputs.forEach((input) => {
-    input.addEventListener("change", function () {
-      if (currentStep === 1) {
-        // Auto-advance tanpa cek login (cek login dilakukan di nextStep)
-        nextStep(2);
-      }
-    });
-  });
-
-  // Setup untuk label/package-card click (untuk handle default checked paket)
-  const packageCards = document.querySelectorAll(".package-card");
-  packageCards.forEach((card) => {
-    card.addEventListener("click", function (e) {
-      if (e.target.closest('input[name="paket"]')) return; // Biarkan input handle-nya sendiri
-
-      // Find input di dalam card
-      const input = this.closest("label")?.querySelector('input[name="paket"]');
-      if (input && currentStep === 1) {
-        input.checked = true;
-        // Trigger change event secara manual
-        const event = new Event("change", { bubbles: true });
-        input.dispatchEvent(event);
-      }
-    });
-  });
-
-  // Trigger auto-advance untuk paket yang sudah default checked saat load
-  const checkedPaket = document.querySelector('input[name="paket"]:checked');
-  if (checkedPaket && currentStep === 1) {
-    // Set maxQuota, lockDuration saat load jika paket sudah checked
-    maxQuota = parseInt(checkedPaket.dataset.quota);
-    lockDuration = parseInt(checkedPaket.dataset.months);
-    // Note: jangan auto-trigger nextStep di sini, biarkan user klik
-  }
-
-  // Setup date input constraints untuk month locking
-  const inputTanggal = document.getElementById("inputTanggal");
-  if (inputTanggal) {
-    inputTanggal.addEventListener("change", function () {
-      const selectedDate = new Date(this.value);
-      const selectedMonth = selectedDate.getMonth();
-      const selectedYear = selectedDate.getFullYear();
-
-      // Jika paket 1 bulan dan ini tanggal pertama yang dipilih
-      if (lockDuration === 1 && lockedMonth === null) {
-        lockedMonth = selectedMonth;
-      }
-
-      // Validasi: jika paket 1 bulan, cegah bulan berbeda
-      if (lockDuration === 1 && lockedMonth !== null && selectedMonth !== lockedMonth) {
-        Swal.fire({
-          icon: "warning",
-          title: "Paket 1 Bulan",
-          text: "Paket 1 bulan hanya berlaku untuk satu bulan kalender saja. Silakan pilih tanggal dalam bulan yang sama.",
-          confirmButtonColor: "#d97706",
-        });
-        // Reset input ke kosong
-        this.value = "";
+function renderSlots(slots, date) {
+    const container = document.getElementById('slotContainer');
+    container.innerHTML = '';
+    
+    if (slots.length === 0) {
+        container.innerHTML = '<div class="col-span-full text-slate-400 text-center py-8 border-2 border-dashed border-slate-100 rounded-xl">Tidak ada jadwal tersedia / Libur.</div>';
         return;
-      }
+    }
+
+    slots.forEach(slot => {
+        const isSelected = selectedSlots.some(s => s.id_waktu == slot.id_waktu && s.tanggal === date);
+        let btnClass = 'bg-white border-slate-200 text-slate-700 hover:border-amber-500 hover:text-amber-600';
+        let onClick = `holdSlot(${slot.id_waktu}, '${slot.jam}', '${date}')`;
+        let icon = '';
+
+        if (slot.status === 'dibooking' && !slot.is_my_hold) {
+            btnClass = 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60';
+            onClick = '';
+            icon = '<i class="fa-solid fa-lock text-xs mr-1"></i>';
+        } else if (slot.is_my_hold || isSelected) {
+            btnClass = 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-200';
+            onClick = `unholdSlot(${slot.id_waktu}, '${date}')`;
+            icon = '<i class="fa-solid fa-check text-xs mr-1"></i>';
+        }
+
+        const div = document.createElement('div');
+        div.className = `border rounded-xl p-3 text-center font-bold text-sm cursor-pointer select-none flex items-center justify-center transition-all ${btnClass}`;
+        if (onClick) div.setAttribute('onclick', onClick);
+        div.innerHTML = `${icon} ${slot.jam}`;
+        container.appendChild(div);
     });
-  }
-});
+}
+
+// --- API: HOLD SLOT ---
+async function holdSlot(idWaktu, jam, tanggal) {
+    // Cek Login
+    if (!isLoggedIn) { Swal.fire('Login Diperlukan', 'Silakan login terlebih dahulu.', 'error'); return; }
+    
+    // Cek Kuota
+    if (selectedSlots.length >= maxQuota) { 
+        Swal.fire('Kuota Penuh', `Maksimal ${maxQuota} pertemuan untuk paket ini.`, 'warning'); 
+        return; 
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'hold_slot');
+    formData.append('id_waktu', idWaktu);
+    formData.append('tanggal', tanggal);
+    formData.append('id_lapangan', selectedLapId);
+
+    try {
+        const res = await fetch('member.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            // Set Lock Bulan jika ini slot pertama
+            if (selectedSlots.length === 0) {
+                const d = new Date(tanggal);
+                lockedMonth = d.getMonth();
+                lockedYear = d.getFullYear();
+            }
+
+            selectedSlots.push({ id_waktu: idWaktu, jam: jam, tanggal: tanggal });
+            updateCartUI();
+            fetchSlots(tanggal);
+            startTimer(15 * 60); 
+        } else {
+            Swal.fire('Gagal', data.message, 'error');
+            fetchSlots(tanggal);
+        }
+    } catch (e) { console.error(e); }
+}
+
+// --- API: UNHOLD SLOT ---
+async function unholdSlot(idWaktu, tanggal) {
+    const formData = new FormData();
+    formData.append('action', 'unhold_slot');
+    formData.append('id_waktu', idWaktu);
+    formData.append('tanggal', tanggal);
+    formData.append('id_lapangan', selectedLapId);
+
+    try {
+        await fetch('member.php', { method: 'POST', body: formData });
+        selectedSlots = selectedSlots.filter(s => !(s.id_waktu == idWaktu && s.tanggal === tanggal));
+        
+        // Reset Lock Bulan jika keranjang kosong
+        if (selectedSlots.length === 0) {
+            lockedMonth = null;
+            lockedYear = null;
+            resetTimer();
+        }
+
+        updateCartUI();
+        fetchSlots(tanggal);
+    } catch (e) { console.error(e); }
+}
+
+function updateCartUI() {
+    const list = document.getElementById('selectedList');
+    const countEl = document.getElementById('countSelected');
+    const btnNext = document.getElementById('btnToStep3');
+    const totalEl = document.getElementById('cartTotal');
+
+    if(countEl) countEl.textContent = selectedSlots.length;
+    
+    // Sort tanggal
+    selectedSlots.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+
+    if (selectedSlots.length === 0) {
+        if(list) list.innerHTML = '<p class="text-xs text-white/40 text-center mt-10 italic">Belum ada jadwal dipilih.</p>';
+        if(btnNext) { btnNext.disabled = true; btnNext.classList.add('opacity-50', 'cursor-not-allowed'); }
+        if(totalEl) totalEl.textContent = 'Rp 0';
+    } else {
+        if(list) list.innerHTML = '';
+        let total = 0;
+        selectedSlots.forEach((s, idx) => {
+            total += selectedLapPrice;
+            const item = document.createElement('div');
+            item.className = 'bg-white/10 rounded-lg p-3 flex justify-between items-center text-sm border border-white/5 animate-fade-in-up';
+            item.innerHTML = `
+                <div>
+                    <div class="text-amber-400 font-bold text-[10px] uppercase">Pertemuan ${idx + 1}</div>
+                    <div class="text-white font-bold">${formatDateIndo(s.tanggal)}</div>
+                    <div class="text-white/70 text-xs">${s.jam}</div>
+                </div>
+                <button onclick="unholdSlot(${s.id_waktu}, '${s.tanggal}')" class="text-red-400 hover:text-red-200 p-2">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            `;
+            list.appendChild(item);
+        });
+        if(totalEl) totalEl.textContent = formatRupiah(total);
+        
+        // Cek apakah kuota sudah terpenuhi
+        if(btnNext) {
+            if (selectedSlots.length === maxQuota) { 
+                btnNext.disabled = false; 
+                btnNext.classList.remove('opacity-50', 'cursor-not-allowed'); 
+            } else { 
+                btnNext.disabled = true; 
+                btnNext.classList.add('opacity-50', 'cursor-not-allowed'); 
+            }
+        }
+    }
+}
+
+// --- STEP 3: REVIEW ---
+function renderReview() {
+    const tableBody = document.getElementById('reviewTableBody');
+    if(!tableBody) return;
+    tableBody.innerHTML = '';
+    let total = 0;
+    
+    selectedSlots.forEach((s, i) => {
+        total += selectedLapPrice;
+        tableBody.innerHTML += `
+            <tr class="bg-white border-b border-slate-100">
+                <td class="px-4 py-3 font-medium text-slate-900">${i + 1}</td>
+                <td class="px-4 py-3 text-slate-600">${formatDateIndo(s.tanggal)}</td>
+                <td class="px-4 py-3 text-center">
+                    <span class="bg-amber-50 text-amber-700 rounded px-2 py-1 text-xs font-bold border border-amber-100">${s.jam}</span>
+                </td>
+            </tr>`;
+    });
+    
+    // Ambil nama paket
+    let namaPaket = "Custom";
+    const checkedRadio = document.querySelector('input[name="paket"]:checked');
+    if(checkedRadio) {
+        namaPaket = checkedRadio.nextElementSibling.querySelector('h4').innerText;
+    }
+    
+    // Ambil nama lapangan
+    const lapSelect = document.getElementById('inputLapangan');
+    const namaLapangan = lapSelect.options[lapSelect.selectedIndex].text.split('—')[0].trim();
+
+    document.getElementById('reviewPaketName').innerText = namaPaket;
+    document.getElementById('reviewLapanganName').innerText = namaLapangan;
+    document.getElementById('reviewTotalMeet').innerText = selectedSlots.length + 'x Pertemuan';
+    document.getElementById('reviewGrandTotal').innerText = formatRupiah(total);
+}
+
+// --- STEP 4: PAYMENT ---
+function updatePaymentInfo() {
+    const methodEl = document.querySelector('input[name="metode_bayar"]:checked');
+    if(!methodEl) return;
+    const method = methodEl.value;
+    
+    const container = document.getElementById('paymentDetails');
+    let totalBayar = selectedSlots.length * selectedLapPrice;
+    
+    let html = '';
+    if (method === 'qris') {
+        html = `
+            <div class="flex flex-col items-center animate-fade-in">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BayarMember${totalBayar}" class="w-48 h-48 object-contain mx-auto mb-4 border p-2 rounded-lg">
+                <p class="font-bold text-slate-800">Scan QRIS</p>
+                <div class="bg-amber-100 text-amber-900 px-6 py-2 rounded-xl font-bold text-xl inline-block mt-2">Total: ${formatRupiah(totalBayar)}</div>
+            </div>`;
+    } else {
+        let rek = method === 'bca' ? '123 456 7890' : '133 000 999 888';
+        let bank = method === 'bca' ? 'Bank BCA' : 'Bank Mandiri';
+        html = `
+            <div class="flex flex-col items-center animate-fade-in">
+                <p class="text-slate-500 mb-1">${bank}</p>
+                <p class="text-2xl font-mono font-bold text-slate-800 mb-2 bg-slate-100 px-4 py-2 rounded-lg">${rek}</p>
+                <p class="text-sm font-bold text-slate-600 mb-4">a.n Rush Badminton</p>
+                <div class="bg-amber-100 text-amber-900 px-6 py-2 rounded-xl font-bold text-xl inline-block">Total: ${formatRupiah(totalBayar)}</div>
+            </div>`;
+    }
+    container.innerHTML = html;
+}
+
+function handleFileUpload(input) {
+    if (input.files && input.files[0]) {
+        if(input.files[0].size > 2 * 1024 * 1024) {
+            Swal.fire('File Besar', 'Maksimal 2MB', 'error');
+            input.value = '';
+            return;
+        }
+        document.getElementById('uploadPlaceholder').classList.add('hidden');
+        document.getElementById('filePreview').classList.remove('hidden');
+        document.getElementById('filePreview').classList.add('flex');
+        document.getElementById('fileName').innerText = input.files[0].name;
+    }
+}
+
+// --- API: SUBMIT FINAL (PERBAIKAN STATUS) ---
+async function submitMember() {
+    const fileInput = document.getElementById('inputBukti');
+    if (!fileInput.files || !fileInput.files[0]) { 
+        Swal.fire({ title: 'Bukti Kosong', text: 'Upload bukti transfer.', icon: 'warning' }); 
+        return; 
+    }
+
+    const btn = document.getElementById('btnFinalSubmit');
+    const originalText = btn.innerHTML;
+    
+    // Loading State
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...';
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-not-allowed');
+
+    const formData = new FormData();
+    formData.append('action', 'submit_member');
+    formData.append('id_lapangan', selectedLapId);
+    formData.append('paket_bulan', durationMonths);
+    formData.append('total_bayar', selectedSlots.length * selectedLapPrice);
+    formData.append('metode_pembayaran', document.querySelector('input[name="metode_bayar"]:checked').value);
+    formData.append('selected_slots', JSON.stringify(selectedSlots));
+    formData.append('bukti_transfer', fileInput.files[0]);
+
+    try {
+        const res = await fetch('member.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            Swal.fire({
+                title: 'Pendaftaran Berhasil!',
+                text: 'Status Membership: PENDING. Admin akan segera memverifikasi.',
+                icon: 'success',
+                confirmButtonText: 'Lihat Riwayat',
+                allowOutsideClick: false
+            }).then(() => { 
+                window.location.href = '../riwayat/riwayat.php'; 
+            });
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (e) {
+        Swal.fire('Gagal', e.message || 'Terjadi kesalahan sistem.', 'error');
+        // Restore button
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+}
+
+// --- TIMER & UTILITIES ---
+function startTimer(seconds) {
+    clearInterval(holdTimerInterval);
+    const display = document.getElementById('countdownDisplay');
+    const bar = document.getElementById('memberTimerBar');
+    
+    if(!bar) return;
+    let rem = seconds;
+    bar.classList.remove('hidden'); bar.classList.add('flex');
+    
+    holdTimerInterval = setInterval(() => {
+        rem--;
+        let m = Math.floor(rem / 60); 
+        let s = rem % 60;
+        display.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        
+        if (rem <= 0) {
+            clearInterval(holdTimerInterval);
+            Swal.fire({
+                title: 'Waktu Habis', 
+                text: 'Slot dilepas karena waktu habis.', 
+                icon: 'warning'
+            }).then(() => resetTimer());
+        }
+    }, 1000);
+}
+
+async function checkExistingTimer() {
+    try {
+        const res = await fetch('member.php', { method: 'POST', body: new URLSearchParams({'action':'start_timer'}) });
+        const data = await res.json();
+        if (data.status === 'success' && data.remaining > 0) {
+            startTimer(data.remaining);
+            // Anda bisa menambahkan logika fetchSlots di sini jika ingin otomatis load grid
+        }
+    } catch (e) {}
+}
+
+async function resetTimer() {
+    clearInterval(holdTimerInterval);
+    document.getElementById('memberTimerBar').classList.add('hidden');
+    
+    selectedSlots = [];
+    lockedMonth = null;
+    lockedYear = null;
+    
+    updateCartUI();
+    
+    await fetch('member.php', { method: 'POST', body: new URLSearchParams({'action':'reset_timer'}) });
+    
+    if(document.getElementById('inputTanggal').value) {
+        fetchSlots(document.getElementById('inputTanggal').value);
+    }
+    
+    // Jika step > 2, kembali ke step 2
+    if(currentStep > 2) prevStep(2);
+}
+
+function confirmCancelBooking() {
+    Swal.fire({
+        title: 'Batalkan Booking?', 
+        text: 'Semua slot akan dihapus.', 
+        icon: 'warning', 
+        showCancelButton: true, 
+        confirmButtonText: 'Ya', 
+        cancelButtonText: 'Tidak'
+    }).then((r) => { 
+        if(r.isConfirmed) resetTimer(); 
+    });
+}
+
+function formatRupiah(n) { 
+    return 'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); 
+}
+
+function formatDateIndo(d) { 
+    return new Date(d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); 
+}

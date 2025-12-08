@@ -53,6 +53,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"/>
 
+
+
 <!-- ================= BOOTSTRAP 4/5 COMPATIBILITY ================= -->
 <script>
 $(document).ready(function() {
@@ -70,7 +72,7 @@ $(document).ready(function() {
 });
 </script>
 
-<!-- ================= OPTIMIZED DATATABLE INIT ================= -->
+<!-- ================= OPTIMIZED DATATABLE INIT (DESKTOP + MOBILE) ================= -->
 <script>
 $(function () {
   const $loader = $("#tableLoader");
@@ -98,17 +100,26 @@ $(function () {
 
     if ($.fn.DataTable.isDataTable($tbl)) return;
 
+    // Wrap table in responsive div only for mobile
+    if (window.innerWidth <= 768 && !$tbl.parent().hasClass('table-responsive')) {
+      $tbl.wrap('<div class="table-responsive"></div>');
+    }
+
+    const isMobile = window.innerWidth <= 768;
+
     const dt = $tbl.DataTable({
-      responsive: true,
+      responsive: false,
       autoWidth: false,
       pageLength: 10,
       lengthChange: true,
+      scrollX: isMobile,
+      scrollCollapse: isMobile,
       dom: '<"row mb-3"<"col-sm-12 col-md-6"B><"col-sm-12 col-md-6"f>>rtip',
       buttons: [
         { 
           extend: 'copy', 
           text: '<i class="fas fa-copy mr-1"></i> Salin', 
-          className: 'btn btn-sm btn-outline-secondary rounded-pill shadow-sm mr-1 mb-1',
+          className: 'btn btn-sm btn-outline-dark rounded-pill shadow-sm mr-1 mb-1 btn-copy-custom',
           exportOptions: { columns: ':visible' }
         },
         { 
@@ -172,6 +183,18 @@ $(function () {
       setTimeout(() => $(el).addClass("appear"), 25 * i);
     });
   }
+
+  // Handle window resize
+  $(window).on('resize', function() {
+    if (window.innerWidth <= 768) {
+      tables.each(function() {
+        const $tbl = $(this);
+        if (!$tbl.parent().hasClass('table-responsive')) {
+          $tbl.wrap('<div class="table-responsive"></div>');
+        }
+      });
+    }
+  });
 });
 
 // ================= TOASTR NOTIFICATIONS =================
@@ -257,12 +280,9 @@ $(function () {
 });
 </script>
 
-<!-- ================= FOOTER SPECIFIC STYLES (No Conflicts) ================= -->
+<!-- ================= COMPLETE RESPONSIVE STYLES (DESKTOP + MOBILE) ================= -->
 <style>
-  /* ===== OPTIMIZED TABLE LOADER ===== */
-  
-
-  /* ===== DATATABLE WRAPPER ===== */
+  /* ===== DATATABLE WRAPPER - DESKTOP ===== */
   .dataTables_wrapper {
     padding: 20px;
     background: white;
@@ -411,6 +431,30 @@ $(function () {
     transform: translateY(0);
   }
 
+  /* Custom style for Copy button */
+  .btn-copy-custom {
+    background-color: #6c757d !important;
+    color: white !important;
+    border-color: #6c757d !important;
+  }
+
+  .btn-copy-custom:hover {
+    background-color: #5a6268 !important;
+    color: white !important;
+    border-color: #545b62 !important;
+  }
+
+  /* Make all export buttons visible and styled */
+  .dt-buttons .btn-outline-dark {
+    color: #343a40;
+    border-color: #6c757d;
+  }
+
+  .dt-buttons .btn-outline-dark:hover {
+    background-color: #6c757d;
+    color: white;
+  }
+
   /* ===== TOASTR CUSTOM ===== */
   .toast-success {
     background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
@@ -450,36 +494,186 @@ $(function () {
     transform: rotate(360deg) scale(1.08);
   }
 
-  /* ===== RESPONSIVE ===== */
+  /* ===== MOBILE RESPONSIVE FIX ===== */
   @media (max-width: 768px) {
+    /* Table responsive wrapper */
+    .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 1rem;
+      display: block;
+      width: 100%;
+    }
+
     .dataTables_wrapper {
       padding: 12px;
     }
     
+    /* Buttons */
     .dt-buttons {
       text-align: center;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px;
     }
     
     .dt-buttons .btn {
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+      font-size: 10px;
+      padding: 5px 8px;
+      margin-right: 0;
+    }
+    
+    /* Table */
+    table.dataTable {
+      font-size: 11px;
+      width: 100% !important;
+    }
+    
+    table.dataTable thead th {
+      font-size: 10px;
+      padding: 10px 8px !important;
+      white-space: nowrap;
+    }
+    
+    table.dataTable tbody td {
+      padding: 8px 8px;
+      font-size: 11px;
+    }
+    
+    /* Pagination */
+    .pagination-rounded .page-link {
+      width: 32px;
+      height: 32px;
+      font-size: 11px;
+      margin: 0 2px;
+    }
+    
+    /* Search and Length */
+    .dataTables_filter {
+      text-align: center !important;
+      margin-bottom: 10px;
+    }
+    
+    .dataTables_filter input {
+      width: 100%;
+      max-width: 180px;
+      margin: 8px auto 0;
       font-size: 12px;
       padding: 6px 12px;
     }
     
+    .dataTables_length {
+      text-align: center !important;
+      margin-bottom: 10px;
+    }
+    
+    .dataTables_length select {
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+    
+    /* Info */
+    .dataTables_info {
+      font-size: 10px;
+      text-align: center;
+      padding: 8px 0;
+    }
+    
+    /* Scroll indicator */
+    .table-responsive::after {
+      content: '← Geser untuk melihat lebih banyak →';
+      display: block;
+      text-align: center;
+      color: #6c757d;
+      font-size: 10px;
+      padding: 6px;
+      background: linear-gradient(90deg, transparent, rgba(24, 116, 173, 0.05), transparent);
+      border-radius: 4px;
+      margin-top: 8px;
+      font-style: italic;
+    }
+    
+    /* Footer */
+    .footer-custom {
+      padding: 15px 12px !important;
+    }
+    
+    .footer-custom .d-flex {
+      flex-direction: column;
+      align-items: center !important;
+      text-align: center;
+    }
+    
+    .footer-left {
+      margin-bottom: 10px;
+    }
+
+    .footer-logo {
+      width: 28px !important;
+      height: 28px !important;
+    }
+
+    .footer-custom strong {
+      font-size: 13px !important;
+    }
+
+    .footer-custom p {
+      font-size: 11px !important;
+    }
+  }
+  
+  /* ===== EXTRA SMALL MOBILE ===== */
+  @media (max-width: 576px) {
+    .dataTables_wrapper {
+      padding: 8px;
+    }
+    
+    table.dataTable {
+      font-size: 10px;
+    }
+    
     table.dataTable thead th {
-      font-size: 11px;
-      padding: 12px 8px !important;
+      font-size: 9px;
+      padding: 8px 6px !important;
     }
     
     table.dataTable tbody td {
-      padding: 10px 8px;
-      font-size: 13px;
+      padding: 6px 6px;
+      font-size: 10px;
     }
     
+    .dt-buttons .btn {
+      font-size: 9px;
+      padding: 4px 6px;
+    }
+
     .pagination-rounded .page-link {
-      width: 35px;
-      height: 35px;
-      font-size: 13px;
+      width: 28px;
+      height: 28px;
+      font-size: 10px;
+    }
+  }
+
+  /* ===== TABLET LANDSCAPE ===== */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .dataTables_wrapper {
+      padding: 16px;
+    }
+
+    table.dataTable thead th {
+      font-size: 11px;
+      padding: 14px !important;
+    }
+
+    table.dataTable tbody td {
+      padding: 12px 14px;
+      font-size: 12px;
+    }
+
+    .dt-buttons .btn {
+      font-size: 12px;
     }
   }
 
@@ -493,5 +687,12 @@ $(function () {
     background: rgba(24, 116, 173, 0.3);
     color: #1874ad;
   }
-</style>
 
+  /* ===== REMOVE SCROLL INDICATOR ON DESKTOP ===== */
+  @media (min-width: 769px) {
+    .dataTables_wrapper::after,
+    .table-responsive::after {
+      display: none !important;
+    }
+  }
+</style>
