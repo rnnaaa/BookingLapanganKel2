@@ -13,7 +13,94 @@ if ($qHarga = mysqli_query($conn, "SELECT harga_per_jam_member FROM lapangan WHE
     mysqli_free_result($qHarga);
 }
 
-// ✅ (2) PROSES POST MEMBER
+// ✅ (2) PROSES VALIDASI MEMBER (PENDING → AKTIF)
+if (isset($_GET['action']) && $_GET['action'] === 'validate' && isset($_GET['id'])) {
+    try {
+        $id_member = intval($_GET['id']);
+        
+        $conn->begin_transaction();
+        
+        // Cek apakah member ada dan statusnya pending
+        $stmt = $conn->prepare("SELECT m.id_member, m.id_user, m.id_lapangan, m.total_bayar, m.tanggal_mulai, l.nama_lapangan 
+                                 FROM member m 
+                                 LEFT JOIN lapangan l ON m.id_lapangan = l.id_lapangan 
+                                 WHERE m.id_member = ? AND m.status = 'pending'");
+        $stmt->bind_param("i", $id_member);
+        $stmt->execute();
+        $member = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        
+        if (!$member) {
+            throw new Exception("Member tidak ditemukan atau sudah divalidasi.");
+        }
+        
+        // Update status member menjadi aktif
+        $stmt = $conn->prepare("UPDATE member SET status='aktif', updated_at=NOW() WHERE id_member=?");
+        $stmt->bind_param("i", $id_member);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Update role user menjadi 'member'
+        $stmt = $conn->prepare("UPDATE users SET role='member', updated_at=NOW() WHERE id_user=?");
+        $stmt->bind_param("i", $member['id_user']);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Update status member_jadwal menjadi aktif
+        $stmt = $conn->prepare("UPDATE member_jadwal SET status='aktif', updated_at=NOW() WHERE id_member=?");
+        $stmt->bind_param("i", $id_member);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Update status booking yang terkait dengan member ini menjadi 'disetujui'
+        // Cari booking berdasarkan id_user, id_lapangan, dan tanggal yang sesuai
+        $stmt = $conn->prepare("
+            UPDATE booking 
+            SET status='disetujui', 
+                payment_status='lunas',
+                approved_by=?,
+                approved_at=NOW(),
+                updated_at=NOW() 
+            WHERE id_user=? 
+            AND id_lapangan=? 
+            AND tanggal=?
+            AND tipe_booking='member'
+            AND status IN ('menunggu', 'belum lunas')
+        ");
+        $admin_id = $_SESSION['id_user'] ?? 1; // ID admin yang melakukan validasi
+        $stmt->bind_param("iiis", $admin_id, $member['id_user'], $member['id_lapangan'], $member['tanggal_mulai']);
+        $stmt->execute();
+        $affected_bookings = $stmt->affected_rows;
+        $stmt->close();
+        
+        // Insert keuangan otomatis
+        $stmt = $conn->prepare("
+            INSERT INTO keuangan 
+            (tanggal, jenis, kategori, keterangan, jumlah, sumber, booking_id, created_at, updated_at)
+            VALUES (CURDATE(), 'pemasukan', 'Membership', ?, ?, 'Pelunasan', NULL, NOW(), NOW())
+        ");
+        $ket = "Pembayaran Member ID $id_member untuk Lapangan: " . $member['nama_lapangan'];
+        $stmt->bind_param("sd", $ket, $member['total_bayar']);
+        $stmt->execute();
+        $stmt->close();
+        
+        $conn->commit();
+        
+        $booking_msg = $affected_bookings > 0 ? " & $affected_bookings booking disetujui" : "";
+        $_SESSION['toast_success'] = "✅ Member berhasil divalidasi dan diaktifkan! ID: $id_member" . $booking_msg;
+        header("Location: member.php");
+        exit;
+        
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['toast_error'] = "❌ ERROR: " . $e->getMessage();
+        error_log("Member Validation Error: " . $e->getMessage());
+        header("Location: member.php");
+        exit;
+    }
+}
+
+// ✅ (3) PROSES POST MEMBER
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $id_user = intval($_POST['id_user']);
@@ -86,12 +173,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// (3) PERIKSA MEMBER EXPIRED
+// (4) PERIKSA MEMBER EXPIRED
 $conn->query("
     UPDATE member m
     JOIN users u ON m.id_user = u.id_user
     SET m.status='nonaktif', u.role='user'
     WHERE m.tanggal_berakhir < CURDATE() AND m.status='aktif'
+");
+
+// Update member_jadwal yang expired
+$conn->query("
+    UPDATE member_jadwal mj
+    JOIN member m ON mj.id_member = m.id_member
+    SET mj.status='nonaktif'
+    WHERE m.status='nonaktif' AND mj.status='aktif'
 ");
 
 // ---------------- DATA FORM ----------------
@@ -102,11 +197,17 @@ $qLapangan = mysqli_query($conn, "SELECT id_lapangan, nama_lapangan FROM lapanga
 
 // ---------------- DATA TABLE ----------------
 $qMember = mysqli_query($conn, "
-    SELECT m.id_member, u.nama, l.nama_lapangan, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, m.total_bayar, m.status
+    SELECT m.id_member, u.nama, l.nama_lapangan, m.durasi_bulan, m.tanggal_mulai, m.tanggal_berakhir, m.total_bayar, m.status, m.bukti_pembayaran, m.method
     FROM member m
     LEFT JOIN users u ON m.id_user = u.id_user
     LEFT JOIN lapangan l ON m.id_lapangan = l.id_lapangan
-    ORDER BY m.id_member DESC
+    ORDER BY 
+        CASE 
+            WHEN m.status = 'pending' THEN 1
+            WHEN m.status = 'aktif' THEN 2
+            ELSE 3
+        END,
+        m.id_member DESC
 ");
 
 include('../includes/header.php');
@@ -118,6 +219,7 @@ include('../includes/sidebar.php');
 :root {
     --primary-gradient: linear-gradient(135deg, #0e5c91 0%, #1874ad 50%, #2196f3 100%);
     --success-gradient: linear-gradient(135deg, #28a745 0%, #218838 100%);
+    --warning-gradient: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
     --card-shadow: 0 4px 20px rgba(14, 92, 145, 0.15);
     --card-hover-shadow: 0 8px 30px rgba(14, 92, 145, 0.25);
 }
@@ -288,6 +390,28 @@ label {
     box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
 }
 
+.btn-success:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-warning {
+    background: var(--warning-gradient);
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    color: #fff;
+    transition: all 0.3s ease;
+}
+
+.btn-warning:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+    color: #fff;
+}
+
 .card-footer {
     background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
     border-top: 2px solid #e3e6f0;
@@ -364,8 +488,17 @@ label {
     background: var(--success-gradient) !important;
 }
 
+.badge.bg-warning {
+    background: var(--warning-gradient) !important;
+}
+
 .badge.bg-secondary {
     background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%) !important;
+}
+
+/* Highlight for pending row */
+tr.pending-row {
+    background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%) !important;
 }
 
 /* Input Group Enhancement */
@@ -398,6 +531,49 @@ label {
     .select2-container--bootstrap4 .select2-selection--single {
         height: 44px !important;
     }
+}
+
+/* Modal Image Styling */
+.modal-image {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.modal-image:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content {
+    border-radius: 20px;
+    border: none;
+    overflow: hidden;
+}
+
+.modal-header {
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    padding: 1.5rem;
+}
+
+.modal-body {
+    padding: 2rem;
+    text-align: center;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 100%);
+}
+
+.modal-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.btn-close {
+    filter: brightness(0) invert(1);
 }
 </style>
 
@@ -546,12 +722,15 @@ label {
                             <th>Tanggal Mulai</th>
                             <th>Tanggal Berakhir</th>
                             <th>Total Bayar</th>
+                            <th>Metode</th>
+                            <th>Bukti Pembayaran</th>
                             <th>Status</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php $no=1; while($m=mysqli_fetch_assoc($qMember)): ?>
-                        <tr>
+                        <tr class="<?= $m['status']=='pending' ? 'pending-row' : '' ?>">
                             <td class="text-center fw-semibold text-muted"><?= $no++ ?></td>
                             <td class="fw-semibold"><?= htmlspecialchars($m['nama']) ?></td>
                             <td class="text-center"><?= htmlspecialchars($m['nama_lapangan']) ?></td>
@@ -560,9 +739,53 @@ label {
                             <td class="text-center"><?= date('d M Y', strtotime($m['tanggal_berakhir'])) ?></td>
                             <td class="text-end fw-bold text-success">Rp <?= number_format($m['total_bayar'],0,',','.') ?></td>
                             <td class="text-center">
-                                <span class="badge bg-<?= $m['status']=='aktif'?'success':'secondary' ?>">
+                                <?php 
+                                $method_icon = [
+                                    'tunai' => '💵',
+                                    'qris' => '📱',
+                                    'bank_transfer' => '🏦'
+                                ];
+                                $method_label = [
+                                    'tunai' => 'Tunai',
+                                    'qris' => 'QRIS',
+                                    'bank_transfer' => 'Transfer'
+                                ];
+                                echo $method_icon[$m['method']] ?? '';
+                                echo ' ' . ($method_label[$m['method']] ?? ucfirst($m['method']));
+                                ?>
+                            </td>
+                            <td class="text-center">
+                                <?php if(!empty($m['bukti_pembayaran']) && file_exists('../uploads/bukti_pembayaran/' . $m['bukti_pembayaran'])): ?>
+                                    <img 
+                                        src="../uploads/bukti_pembayaran/<?= htmlspecialchars($m['bukti_pembayaran']) ?>" 
+                                        class="modal-image" 
+                                        width="60" 
+                                        height="60" 
+                                        style="object-fit: cover; cursor: pointer;"
+                                        onclick="showImageModal('<?= htmlspecialchars($m['bukti_pembayaran']) ?>', '<?= htmlspecialchars($m['nama']) ?>')"
+                                        title="Klik untuk memperbesar">
+                                <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-<?= $m['status']=='aktif'?'success':($m['status']=='pending'?'warning':'secondary') ?>">
                                     <?= ucfirst($m['status']) ?>
                                 </span>
+                            </td>
+                            <td class="text-center">
+                                <?php if($m['status']=='pending' || $m['status']=='aktif'): ?>
+                                    <button 
+                                        class="btn btn-<?= $m['status']=='pending'?'warning':'success' ?> btn-sm"
+                                        onclick="validateMember(<?= $m['id_member'] ?>)"
+                                        title="<?= $m['status']=='pending'?'Validasi & Aktifkan Member':'Member Sudah Aktif' ?>"
+                                        <?= $m['status']=='aktif'?'disabled':'' ?>>
+                                        <i class="fas fa-<?= $m['status']=='pending'?'check-circle':'check-double' ?> me-1"></i> 
+                                        <?= $m['status']=='pending'?'Validasi':'Aktif' ?>
+                                    </button>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Nonaktif</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; ?>
@@ -575,6 +798,32 @@ label {
 </section>
 </div>
 
+<!-- Modal untuk Menampilkan Gambar Bukti Pembayaran -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel">
+                    <i class="fas fa-receipt me-2"></i> Bukti Pembayaran
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 fw-semibold" id="memberName"></p>
+                <img id="modalImage" src="" alt="Bukti Pembayaran" class="img-fluid">
+            </div>
+            <div class="modal-footer">
+                <a id="downloadImage" href="" download class="btn btn-primary">
+                    <i class="fas fa-download me-1"></i> Download
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php 
 // free results and include footer
 mysqli_free_result($qLapangan);
@@ -584,7 +833,82 @@ include('../includes/footer.php');
 ?>
 
 <script>
+// Function untuk validasi member - HARUS DI LUAR $(document).ready()
+function validateMember(id) {
+    console.log('validateMember called with id:', id);
+    
+    // Cek apakah Swal tersedia
+    if (typeof Swal === 'undefined') {
+        console.error('SweetAlert2 tidak tersedia!');
+        // Fallback ke confirm native browser
+        if (confirm('Validasi member ini?\n\nMember akan diaktifkan dan dicatat di keuangan.')) {
+            window.location.href = `member.php?action=validate&id=${id}`;
+        }
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Validasi Member?',
+        text: 'Member akan diaktifkan dan dicatat di keuangan',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ffc107',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '<i class="fas fa-check-circle me-1"></i> Ya, Validasi!',
+        cancelButtonText: '<i class="fas fa-times me-1"></i> Batal',
+        customClass: {
+            confirmButton: 'btn btn-warning',
+            cancelButton: 'btn btn-secondary'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Tampilkan loading
+            Swal.fire({
+                title: 'Memproses...',
+                text: 'Sedang memvalidasi member',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            // Redirect ke URL validasi
+            window.location.href = `member.php?action=validate&id=${id}`;
+        }
+    });
+}
+
+// Hitung total bayar berdasarkan harga per jam (asumsi 4 jam/bln)
+function hitungTotal(){
+    let hargaPerJam = <?= json_encode($harga_per_jam_member) ?>;
+    let durasi = parseInt($('#durasi_bulan').val()) || 0;
+    let total = hargaPerJam * 4 * durasi;
+    $('#total_bayar_display').val("Rp " + total.toLocaleString('id-ID'));
+    $('#total_bayar_value').val(total);
+}
+
+// Function untuk menampilkan modal gambar bukti pembayaran
+function showImageModal(imageName, memberName) {
+    console.log('showImageModal called:', imageName, memberName);
+    
+    const imagePath = '../uploads/bukti_pembayaran/' + imageName;
+    
+    // Set gambar dan informasi member
+    document.getElementById('modalImage').src = imagePath;
+    document.getElementById('memberName').textContent = 'Member: ' + memberName;
+    document.getElementById('downloadImage').href = imagePath;
+    document.getElementById('downloadImage').download = 'bukti_pembayaran_' + imageName;
+    
+    // Tampilkan modal menggunakan Bootstrap 5
+    const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    imageModal.show();
+}
+
 $(document).ready(function() {
+    console.log('jQuery ready');
+    console.log('SweetAlert2 available:', typeof Swal !== 'undefined');
+    
     // Inisialisasi select2 dengan tema bootstrap4
     $('#id_user_select, #id_lapangan, #durasi_bulan, #method').select2({
         theme: 'bootstrap4',
@@ -623,21 +947,13 @@ $(document).ready(function() {
     setTimeout(function() {
         $('.alert').fadeOut('slow');
     }, 5000);
-});
-
-// Hitung total bayar berdasarkan harga per jam (asumsi 4 jam/bln)
-function hitungTotal(){
-    let hargaPerJam = <?= json_encode($harga_per_jam_member) ?>;
-    let durasi = parseInt($('#durasi_bulan').val()) || 0;
-    let total = hargaPerJam * 4 * durasi;
-    $('#total_bayar_display').val("Rp " + total.toLocaleString('id-ID'));
-    $('#total_bayar_value').val(total);
-}
-
-// trigger hitung saat durasi berubah
-$('#durasi_bulan').on('change', hitungTotal);
-// juga trigger saat lapangan berubah (jika nantinya harga berbeda per lapangan)
-$('#id_lapangan').on('change', function(){
-    hitungTotal();
+    
+    // trigger hitung saat durasi berubah
+    $('#durasi_bulan').on('change', hitungTotal);
+    
+    // juga trigger saat lapangan berubah (jika nantinya harga berbeda per lapangan)
+    $('#id_lapangan').on('change', function(){
+        hitungTotal();
+    });
 });
 </script>
